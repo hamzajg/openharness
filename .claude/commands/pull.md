@@ -8,8 +8,17 @@ allowed-tools: [Bash, Read]
 !`python -m openharness self`
 !`python -m openharness env`
 
-Read REPOS.md and .openharness/ENV.md. If a repo-level
-`sources/<repo>/.openharness/ENV.md` exists for the default repo, prefer it.
+## Target repo
+If the session cwd is inside sources/<repo>, that repo is the default
+target. Otherwise ask the user which managed repo to operate on
+(see REPOS.md). Never guess.
+
+## Layered ENV
+If sources/<repo>/.openharness/ENV.md exists, prefer it over the global
+.openharness/ENV.md for that repo. Compare with the live env probe
+output and surface any drift; do not silently choose.
+
+Read REPOS.md and .openharness/ENV.md.
 
 ## Workflow
 

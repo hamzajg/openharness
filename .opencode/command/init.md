@@ -9,7 +9,17 @@ First build awareness by running these commands via the Bash tool and reading th
 - `python -m openharness self` → read the harness manifest + decisions
 - `python -m openharness env` → probe live environment + drift check
 
-Then read REPOS.md and .openharness/ENV.md. If the session cwd is inside sources/<repo>, that repo is the default target; otherwise ask the user which repo.
+## Target repo
+If the session cwd is inside sources/<repo>, that repo is the default
+target. Otherwise ask the user which managed repo to operate on
+(see REPOS.md). Never guess.
+
+## Layered ENV
+If sources/<repo>/.openharness/ENV.md exists, prefer it over the global
+.openharness/ENV.md for that repo. Compare with the live env probe
+output and surface any drift; do not silently choose.
+
+Then read REPOS.md and .openharness/ENV.md.
 
 ## Workflow
 
