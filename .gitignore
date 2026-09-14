@@ -1,0 +1,7 @@
+sources/
+openharness/web/dist/
+openharness/web/node_modules/
+__pycache__/
+*.egg-info/
+.venv/
+.openharness/chroma/
