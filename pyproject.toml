@@ -21,3 +21,9 @@ oh = "openharness.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["openharness"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["sources", ".git", "node_modules", ".venv", "openharness/web"]
+pythonpath = ["."]
+addopts = "-q"
