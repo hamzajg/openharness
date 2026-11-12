@@ -53,6 +53,22 @@ def main():
         return
     if v == "pull":
         from . import repos; repos.sync(*rest); return
+    if v == "status":
+        from . import repos
+        st = repos.status(*rest)
+        for name, info in sorted(st.items()):
+            if not info.get("exists"):
+                print(f"{name:30s} not cloned")
+                continue
+            br = info.get("branch", "?")
+            def_br = info.get("default_branch", "?")
+            dirty = " [DIRTY]" if info.get("dirty") else ""
+            diverge = ""
+            if info.get("ahead", 0) > 0 or info.get("behind", 0) > 0:
+                diverge = f" (+{info.get('ahead', 0)}/-{info.get('behind', 0)})"
+            mismatch = f" (expected {def_br})" if def_br and br != def_br else ""
+            print(f"{name:30s} {br}{mismatch}{diverge}{dirty}")
+        return
     if v == "self":
         sr = Path(__file__).resolve().parent.parent / "SELF"
         if rest:
@@ -75,7 +91,7 @@ def main():
         import uvicorn
         uvicorn.run("openharness.serve:app", host=host, port=port); return
     print(f"Unknown verb: {v}", file=sys.stderr)
-    print("Verbs: run, ask, ingest, env, pull, self, serve", file=sys.stderr); sys.exit(1)
+    print("Verbs: run, ask, ingest, env, pull, status, self, serve", file=sys.stderr); sys.exit(1)
 
 
 if __name__ == "__main__":
