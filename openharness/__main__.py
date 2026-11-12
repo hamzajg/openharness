@@ -69,6 +69,22 @@ def main():
             mismatch = f" (expected {def_br})" if def_br and br != def_br else ""
             print(f"{name:30s} {br}{mismatch}{diverge}{dirty}")
         return
+    if v == "prune":
+        from . import repos
+        remote = "--remote" in rest
+        names = [x for x in rest if not x.startswith("--")]
+        res = repos.prune(*names, remote=remote)
+        for name, rec in sorted(res.items()):
+            if rec["skipped"]:
+                print(f"{name:30s} {rec['skipped']}")
+                continue
+            parts = []
+            if rec["local"]:
+                parts.append(f"local -{len(rec['local'])}: {', '.join(rec['local'])}")
+            if rec["remote"]:
+                parts.append(f"remote -{len(rec['remote'])}: {', '.join(rec['remote'])}")
+            print(f"{name:30s} {'; '.join(parts) if parts else 'nothing to prune'}")
+        return
     if v == "self":
         sr = Path(__file__).resolve().parent.parent / "SELF"
         if rest:
@@ -91,7 +107,7 @@ def main():
         import uvicorn
         uvicorn.run("openharness.serve:app", host=host, port=port); return
     print(f"Unknown verb: {v}", file=sys.stderr)
-    print("Verbs: run, ask, ingest, env, pull, status, self, serve", file=sys.stderr); sys.exit(1)
+    print("Verbs: run, ask, ingest, env, pull, status, prune, self, serve", file=sys.stderr); sys.exit(1)
 
 
 if __name__ == "__main__":
