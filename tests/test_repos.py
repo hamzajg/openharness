@@ -2,7 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from openharness.repos import entries, status, sync
+from openharness.repos import entries, prune, status, sync
 
 
 def _make_local_repo(tmp_path: Path, name: str) -> Path:
@@ -115,6 +115,95 @@ def test_sync_switches_to_target_branch(tmp_path):
         # sync should switch back to main
         sync("branch-proj")
         assert status("branch-proj")["branch-proj"]["branch"] == "main"
+    finally:
+        os.chdir(cwd)
+
+
+def _commit_file(repo: Path, name: str, content: str, message: str):
+    (repo / name).write_text(content)
+    subprocess.run(["git", "-C", str(repo), "add", name], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-m", message], check=True, capture_output=True)
+
+
+def test_prune_deletes_only_merged_local_branches(tmp_path):
+    up = _make_local_repo(tmp_path, "prune-proj")
+    work = tmp_path / "work"
+    work.mkdir()
+    _write_repos_md(work, [("prune-proj", f"file://{up}", "main", "modernization")])
+    cwd = Path.cwd()
+    os.chdir(work)
+    try:
+        sync("prune-proj")
+        dest = work / "sources" / "prune-proj"
+
+        # A merged branch: commit on a branch, merge it back into main upstream.
+        subprocess.run(["git", "-C", str(dest), "checkout", "-b", "feat/old"], check=True, capture_output=True)
+        _commit_file(dest, "old.txt", "old\n", "old work")
+        subprocess.run(["git", "-C", str(dest), "checkout", "main"], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(dest), "-c", "user.email=t@t", "-c", "user.name=t", "merge", "--no-ff", "feat/old", "-m", "merge old"],
+                       check=True, capture_output=True)
+        # An unmerged branch: work that never landed.
+        subprocess.run(["git", "-C", str(dest), "checkout", "-b", "feat/wip"], check=True, capture_output=True)
+        _commit_file(dest, "wip.txt", "wip\n", "wip work")
+
+        res = prune("prune-proj")
+        rec = res["prune-proj"]
+        assert rec["local"] == ["feat/old"]
+        assert rec["remote"] == []
+        branches = subprocess.run(["git", "-C", str(dest), "branch", "--format=%(refname:short)"],
+                                  capture_output=True, text=True).stdout.split()
+        assert "feat/old" not in branches
+        assert "feat/wip" in branches
+        assert "main" in branches
+    finally:
+        os.chdir(cwd)
+
+
+def test_prune_remote_deletes_merged_remote_branches(tmp_path):
+    # The remote must be bare: git refuses pushes to a non-bare repo's
+    # checked-out branch, which is what a real origin never is.
+    up = _make_local_repo(tmp_path, "prune-remote-seed")
+    bare = tmp_path / "prune-remote.git"
+    subprocess.run(["git", "clone", "--bare", str(up), str(bare)], check=True, capture_output=True)
+    work = tmp_path / "work"
+    work.mkdir()
+    _write_repos_md(work, [("prune-remote", f"file://{bare}", "main", "modernization")])
+    cwd = Path.cwd()
+    os.chdir(work)
+    try:
+        sync("prune-remote")
+        dest = work / "sources" / "prune-remote"
+
+        # Push a branch upstream, then merge it into main upstream so the
+        # remote branch is fully contained in origin/main.
+        subprocess.run(["git", "-C", str(dest), "checkout", "-b", "feat/landed"], check=True, capture_output=True)
+        _commit_file(dest, "landed.txt", "landed\n", "landed work")
+        subprocess.run(["git", "-C", str(dest), "push", "-u", "origin", "feat/landed"],
+                       check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(dest), "checkout", "main"], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(dest), "-c", "user.email=t@t", "-c", "user.name=t", "merge", "--no-ff", "feat/landed", "-m", "merge landed"],
+                       check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(dest), "push", "origin", "main"], check=True, capture_output=True)
+
+        # A remote branch that never merged must survive.
+        subprocess.run(["git", "-C", str(dest), "checkout", "-b", "feat/stale"], check=True, capture_output=True)
+        _commit_file(dest, "stale.txt", "stale\n", "stale work")
+        subprocess.run(["git", "-C", str(dest), "push", "-u", "origin", "feat/stale"],
+                       check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(dest), "checkout", "main"], check=True, capture_output=True)
+
+        res = prune("prune-remote", remote=True)
+        rec = res["prune-remote"]
+        assert "feat/landed" in rec["remote"]
+        assert "feat/stale" not in rec["remote"]
+
+        remote_heads = subprocess.run(
+            ["git", "-C", str(bare), "branch", "--format=%(refname:short)"],
+            capture_output=True, text=True).stdout.split()
+        assert "feat/landed" not in remote_heads
+        assert "feat/stale" in remote_heads
+        assert "main" in remote_heads
     finally:
         os.chdir(cwd)
 
