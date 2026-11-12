@@ -2,7 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from openharness.repos import entries, sync
+from openharness.repos import entries, status, sync
 
 
 def _make_local_repo(tmp_path: Path, name: str) -> Path:
@@ -67,3 +67,54 @@ def test_sync_clones_and_pulls(tmp_path, monkeypatch):
         assert (dest / "NEW.md").exists()
     finally:
         os.chdir(cwd)
+
+
+def test_status_reports_repo_state(tmp_path):
+    up = _make_local_repo(tmp_path, "status-proj")
+    work = tmp_path / "work"
+    work.mkdir()
+    _write_repos_md(work, [
+        ("status-proj", f"file://{up}", "main", "modernization"),
+        ("missing-proj", "file:///tmp/nope", "main", "modernization"),
+    ])
+    cwd = Path.cwd()
+    os.chdir(work)
+    try:
+        st = status()
+        assert st["missing-proj"]["exists"] is False
+
+        sync("status-proj")
+        st = status("status-proj")
+        assert st["status-proj"]["exists"] is True
+        assert st["status-proj"]["branch"] == "main"
+        assert st["status-proj"]["dirty"] is False
+
+        # Make it dirty
+        dest = work / "sources" / "status-proj"
+        (dest / "dirty.txt").write_text("uncommitted")
+        st = status("status-proj")
+        assert st["status-proj"]["dirty"] is True
+    finally:
+        os.chdir(cwd)
+
+
+def test_sync_switches_to_target_branch(tmp_path):
+    up = _make_local_repo(tmp_path, "branch-proj")
+    work = tmp_path / "work"
+    work.mkdir()
+    _write_repos_md(work, [("branch-proj", f"file://{up}", "main", "modernization")])
+    cwd = Path.cwd()
+    os.chdir(work)
+    try:
+        sync("branch-proj")
+        dest = work / "sources" / "branch-proj"
+        # Create and checkout feature branch
+        subprocess.run(["git", "-C", str(dest), "checkout", "-b", "feat/my-feature"], check=True, capture_output=True)
+        assert status("branch-proj")["branch-proj"]["branch"] == "feat/my-feature"
+
+        # sync should switch back to main
+        sync("branch-proj")
+        assert status("branch-proj")["branch-proj"]["branch"] == "main"
+    finally:
+        os.chdir(cwd)
+
