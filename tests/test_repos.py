@@ -141,7 +141,7 @@ def test_prune_deletes_only_merged_local_branches(tmp_path):
         subprocess.run(["git", "-C", str(dest), "checkout", "-b", "feat/old"], check=True, capture_output=True)
         _commit_file(dest, "old.txt", "old\n", "old work")
         subprocess.run(["git", "-C", str(dest), "checkout", "main"], check=True, capture_output=True)
-        subprocess.run(["git", "-C", str(dest), "merge", "--no-ff", "feat/old", "-m", "merge old"],
+        subprocess.run(["git", "-C", str(dest), "-c", "user.email=t@t", "-c", "user.name=t", "merge", "--no-ff", "feat/old", "-m", "merge old"],
                        check=True, capture_output=True)
         # An unmerged branch: work that never landed.
         subprocess.run(["git", "-C", str(dest), "checkout", "-b", "feat/wip"], check=True, capture_output=True)
@@ -182,7 +182,7 @@ def test_prune_remote_deletes_merged_remote_branches(tmp_path):
         subprocess.run(["git", "-C", str(dest), "push", "-u", "origin", "feat/landed"],
                        check=True, capture_output=True)
         subprocess.run(["git", "-C", str(dest), "checkout", "main"], check=True, capture_output=True)
-        subprocess.run(["git", "-C", str(dest), "merge", "--no-ff", "feat/landed", "-m", "merge landed"],
+        subprocess.run(["git", "-C", str(dest), "-c", "user.email=t@t", "-c", "user.name=t", "merge", "--no-ff", "feat/landed", "-m", "merge landed"],
                        check=True, capture_output=True)
         subprocess.run(["git", "-C", str(dest), "push", "origin", "main"], check=True, capture_output=True)
 
