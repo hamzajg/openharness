@@ -23,10 +23,11 @@ jobs:
           cache: pip
 
       - name: Install
-        # The harness tests only need the stdlib; skip the heavy RAG
-        # dependencies (chromadb / sentence-transformers).
+        # The harness tests only need the stdlib plus fastapi for the serve
+        # API tests; skip the heavy RAG dependencies (chromadb /
+        # sentence-transformers).
         run: |
-          pip install pytest
+          pip install pytest fastapi httpx
           pip install -e . --no-deps
 
       - name: Test
