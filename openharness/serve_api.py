@@ -78,3 +78,27 @@ def get_env():
 def knowledge(q: str = Query(...), k: int = 5):
     from openharness.knowledge import rag
     return {"query": q, "chunks": rag.search(q, k=k)}
+
+
+@router.get("/repos/status")
+def repos_status(names: str | None = Query(default=None)):
+    from openharness import repos
+    ns = [n.strip() for n in names.split(",") if n.strip()] if names else []
+    return repos.status(*ns)
+
+
+@router.post("/repos/sync")
+def repos_sync(body: dict | None = None):
+    from openharness import repos
+    names = (body or {}).get("names") or []
+    repos.sync(*names)
+    return {"ok": True}
+
+
+@router.post("/repos/prune")
+def repos_prune(body: dict | None = None):
+    from openharness import repos
+    body = body or {}
+    names = body.get("names") or []
+    remote = bool(body.get("remote", False))
+    return repos.prune(*names, remote=remote)
