@@ -7,7 +7,7 @@ name = "openharness"
 version = "0.1.0"
 description = "OpenHarness — workspace manager + context package for agent-driven development"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 license = {text = "MIT"}
 dependencies = [
     "fastapi",
