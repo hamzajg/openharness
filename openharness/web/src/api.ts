@@ -79,10 +79,9 @@ export interface EvolutionCommit {
 export interface EvolutionStats {
   core_loc: number
   core_budget: number
+  platform_loc: number
+  platform_budget: number
   skills_loc: number
-  observers_loc: number
-  serve_loc: number
-  serve_budget: number
   tests: number
   skills: number
   blocks: number
