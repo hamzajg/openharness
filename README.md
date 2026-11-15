@@ -75,4 +75,13 @@ launches or schedules agents. `--merge=review` (default) leaves PRs open for a
 human; `--merge=auto` is opt-in. Loop state and specs are product artifacts
 committed with the feature's PRs.
 
-See `SELF/blocks/delivery-loop.md` for the state model and action contract.
+**Gates.** Complex domains need preconditions before a phase can start — a
+signed-off business rule, a data contract, sandbox credentials, seed data, a
+security/legal review. Declare them in `specs/<feature>/GATES.md`
+(`Before: spec|plan|wave:<n>|validate|finish`, `Resolver: human|agent`,
+`Check: manual|file:<path>|command:<cmd>`); the oracle refuses to advance
+past a phase while a blocking gate is `pending`/`failed`, and only a named
+human can waive one. Status and evidence live in `LOOP.md`.
+
+See `SELF/blocks/delivery-loop.md` for the state model, gate contract, and
+action contract.

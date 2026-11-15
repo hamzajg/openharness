@@ -59,4 +59,4 @@ See `SELF/blocks/<name>.md` for full block specs:
 | [env-probe](SELF/blocks/env-probe.md) | Environment probe + drift check vs ENV.md |
 | [repos](SELF/blocks/repos.md) | REPOS.md registry + clone/pull into `sources/` |
 | [serve](SELF/blocks/serve.md) | FastAPI observer API + SSE + SPA web UI |
-| [delivery-loop](SELF/blocks/delivery-loop.md) | `/ship-loop` oracle + subagents; `LOOP.md` state; D001/D009 |
+| [delivery-loop](SELF/blocks/delivery-loop.md) | `/ship-loop` oracle + subagents; `LOOP.md` state; `GATES.md` preconditions; D001/D009/D010 |

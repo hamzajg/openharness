@@ -42,6 +42,7 @@ one state write (`start` / `complete` / `block` / `finish`).
 ```
 ship_loop --action=next   → read directive
   ├─ "no specs yet" / "complete the spec" / "plan waves"  → product-framer
+  ├─ GATE: ...                                             → resolve or block
   ├─ "implement wave N" / "resume wave N"                  → wave-implementer
   │      └─ then wave-reviewer (must pass) → record complete
   ├─ "validate <feature>"                                  → delivery-verifier
@@ -60,13 +61,55 @@ the artifacts on disk.
 |---|---|
 | Before touching code | `--action=start --wave=N` |
 | After green CI + review | `--action=complete --wave=N --pr="#<n>" --note="<tests N/N, CI green, demo: ...>"` |
+| Agent-owned gate satisfied | `--action=gate --gate=G1 --status=met --evidence="file:docs/x.md / command output"` |
+| Gate needs a human | `--action=block --note="G1: <decision or access needed>"`; after resolution record `met`/`waived`, then `--action=resume` |
+| Gate waived by a human | `--action=gate --gate=G1 --status=waived --waived-by="<name>" --note="<reason>"` |
 | Human decision needed | `--action=block --note="<exactly what must be decided>"` |
 | Human resolved it | `--action=resume` |
-| Validation walked | `--action=finish` (requires `VALIDATION.md`, all waves done) |
+| Validation walked | `--action=finish` (requires `VALIDATION.md`, all waves done, finish gates met) |
 | Wave went sideways | `--action=reset --wave=N` (or `--force` for a full reset) |
 
 Evidence is not optional: `--note` must name the tests that ran and their
 result. "Done" without evidence is how loops lie to themselves.
+
+## Gates — preconditions for phase transitions
+
+Complex domains need decisions, artifacts, access, or sign-offs **before** a
+phase can start. Those are gates, declared in `specs/<feature>/GATES.md`
+(definitions) and tracked in `LOOP.md` (status/evidence). A blocking gate
+stops the phase it is attached to:
+
+| `Before:` | Blocks |
+|---|---|
+| `spec` | writing/refining the spec (domain glossary, regulatory rules) |
+| `plan` | planning waves (architecture decisions, data contracts) |
+| `wave:<n>` | starting wave n (credentials, seed data, schema) |
+| `validate` | running validation (UAT environment, test data) |
+| `finish` | closing the feature (legal/security/product sign-off) |
+
+Overdue gates keep blocking: if a `Before: spec` gate is still pending when
+the artifacts already exist, the loop refuses wave 1 until it is met or
+waived. Gates are not checkboxes to route around.
+
+When the oracle prints `GATE:`:
+
+1. Read each gate's `owner`, `resolver`, and `check`.
+2. **Resolver `agent`** — create the artifact or run the check, then record
+   it with `--action=gate --gate=Gx --status=met --evidence="..."`.
+   `Check: file:<path>` is verified by the oracle (the file must exist);
+   `Check: command:<cmd>` is run by you, and you record the output — the
+   oracle never executes repo-provided commands.
+3. **Resolver `human`** — do not guess or self-approve. Record
+   `--action=block --note="Gx: <what the person must decide/provide>"`,
+   report, and exit. When the human answers, record the evidence and
+   `--action=resume`.
+4. **Waivers** are human decisions. Record one only when a human explicitly
+   approved it: `--status=waived --waived-by="<name>" --note="<reason>"`.
+5. Advisory gates (`Blocking: no`) are reported but never stop the loop.
+
+If a gate turns out to be wrong (not a real precondition), fix `GATES.md` —
+do not silently mark it met. If a check fails, record `--status=failed` with
+the failure so the loop stops honestly.
 
 ## Wave execution protocol
 
@@ -95,8 +138,9 @@ Delegate to **product-framer** with the repo path and any feature hint. It
 runs `discover_product`, proposes 3–5 scored candidates (value ×
 feasibility × differentiation), picks the highest in autonomous mode,
 scaffolds `specs/<feature>/`, fills SPEC.md / EXAMPLES.feature (tagged
-`@w<N>`) / BACKLOG.md (user stories with `Depends:`), and runs `wave_plan`
-until warnings are clean. It may write **only** under `specs/`.
+`@w<N>`) / BACKLOG.md (user stories with `Depends:`), derives preconditions
+into GATES.md, and runs `wave_plan` until warnings are clean. It may write
+**only** under `specs/`.
 
 The orchestrator then calls `ship_loop --action=next` again to enter wave 1.
 
@@ -105,8 +149,9 @@ The orchestrator then calls `ship_loop --action=next` again to enter wave 1.
 Delegate to **delivery-verifier**. It runs `ship_validate`, walks the demo
 script, verifies each acceptance criterion has scenario + wave + test
 evidence, refreshes `specs/PRODUCT.md` via `product_map`, and updates
-README/AGENTS.md for what shipped. Real gaps are reported back — do not
-paper over them. Only then call `--action=finish`.
+README/AGENTS.md for what shipped. It also verifies that every `Before:
+validate` and `Before: finish` gate is met or explicitly waived. Real gaps
+are reported back — do not paper over them. Only then call `--action=finish`.
 
 ## Stop conditions (report and exit the loop)
 
@@ -114,6 +159,8 @@ paper over them. Only then call `--action=finish`.
 - `STOP` — iteration budget exhausted; report progress and the next action.
 - `BLOCKED` — the note says what a human must decide (scope, pricing,
   credentials, destructive migration, product direction).
+- A `GATE:` directive whose resolver is `human` — record `block`, report, exit.
+- A failed gate check that needs a human decision or a re-plan.
 - Two consecutive CI failures on the same wave after one flaky rerun.
 - A merge conflict, a dirty worktree with changes you did not make, or a
   repo that is not registered / has no remote.
@@ -128,6 +175,7 @@ When the loop ends, report:
 Feature: <name> — <status>
 Iterations: N/max
 Waves:    W1 done (#12) · W2 done (#14) · W3 pending
+Gates:    G1 met · G2 met · G3 pending (owner: security, resolver: human)
 PRs:      #12, #14 (merge order matters; stacked: #14 on #12)
 Evidence: <tests run, CI state>
 Gaps:     <known gaps or "none">
