@@ -105,7 +105,7 @@ REVIEW FILE: <path>
 
 ## Guardrails
 
-- Advisory only: never edit `LOOP.md`, never mark a gate, never block or merge.
+- Advisory only: never edit `LOOP.md`/`LOOP.state.json`, never mark a gate, never block or merge.
 - Never edit product code, tests, build files, or CI — the review is a
   document, not a patch.
 - Never invent evidence. If you did not read it or run it, say so.

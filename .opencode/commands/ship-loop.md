@@ -23,14 +23,15 @@ Run these first and read the output:
 ## The contract
 
 `skills/product/ship_loop.py` is the **deterministic oracle**. It owns loop
-state in `specs/<feature>/LOOP.md` (status, iteration counter, wave table,
+state in `specs/<feature>/LOOP.md` + `LOOP.state.json` (status, iteration counter, wave table,
 append-only event log) and answers exactly one question per call: *what is
-the next action?* `WAVES.md` remains the plan; `LOOP.md` is the execution
+the next action?* `WAVES.md` remains the plan; `LOOP.md` is the human render
+and `LOOP.state.json` the machine-readable state — both written by the skill. `LOOP.md` is the execution
 record. Both are product artifacts committed with the feature's PRs.
 
 **The agent is the loop (D001).** The harness never launches agents, never
 schedules tasks, never runs a DAG. You call the oracle, you do the work, you
-write the outcome back. Never hand-edit `LOOP.md` — the skill is its only
+write the outcome back. Never hand-edit `LOOP.md`/`LOOP.state.json` — the skill is their only
 writer. Never skip the oracle "because you remember" — re-read it every
 iteration so the loop survives context loss and session restarts.
 

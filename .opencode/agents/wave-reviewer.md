@@ -44,7 +44,7 @@ ask.
 
 1. **Gather.** `git status`, the PR diff (`git diff <default>...<branch>` or
    the GitHub API), the PR body, and CI status.
-2. **Gate evidence.** Read `GATES.md` and the `## Gates` table in `LOOP.md`.
+2. **Gate evidence.** Read `GATES.md` and the `## Gates` table in `LOOP.md`/`LOOP.state.json`.
    For every blocking gate due at or before this wave (`Before: spec|plan|wave:<n>`):
    - status is `met`, `waived`, or legitimately advisory (`Blocking: no`);
    - a `met` gate cites real evidence (file exists, command output recorded),

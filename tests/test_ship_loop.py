@@ -305,3 +305,41 @@ def test_state_survives_reload_and_events_are_append_only(tmp_path):
     assert "(none)" not in text
     out = _run(tmp_path)
     assert "waves 1/2 done" in out
+
+
+# ---------- machine-readable state ----------
+
+def test_state_json_written_alongside_loop_md(tmp_path):
+    import json
+    d = _spec(tmp_path)
+    _run(tmp_path, action="start", wave=1)
+    state_file = d / "LOOP.state.json"
+    assert state_file.is_file()
+    data = json.loads(state_file.read_text())
+    assert data["feature"] == "cart-checkout"
+    assert data["status"] == "running"
+    assert data["waves"]["1"]["status"] == "in-progress"
+    # markdown render still produced for humans/PRs
+    assert "| 1 | in-progress |" in (d / "LOOP.md").read_text()
+
+
+def test_state_json_is_authoritative_when_present(tmp_path):
+    import json
+    d = _spec(tmp_path)
+    _run(tmp_path, action="start", wave=1)
+    # machine consumer updates JSON directly; markdown is now stale
+    data = json.loads((d / "LOOP.state.json").read_text())
+    data["waves"]["1"]["status"] = "done"
+    (d / "LOOP.state.json").write_text(json.dumps(data))
+    out = _run(tmp_path)
+    assert "implement wave 2" in out  # oracle followed JSON, not stale md
+
+
+def test_state_json_regenerated_on_next_mutation(tmp_path):
+    import json
+    d = _spec(tmp_path)
+    _run(tmp_path, action="start", wave=1)
+    _run(tmp_path, action="complete", wave=1, pr="#7", note="green")
+    data = json.loads((d / "LOOP.state.json").read_text())
+    assert data["waves"]["1"]["status"] == "done"
+    assert data["waves"]["1"]["pr"] == "#7"

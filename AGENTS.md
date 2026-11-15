@@ -110,7 +110,9 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   before structural changes.
 - The web UI must call the same verbs as the CLI (D005) — no business
   logic in TSX.
-- Never hand-edit `specs/<feature>/LOOP.md`; `ship_loop` is its only writer.
+- Never hand-edit `specs/<feature>/LOOP.md` or `LOOP.state.json`;
+  `ship_loop` is their only writer (JSON is the machine projection,
+  markdown the human render — both regenerated together).
   The loop is driven by the agent, not by a daemon or cron (D001/D009).
 - Never mark a gate `met` without evidence or `waived` without a human's name
   and reason. Fix a wrong gate in `GATES.md`; do not route around it.

@@ -30,7 +30,7 @@ OpenHarness is simultaneously:
 | RAG | `knowledge/rag.py` | ChromaDB + sentence-transformers, local |
 | Web UI | `web/` (Vite+TS) | observer dashboard — calls same verbs, no logic (D005) |
 | Skills | `skills/{harness,security,legacy_migration,product}/` | executable Python skills (`ship_loop`, `challenge_decision`, ...) |
-| Delivery loop | `skills/product/ship_loop.py` + `.opencode/commands/ship-loop.md` + `.opencode/agents/*` | deterministic oracle, per-feature `specs/<feature>/LOOP.md` state, `GATES.md` preconditions, subagent roles |
+| Delivery loop | `skills/product/ship_loop.py` + `.opencode/commands/ship-loop.md` + `.opencode/agents/*` | deterministic oracle, per-feature `specs/<feature>/LOOP.md` + `LOOP.state.json` state, `GATES.md` preconditions, subagent roles |
 | Self specs | `SELF/` | PRINCIPLES.md, decision log, domain blocks |
 
 ## Data flow
@@ -42,10 +42,10 @@ OpenHarness is simultaneously:
   `serve_api` streams to the web UI. Read-only; the harness never injects
   into agent sessions.
 - **Product delivery:** `/ship-loop` → `ship_loop --action=next` reads
-  `specs/<feature>/{SPEC.md,EXAMPLES.feature,BACKLOG.md,GATES.md,WAVES.md,LOOP.md}`
+  `specs/<feature>/{SPEC.md,EXAMPLES.feature,BACKLOG.md,GATES.md,WAVES.md,LOOP.md,LOOP.state.json}`
   → checks blocking gates for the current phase → returns one directive (or a
   `GATE:` directive) → the agent delegates it to a subagent role → outcome
-  recorded back into `LOOP.md`. No harness-side scheduling (D001, D009).
+  recorded back into `LOOP.md`/`LOOP.state.json`. No harness-side scheduling (D001, D009).
 - **Decision review:** `/challenge-decision` → `challenge_decision` builds a
   deterministic brief (record completeness, heuristic code signals, design
   moves, lens questions) → `decision-challenger` supplies alternatives,

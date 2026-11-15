@@ -9,12 +9,16 @@ loss and session restarts.
 
 State lives in `specs/<feature>/LOOP.md` next to the spec it describes:
 a status line, an iteration counter, a wave table, and an append-only event
-log. WAVES.md stays the immutable plan; LOOP.md is the mutable execution
-record. Both are product artifacts committed with the PRs.
+log — the human/PR-facing rendering. `LOOP.state.json` next to it is the
+machine-readable projection (same state, written atomically by the same
+`_save_state` call; never hand-edit either). WAVES.md stays the immutable
+plan; LOOP.* is the mutable execution record. All are product artifacts
+committed with the PRs.
 
 Deterministic; stdlib only.
 """
 
+import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -107,6 +111,20 @@ def _parse_waves(spec_dir: Path) -> dict[int, dict]:
 
 
 def _load_state(spec_dir: Path) -> dict:
+    state_file = spec_dir / "LOOP.state.json"
+    if state_file.is_file():
+        try:
+            data = json.loads(state_file.read_text())
+            status = data.get("status")
+            return {
+                "status": status if status in _FEATURE_STATUSES else "running",
+                "iterations": int(data.get("iterations", 0)),
+                "waves": {int(k): v for k, v in data.get("waves", {}).items()},
+                "gates": data.get("gates", {}),
+                "events": data.get("events", []),
+            }
+        except (OSError, ValueError, TypeError):
+            pass  # corrupt/missing JSON — fall back to the markdown record
     text = _read(spec_dir / "LOOP.md")
     status = (_STATUS_RE.search(text).group(1) if _STATUS_RE.search(text) else "running")
     iterations = int(_ITER_RE.search(text).group(1)) if _ITER_RE.search(text) else 0
@@ -185,6 +203,19 @@ def _save_state(spec_dir: Path, state: dict) -> None:
     out += ["", "## Events", ""]
     out += [f"- {e}" for e in state["events"][-200:]] or ["- (none)"]
     (spec_dir / "LOOP.md").write_text("\n".join(out) + "\n")
+
+    payload = {
+        "feature": spec_dir.name,
+        "status": state["status"],
+        "iterations": state["iterations"],
+        "updated": _now(),
+        "waves": {str(w): state["waves"][w] for w in sorted(state["waves"])},
+        "gates": state.get("gates", {}),
+        "events": state["events"][-200:],
+    }
+    tmp = spec_dir / "LOOP.state.json.tmp"
+    tmp.write_text(json.dumps(payload, indent=2) + "\n")
+    tmp.replace(spec_dir / "LOOP.state.json")
 
 
 def _wave(state: dict, n: int) -> dict:
