@@ -14,14 +14,15 @@ Stack: Python ≥3.13, optional web UI (`openharness/web`, Vite+TS).
 
 ## Commands
 
-Verified 2026-11-13 against CI (`.github/workflows/ci.yml`) and README.
+Verified 2026-11-15 against CI (`.github/workflows/ci.yml`) and README.
 
 | Task | Command |
 |---|---|
 | Install | `pip install -e .` (full); tests need `pip install pytest && pip install -e . --no-deps` |
-| Test | `pytest` (24 tests; stdlib-only — CI skips heavy RAG deps) |
+| Test | `pytest` (72 tests; stdlib-only — CI skips heavy RAG deps) |
 | CLI | `oh <command>` / `python -m openharness <command>` |
 | Run a skill | `python -m openharness run <skill>` |
+| Delivery loop | `/ship-loop` (agent-driven) · oracle: `python -m openharness run ship_loop --action=next --repo_path=sources/<repo>` |
 | Serve (observer UI) | `oh serve` → http://localhost:7337 |
 | Repo ops | `oh pull` (clone registered repos into `sources/`) |
 | Web UI build | `cd openharness/web && npm ci && npm run build` |
@@ -47,9 +48,14 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
 - `skills/` — executable Python skills grouped by area (`harness/`,
   `security/` e.g. `scan_secrets`, `legacy_migration/` e.g.
   `map_architecture`, `strangler_plan`, `product/` e.g. `discover_product`,
-  `spec_scaffold`, `wave_plan` — the /ship-product spec-driven pipeline).
+  `spec_scaffold`, `wave_plan`, `ship_validate`, `product_map`,
+  `ship_loop` — the /ship-product pipeline and its delivery loop).
+- `.opencode/commands/`, `.claude/commands/` — slash commands (`ship-loop`,
+  `ship-product`, `sync`, ...). `.opencode/agents/`, `.claude/agents/` —
+  subagent roles for the loop (`product-framer`, `wave-implementer`,
+  `wave-reviewer`, `delivery-verifier`).
 - `SELF/` — the harness's own specs/principles (`PRINCIPLES.md`, decision
-  log D001–D008, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
+  log D001–D009, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
 - `REPOS.md` — YAML-frontmatter registry of managed repos (source of truth).
 - `tests/` — unittest-style pytest files per module.
 
@@ -58,7 +64,8 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
 ```
 harness root = workspace root
   REPOS.md ──► sources/<repo>/   (clones, gitignored)
-  .claude/commands, .opencode/command, skills/, SELF/, ENV.md
+  .claude/commands, .opencode/commands, .claude/agents, .opencode/agents,
+  skills/, SELF/, ENV.md
        │  discovered natively by agent CLIs running inside the tree
        ▼
 agent CLI (orchestrator) ──► skills via `python -m openharness run <skill>`
@@ -76,6 +83,9 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - **Complexity budget (D003):** runtime core ≤ ~300 LOC; serve block has
   its own ~900 LOC budget. Respects KISS — don't grow the core casually.
 - **D008:** harness files are never copied into target repos.
+- **D009:** delivery loops are agent-executed, not harness-scheduled. The
+  oracle (`skills/product/ship_loop.py`) owns `specs/<feature>/LOOP.md`; the
+  agent owns execution. Default merge policy is `review` (PRs stay open).
 
 ## Landmines
 
@@ -86,10 +96,12 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   registry.
 - `oh serve` observes session JSONL files the agent CLIs already write —
   don't add instrumentation hooks into agents.
-- Decision log D001–D008 in `SELF/PRINCIPLES.md` is normative — read it
+- Decision log D001–D009 in `SELF/PRINCIPLES.md` is normative — read it
   before structural changes.
 - The web UI must call the same verbs as the CLI (D005) — no business
   logic in TSX.
+- Never hand-edit `specs/<feature>/LOOP.md`; `ship_loop` is its only writer.
+  The loop is driven by the agent, not by a daemon or cron (D001/D009).
 
 ## Agent rules
 
@@ -98,6 +110,9 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - Verify before claiming: run `pytest` (with `--no-deps` install path) and
   report the real result.
 - Keep changes minimal and consistent with surrounding code. Respect the
-  D001–D008 decision log.
+  D001–D009 decision log.
+- For product work, prefer `/ship-loop` (autonomous) or `/ship-product`
+  (phased); both keep specs and loop state in the target repo under
+  `specs/` and ship one wave per PR.
 - Update AGENTS.md / docs/ARCHITECTURE.md when you change commands, the
   skill contract, or module layout.

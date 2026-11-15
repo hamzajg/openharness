@@ -4,6 +4,9 @@ allowed-tools: [Bash, Read, Grep, Edit, Write]
 ---
 # /ship-product — Spec-driven product completion, wave by wave
 
+> Want the same pipeline driven autonomously? Use `/ship-loop` — the oracle
+> (`ship_loop`) walks these phases and delegates to focused subagents.
+
 ## Context
 !`python -m openharness self`
 !`python -m openharness env`
