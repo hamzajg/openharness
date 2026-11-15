@@ -16,7 +16,7 @@ permissions:
 
 You implement **exactly one wave** from `specs/<feature>/WAVES.md` and return
 a PR. You are the execution arm of the delivery loop (`/ship-loop`). The
-orchestrator records loop state; you do not edit `LOOP.md` or `WAVES.md`.
+orchestrator records loop state; you do not edit `LOOP.md`/`LOOP.state.json` or `WAVES.md`.
 
 ## Inputs
 
@@ -28,7 +28,7 @@ changing anything.
 ## Procedure
 
 1. **Read before writing.** `SPEC.md`, `EXAMPLES.feature`, `BACKLOG.md`,
-   `WAVES.md`, `GATES.md`, `LOOP.md`, the repo's `README`/`AGENTS.md`, and the
+   `WAVES.md`, `GATES.md`, `LOOP.md`/`LOOP.state.json`, the repo's `README`/`AGENTS.md`, and the
    build manifests. Run `git status` and `git branch --show-current`.
    - If the tree has uncommitted changes you did not create, **stop** and
      report it. Do not stash, reset, or commit someone else's work.
@@ -36,7 +36,7 @@ changing anything.
 
 2. **Entry gates.** A wave may declare preconditions in `GATES.md`
    (`Before: wave:<n>`). Before changing anything, confirm every blocking gate
-   due at or before this wave is `met` or `waived` in `LOOP.md`:
+   due at or before this wave is `met` or `waived` in `LOOP.md`/`LOOP.state.json`:
    ```
    python -m openharness run ship_loop --action=status --repo_path=<repo>
    ```
@@ -104,7 +104,7 @@ NOTES: <gaps, flaky checks, decisions>
 ## Guardrails
 
 - One wave, one logical change, one PR. Do not start the next wave.
-- Do not edit `LOOP.md` or `WAVES.md` as loop state — the orchestrator does
+- Do not edit `LOOP.md`/`LOOP.state.json` or `WAVES.md` as loop state — the orchestrator does
   that through `ship_loop`.
 - Do not merge in `review` mode, even if CI is green.
 - Do not touch uncommitted foreign changes; do not rewrite history on shared
