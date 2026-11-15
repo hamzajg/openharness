@@ -19,6 +19,33 @@ def get_session(sid: str):
     return {"lines": obs.tail(sid)}
 
 
+@router.get("/sessions/{sid}/metrics")
+def get_session_metrics(sid: str):
+    from openharness.observers import find_session
+    from openharness import metrics as metrics_mod
+    _, meta = find_session(sid)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    return metrics_mod.session_metrics(meta.file)
+
+
+@router.get("/metrics")
+def get_metrics_summary():
+    from openharness.observers import ALL_OBSERVERS
+    from openharness import metrics as metrics_mod
+    files = []
+    for obs in ALL_OBSERVERS:
+        try:
+            files.extend(s.file for s in obs.sessions())
+        except Exception:
+            continue
+    per_session = [metrics_mod.session_metrics(f) for f in files]
+    return {
+        "summary": metrics_mod.summarize(per_session),
+        "sessions": per_session,
+    }
+
+
 @router.get("/skills")
 def get_skills():
     from openharness import registry
