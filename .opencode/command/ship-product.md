@@ -78,6 +78,13 @@ Fill `specs/<feature>/SPEC.md`: problem, users, scope in/out, acceptance
 criteria table mapping each criterion to scenario tags. Record decisions
 in the Decisions section as ADR-style entries.
 
+**Optional — challenge high-impact decisions.** When a decision is a one-way
+door (data ownership, schema, public contract, service split, security
+control) or the domain is contested, run `/challenge-decision` before planning
+waves. It is advisory (D011): it produces alternatives, a tradeoff matrix, and
+a verdict, but never blocks the pipeline. Record the outcome in the Decisions
+section and, if it changes a precondition, update `GATES.md`.
+
 ### Phase 4 — Examples (specifications by example)
 Write real Gherkin scenarios in `EXAMPLES.feature`. Rules:
 - Every scenario is observable behavior, not implementation.

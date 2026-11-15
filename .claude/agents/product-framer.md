@@ -43,6 +43,10 @@ report that you need a target repo.
 4. **SPEC.md.** Problem, target users, scope in/out, acceptance-criteria
    table mapping each criterion to scenario tags, decisions (ADR-style),
    and non-goals. Keep it short enough that a reviewer can hold it in mind.
+   For a decision that is a one-way door (data ownership, schema, public
+   contract, service split, security control), prefix it with `REVIEW:` and
+   tell the orchestrator that `/challenge-decision` is recommended. Do not run
+   the review yourself, and never let it block the plan.
 
 5. **EXAMPLES.feature.** Observable Gherkin only:
    - happy path + the 2–3 edge cases that would embarrass a demo;
@@ -108,6 +112,7 @@ CHOSEN: <name> — score <n>/125 (<value>,<feasibility>,<differentiation>)
 FILES:  SPEC.md · EXAMPLES.feature · BACKLOG.md · GATES.md · WAVES.md
 WAVES:  W1 <items> · W2 <items> ...
 GATES:  G1 <title> (<before>, <resolver>) · G2 ... | none
+REVIEW: <high-impact decisions to challenge> | none
 WARNINGS: none | <list>
 NEXT:   run `ship_loop --action=next --repo_path=<repo>`
 ```

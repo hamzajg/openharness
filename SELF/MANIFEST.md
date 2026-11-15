@@ -3,7 +3,7 @@ name: OpenHarness
 version: 0.1.0
 runtime_entry: "python -m openharness"
 principles: [KISS, agent-agnostic, markdown-for-specs, python-for-execution, local-first, ui-observer-only]
-blocks: [skill-system, rag, command-bridge, env-probe, repos, serve, delivery-loop]
+blocks: [skill-system, rag, command-bridge, env-probe, repos, serve, delivery-loop, decision-review]
 ---
 # OpenHarness MANIFEST
 
@@ -60,3 +60,4 @@ See `SELF/blocks/<name>.md` for full block specs:
 | [repos](SELF/blocks/repos.md) | REPOS.md registry + clone/pull into `sources/` |
 | [serve](SELF/blocks/serve.md) | FastAPI observer API + SSE + SPA web UI |
 | [delivery-loop](SELF/blocks/delivery-loop.md) | `/ship-loop` oracle + subagents; `LOOP.md` state; `GATES.md` preconditions; D001/D009/D010 |
+| [decision-review](SELF/blocks/decision-review.md) | `/challenge-decision` + `decision-challenger`; deterministic brief + design lenses; advisory only; D011 |
