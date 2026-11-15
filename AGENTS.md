@@ -37,13 +37,17 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   - `repos.py` — REPOS.md parsing, `sources/` clone/pull management.
   - `registry.py`, `skill.py`, `frontmatter.py`, `env.py` — skill catalog,
     YAML-frontmatter spec parsing (~15 LOC, no PyYAML), ENV.md handling.
-  - `serve.py` + `serve_api.py` — observer HTTP API + SSE session stream.
+  - `serve.py` + `serve_api.py` — observer HTTP API + SSE streams
+    (agent sessions via `/api/stream/{sid}`; ship-loop state via
+    `/api/loops` + `/api/loops/stream`, read from
+    `sources/*/specs/*/LOOP.state.json`).
   - `metrics.py` — per-session cost/latency rollups over session JSONL
     (`GET /api/sessions/{sid}/metrics`, `GET /api/metrics`).
   - `observers/` — per-agent-CLI log tailers (`claude.py`, `opencode.py`,
     `base.py`) — the only vendor-aware code, kept thin.
   - `knowledge/rag.py` — local RAG (ChromaDB + sentence-transformers).
-  - `web/` — observer UI (Vite+TS); **observer only, never re-implements
+  - `web/` — observer UI (Vite+TS): Sessions, Loops (live ship-loop
+    progress), Skills, SELF, Knowledge; **observer only, never re-implements
     runtime logic (D005)**.
 - `skills/` — executable Python skills grouped by area (`harness/`,
   `security/` e.g. `scan_secrets`, `legacy_migration/` e.g.

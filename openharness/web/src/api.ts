@@ -29,6 +29,39 @@ export interface SessionMeta {
   active: boolean
 }
 
+export interface LoopSummary {
+  repo: string
+  feature: string
+  status: 'running' | 'blocked' | 'done' | string
+  iterations: number
+  updated: string
+  waves_total: number
+  waves_done: number
+  gates_total: number
+  gates_pending: number
+  last_event: string
+}
+
+export interface LoopWave {
+  status: string
+  branch: string
+  pr: string
+  evidence: string
+  updated: string
+}
+
+export interface LoopGate {
+  status: string
+  evidence: string
+  updated: string
+}
+
+export interface LoopDetail extends LoopSummary {
+  waves: Record<string, LoopWave>
+  gates: Record<string, LoopGate>
+  events: string[]
+}
+
 export const api = {
   sessions: () => _fetch<Record<string, SessionMeta[]>>('/sessions'),
   sessionLines: (id: string) => _fetch<{ lines: unknown[] }>(`/sessions/${encodeURIComponent(id)}`),
@@ -43,4 +76,7 @@ export const api = {
   env: () => _fetch<{ probe: unknown; env_declared: unknown; env_content: string; drift: string }>('/env'),
   knowledge: (q: string, k = 5) =>
     _fetch<{ query: string; chunks: string[] }>(`/knowledge?q=${encodeURIComponent(q)}&k=${k}`),
+  loops: () => _fetch<{ loops: LoopSummary[] }>('/loops'),
+  loopDetail: (repo: string, feature: string) =>
+    _fetch<LoopDetail>(`/loops/${encodeURIComponent(repo)}/${encodeURIComponent(feature)}`),
 }
