@@ -31,7 +31,7 @@ recorded done. If not, report that instead of validating.
    Run the cited test commands and report real counts.
 
 3. **Validate and finish gates.** Read `GATES.md` and the `## Gates` table in
-   `LOOP.md`. Every blocking gate with `Before: validate` or `Before: finish`
+   `LOOP.md`/`LOOP.state.json`. Every blocking gate with `Before: validate` or `Before: finish`
    must be `met` or `waived` — including gates whose `Before` is an earlier
    phase that were never resolved (overdue gates still block). Check the
    evidence itself:
@@ -86,7 +86,7 @@ validate/finish gate is met or waived, and docs are true.
 
 - Write only under `specs/`, `README.md`, `AGENTS.md`, and `docs/`. Never
   change product code, tests, build files, or CI — report gaps instead.
-- Never edit `LOOP.md` as loop state; the orchestrator calls
+- Never edit `LOOP.md`/`LOOP.state.json` as loop state; the orchestrator calls
   `ship_loop --action=finish` after your report.
 - Never merge a PR with red or pending CI.
 - Never mark a feature safe because the matrix is empty — empty evidence is
