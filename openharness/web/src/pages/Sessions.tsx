@@ -89,15 +89,25 @@ export default function Sessions() {
 
   const repos = Object.keys(data)
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Agent Sessions</h2>
-        <span className="text-xs text-neutral-500">auto-refresh 5s</span>
+    <div className="space-y-6">
+      <div>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-neutral-100">Sessions</h2>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium ring-1 bg-emerald-500/10 text-emerald-300 ring-emerald-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            auto-refresh 5s
+          </span>
+        </div>
+        <p className="text-sm text-neutral-500 mt-1">
+          Agent CLI sessions observed on this machine — read-only.
+        </p>
       </div>
-      {err && <div className="mb-3 text-sm text-red-400">{err}</div>}
+      {err && <div className="text-sm text-red-400">{err}</div>}
       {repos.length === 0 ? (
-        <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-8 text-center">
-          No agent sessions observed yet. Run <code className="text-neutral-300">oh serve</code> in one terminal and launch <code className="text-neutral-300">opencode</code> / <code className="text-neutral-300">claude</code> in another.
+        <div className="rounded-xl border border-dashed border-neutral-800 p-12 text-center">
+          <p className="text-sm text-neutral-500">
+            No agent sessions observed yet. Run <code className="text-neutral-300 font-mono text-xs">oh serve</code> in one terminal and launch <code className="text-neutral-300 font-mono text-xs">opencode</code> / <code className="text-neutral-300 font-mono text-xs">claude</code> in another.
+          </p>
         </div>
       ) : (
         <div className="space-y-6">
