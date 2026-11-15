@@ -208,8 +208,9 @@ _HARNESS_ROOT = Path(__file__).resolve().parent.parent
 _DECISION_RE = re.compile(r"^###\s+(D\d+)\s*[—-]\s*(.+?)\s*$", re.M)
 _CORE_FILES = [
     "__main__.py", "skill.py", "registry.py", "frontmatter.py",
-    "repos.py", "env.py", "knowledge/rag.py",
+    "env.py", "knowledge/rag.py",
 ]
+_PLATFORM_FILES = ["repos.py", "metrics.py", "serve.py", "serve_api.py"]
 _COMMIT_TYPES = {
     "feat": "feature", "fix": "fix", "evolve": "evolve",
     "docs": "docs", "chore": "chore", "refactor": "refactor",
@@ -276,12 +277,12 @@ def _loc(path: Path) -> int:
 def _harness_stats(root: Path) -> dict:
     pkg = root / "openharness"
     core_loc = sum(_loc(pkg / f) for f in _CORE_FILES if (pkg / f).is_file())
+    platform_loc = sum(_loc(pkg / f) for f in _PLATFORM_FILES if (pkg / f).is_file())
+    platform_loc += sum(_loc(p) for p in (pkg / "observers").glob("*.py"))
     skills_loc = sum(
         _loc(p) for p in (pkg.parent / "skills").rglob("*.py")
         if "__pycache__" not in p.parts
     )
-    observers_loc = sum(_loc(p) for p in (pkg / "observers").glob("*.py"))
-    serve_loc = _loc(pkg / "serve.py") + _loc(pkg / "serve_api.py")
     tests = 0
     for p in (root / "tests").glob("test_*.py"):
         try:
@@ -296,8 +297,8 @@ def _harness_stats(root: Path) -> dict:
         n_skills = len(list((root / "skills").rglob("*.py")))
     return {
         "core_loc": core_loc, "core_budget": 300,
-        "skills_loc": skills_loc, "observers_loc": observers_loc,
-        "serve_loc": serve_loc, "serve_budget": 900,
+        "platform_loc": platform_loc, "platform_budget": 1100,
+        "skills_loc": skills_loc,
         "tests": tests,
         "skills": n_skills,
         "blocks": len(list((root / "SELF" / "blocks").glob("*.md"))),

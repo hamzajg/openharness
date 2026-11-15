@@ -114,7 +114,7 @@ export default function Evolution() {
 
   const s = data?.stats
   const corePct = s ? Math.round((s.core_loc / s.core_budget) * 100) : 0
-  const servePct = s ? Math.round((s.serve_loc / s.serve_budget) * 100) : 0
+  const platformPct = s ? Math.round((s.platform_loc / s.platform_budget) * 100) : 0
 
   return (
     <div className="space-y-6">
@@ -148,10 +148,11 @@ export default function Evolution() {
                 bar={{ pct: corePct, over: s.core_loc > s.core_budget }}
               />
               <StatCard
-                label="Serve LOC"
-                value={`${s.serve_loc}/${s.serve_budget}`}
-                tone={s.serve_loc > s.serve_budget ? 'text-amber-300' : 'text-neutral-100'}
-                bar={{ pct: servePct, over: s.serve_loc > s.serve_budget }}
+                label="Platform LOC"
+                value={`${s.platform_loc}/${s.platform_budget}`}
+                tone={s.platform_loc > s.platform_budget ? 'text-amber-300' : 'text-neutral-100'}
+                sub="repos + metrics + observers + serve (D012)"
+                bar={{ pct: platformPct, over: s.platform_loc > s.platform_budget }}
               />
             </div>
           </div>
