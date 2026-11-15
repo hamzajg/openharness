@@ -92,3 +92,35 @@ def test_loop_detail_and_404(tmp_path, monkeypatch):
     assert body["repo"] == "RepoA" and body["feature"] == "feat-x"
     assert body["status"] == "blocked" and body["events"] == ["e1"]
     assert client.get("/api/loops/RepoA/nope").status_code == 404
+
+
+def test_evolution_shape():
+    r = client.get("/api/evolution")
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body) == {"decisions", "commits", "stats"}
+    assert isinstance(body["decisions"], list)
+    assert isinstance(body["commits"], list)
+    assert isinstance(body["stats"], dict)
+    for d in body["decisions"]:
+        assert {"id", "title", "rule", "because"} <= set(d)
+        assert d["id"].startswith("D")
+    for c in body["commits"]:
+        assert {"sha", "date", "subject", "type"} <= set(c)
+
+
+def test_parse_decisions_extracts_rule_and_because(tmp_path):
+    p = tmp_path / "PRINCIPLES.md"
+    p.write_text(
+        "### D001 — First decision\n"
+        "Rule: Do the thing.\n"
+        "Because: Reasons.\n\n"
+        "### D002 — Second decision\n"
+        "Rule: Other thing.\n"
+    )
+    ds = serve_api._parse_decisions(p)
+    assert [d["id"] for d in ds] == ["D001", "D002"]
+    assert ds[0]["title"] == "First decision"
+    assert ds[0]["rule"] == "Do the thing."
+    assert ds[0]["because"] == "Reasons."
+    assert ds[1]["because"] == ""
