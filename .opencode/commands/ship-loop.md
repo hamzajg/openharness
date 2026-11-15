@@ -111,6 +111,28 @@ If a gate turns out to be wrong (not a real precondition), fix `GATES.md` —
 do not silently mark it met. If a check fails, record `--status=failed` with
 the failure so the loop stops honestly.
 
+## Optional — challenge a design decision
+
+Gates check *whether* a precondition exists; they do not judge *how* a
+decision was made. When a spec records a high-impact decision (data ownership,
+schema, public contract, service split, security control) or the domain is
+contested, run `/challenge-decision` before the wave that inherits it:
+
+```
+python -m openharness run challenge_decision --repo_path=<repo> \
+  --spec_dir=<repo>/specs/<feature> --paths="<paths>" --write
+```
+
+Delegate the judgment to **decision-challenger**. It returns
+`ACCEPT`/`REVISE`/`REVISIT`/`SPLIT` plus the smallest next step. This is
+**advisory** (D011): it is not a gate, it never stops the loop, and a `REVISE`
+becomes a backlog item or a new wave — not a silent edit during review. If the
+review changes the decision, update `SPEC.md` → Decisions and, when it affects
+a precondition, `GATES.md`.
+
+Skip it for small reversible choices; a review that fires constantly stops
+being read.
+
 ## Wave execution protocol
 
 1. Delegate to **wave-implementer** with: repo path, spec dir, wave number,

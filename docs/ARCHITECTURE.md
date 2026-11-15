@@ -1,7 +1,7 @@
 # Architecture — openharness
 
 Current-state map. Descriptive, not aspirational; normative decisions live
-in `SELF/PRINCIPLES.md` (D001–D010). See `docs/adr/` for the baseline record.
+in `SELF/PRINCIPLES.md` (D001–D011). See `docs/adr/` for the baseline record.
 
 ## Dual role
 
@@ -29,7 +29,7 @@ OpenHarness is simultaneously:
 | Metrics | `metrics.py` + `/api/metrics*` | per-session cost/latency rollups over the same JSONL |
 | RAG | `knowledge/rag.py` | ChromaDB + sentence-transformers, local |
 | Web UI | `web/` (Vite+TS) | observer dashboard — calls same verbs, no logic (D005) |
-| Skills | `skills/{harness,security,legacy_migration,product}/` | executable Python skills |
+| Skills | `skills/{harness,security,legacy_migration,product}/` | executable Python skills (`ship_loop`, `challenge_decision`, ...) |
 | Delivery loop | `skills/product/ship_loop.py` + `.opencode/commands/ship-loop.md` + `.opencode/agents/*` | deterministic oracle, per-feature `specs/<feature>/LOOP.md` state, `GATES.md` preconditions, subagent roles |
 | Self specs | `SELF/` | PRINCIPLES.md, decision log, domain blocks |
 
@@ -46,6 +46,11 @@ OpenHarness is simultaneously:
   → checks blocking gates for the current phase → returns one directive (or a
   `GATE:` directive) → the agent delegates it to a subagent role → outcome
   recorded back into `LOOP.md`. No harness-side scheduling (D001, D009).
+- **Decision review:** `/challenge-decision` → `challenge_decision` builds a
+  deterministic brief (record completeness, heuristic code signals, design
+  moves, lens questions) → `decision-challenger` supplies alternatives,
+  tradeoffs, scores, and a verdict → `DECISION-REVIEW.md`. Advisory only
+  (D011); it never blocks the loop.
 
 ## State
 
@@ -59,4 +64,5 @@ See `SELF/PRINCIPLES.md` — D001 (no orchestration), D002 (md specs / py
 execution), D003 (LOC budgets), D005 (UI is observer), D006 (log-tail
 observation only), D007 (REPOS.md + sources/), D008 (no copying into target
 repos), D009 (agent-executed delivery loops, state in `specs/`), D010
-(declared gates guard phase transitions).
+(declared gates guard phase transitions), D011 (optional advisory decision
+review).

@@ -62,6 +62,7 @@ Two commands take a managed repo from "code exists" to "product ships":
 |---|---|
 | `/ship-product` | Phased, human-in-the-loop: discover → frame → spec → examples → waves → implement → validate. One feature at a time. |
 | `/ship-loop` | Autonomous loop over the same pipeline: the oracle picks the next action, subagents execute it, every wave is one PR. Stops on `DONE`, `BLOCKED`, or the iteration budget. |
+| `/challenge-decision` | Optional, advisory design review: steelman a decision, generate alternatives, weigh tradeoffs, apply DDD/architecture/testability/craftsmanship lenses. Never blocks. |
 
 ```
 /ship-loop --repo=sources/portal-api --merge=review --max=25
@@ -83,5 +84,15 @@ security/legal review. Declare them in `specs/<feature>/GATES.md`
 past a phase while a blocking gate is `pending`/`failed`, and only a named
 human can waive one. Status and evidence live in `LOOP.md`.
 
+**Decision review.** Complex domains also need their *design* challenged —
+where the boundary sits, what owns the invariant, whether the domain depends on
+a framework, how it will be tested. `/challenge-decision` builds a
+deterministic brief (`challenge_decision`: record completeness, heuristic code
+signals, design moves, lens questions) and delegates the judgment to the
+`decision-challenger` subagent: steelman, alternatives, tradeoff matrix,
+scores with evidence, verdict `ACCEPT`/`REVISE`/`REVISIT`/`SPLIT`. It is
+advisory (D011) — it never blocks a gate, wave, or merge.
+
 See `SELF/blocks/delivery-loop.md` for the state model, gate contract, and
-action contract.
+action contract, and `SELF/blocks/decision-review.md` for the review lenses
+and guardrails.
