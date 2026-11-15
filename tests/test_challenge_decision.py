@@ -317,3 +317,29 @@ def test_architecture_decision_gets_boundary_move(tmp_path):
         "to reduce coupling between layers. Evidence: docs/adr/0009.md. Reversible."
     ))
     assert "Can this be a module inside the current deployable" in out
+
+
+def test_repo_root_is_inferred_from_adr_location(tmp_path):
+    """An ADR inside a sources/<repo> checkout resolves code paths against
+    that checkout even when repo_path points at the harness root."""
+    harness = tmp_path / "harness"
+    harness.mkdir()
+    repo = tmp_path / "sources" / "shop"
+    (repo / ".git").mkdir(parents=True)
+    src = repo / "src" / "order.py"
+    src.parent.mkdir(parents=True)
+    src.write_text("class Order:\n    pass\n")
+    adr = repo / "docs" / "adr" / "0001-store.md"
+    adr.parent.mkdir(parents=True)
+    adr.write_text(
+        "# ADR 0001 — order store\n\n## Context\nOrders need durable storage.\n\n"
+        "## Decision\nKeep orders in `src/order.py` behind a repository. "
+        "This is reversible.\n\n## Alternatives\n- JSON file — simplest.\n"
+        "- Postgres — more ops.\n\n## Consequences\nPositive: durable. "
+        "Negative: migrations. Evidence: `src/order.py`.\n"
+    )
+    out = challenge_decision.invoke(
+        repo_path=str(harness), adr=str(adr)
+    )
+    assert "no code paths referenced" not in out
+    assert "`src/order.py`" in out or "src/order.py" in out

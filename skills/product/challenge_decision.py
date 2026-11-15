@@ -610,6 +610,37 @@ def _brief(parts, label, types, checks, readiness, signals, style, paths, root, 
     return "\n".join(out) + "\n"
 
 
+def _infer_root(root: Path, adr: str, spec_dir: str):
+    """Return (root, adr, spec_dir), promoting the file's own git checkout.
+
+    When the decision file lives inside a different git checkout than
+    `repo_path` (e.g. `--adr=sources/<repo>/docs/x.md` run from the harness
+    root), code-path signals must resolve against that checkout — not the
+    harness root. Rewrites relative args to absolute paths so `_source`
+    still finds them under the promoted root.
+    """
+    if not adr and not spec_dir:
+        return root, adr, spec_dir
+    target = Path(adr or spec_dir)
+    p = target if target.is_absolute() else (
+        root / target if (root / target).exists() else Path.cwd() / target
+    )
+    if spec_dir and adr == "":
+        p = p / "SPEC.md"
+    try:
+        p = p.resolve()
+    except OSError:
+        return root, adr, spec_dir
+    if not p.is_file():
+        return root, adr, spec_dir
+    for parent in (p.parent, *p.parents):
+        if (parent / ".git").exists():
+            if parent == root:
+                return root, adr, spec_dir
+            return parent, (str(p) if adr else adr), (str(p.parent) if spec_dir else spec_dir)
+    return root, adr, spec_dir
+
+
 @skill
 def challenge_decision(
     repo_path: str = ".",
@@ -644,6 +675,7 @@ def challenge_decision(
     if not root.is_dir():
         return f"ERROR: {repo_path} is not a directory"
 
+    root, adr, spec_dir = _infer_root(root, adr, spec_dir)
     parts, label, write_dir, err = _source(root, spec_dir, adr, decision)
     if err:
         return err
