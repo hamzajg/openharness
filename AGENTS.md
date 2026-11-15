@@ -37,6 +37,8 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   - `registry.py`, `skill.py`, `frontmatter.py`, `env.py` — skill catalog,
     YAML-frontmatter spec parsing (~15 LOC, no PyYAML), ENV.md handling.
   - `serve.py` + `serve_api.py` — observer HTTP API + SSE session stream.
+  - `metrics.py` — per-session cost/latency rollups over session JSONL
+    (`GET /api/sessions/{sid}/metrics`, `GET /api/metrics`).
   - `observers/` — per-agent-CLI log tailers (`claude.py`, `opencode.py`,
     `base.py`) — the only vendor-aware code, kept thin.
   - `knowledge/rag.py` — local RAG (ChromaDB + sentence-transformers).

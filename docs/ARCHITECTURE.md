@@ -25,6 +25,7 @@ OpenHarness is simultaneously:
 | Specs | `frontmatter.py`, `env.py`, `skill.py` | md+frontmatter parsing, ENV.md, skill runner |
 | Observer | `serve.py`, `serve_api.py` | HTTP API + SSE session stream (:7337) |
 | Agent adapters | `observers/{base,claude,opencode}.py` | tail agent session JSONL — read-only, thin |
+| Metrics | `metrics.py` + `/api/metrics*` | per-session cost/latency rollups over the same JSONL |
 | RAG | `knowledge/rag.py` | ChromaDB + sentence-transformers, local |
 | Web UI | `web/` (Vite+TS) | observer dashboard — calls same verbs, no logic (D005) |
 | Skills | `skills/{harness,security,legacy_migration}/` | executable Python skills |
