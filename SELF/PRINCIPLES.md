@@ -55,3 +55,19 @@ Because: Keeps the harness repo clean. One table → one place to edit. No token
 ### D008 — Central mode only
 Rule: The harness is the workspace root. Harness files are never copied into target repos. Agent CLIs discover commands because sessions run inside the harness tree.
 Because: Copying files into target repos means divergence and dirtying pristine checkouts. Walking up from cwd to find `.claude/commands/` is the CLI's native behavior.
+
+### D009 — Delivery loops are agent-executed, not harness-scheduled
+Rule: The product-delivery loop is a Markdown protocol (`/ship-loop` + four
+subagent roles) plus a deterministic Python oracle
+(`skills/product/ship_loop.py`). The agent calls the oracle once per iteration
+and executes the returned action. The harness never launches an agent, daemon,
+cron, or background worker. Loop state lives in `specs/<feature>/LOOP.md`
+inside the target repo and is committed with that feature's PRs; `WAVES.md`
+remains the immutable plan.
+Because: This is D001 applied to product delivery. A deterministic oracle
+makes the loop resumable after context loss, auditable (append-only event
+log), and bounded (iteration budget) without adding a second orchestration
+layer. Product artifacts (`specs/`, `LOOP.md`) are product content, not
+harness files — D008 still forbids copying harness config into target repos.
+The human gate stays explicit: default `--merge=review` leaves every PR open
+for review; `--merge=auto` is opt-in.

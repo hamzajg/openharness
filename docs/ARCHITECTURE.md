@@ -1,7 +1,7 @@
 # Architecture — openharness
 
 Current-state map. Descriptive, not aspirational; normative decisions live
-in `SELF/PRINCIPLES.md` (D001–D008). See `docs/adr/` for the baseline record.
+in `SELF/PRINCIPLES.md` (D001–D009). See `docs/adr/` for the baseline record.
 
 ## Dual role
 
@@ -12,7 +12,8 @@ OpenHarness is simultaneously:
    (gitignored, reconstructable via `pull`). Launch agent CLIs from the
    harness root or a `sources/<repo>` — the harness tree *is* the workspace.
 2. **Context package** — agent-facing assets discoverable in place:
-   `.claude/commands/`, `.opencode/command/`, `skills/` (Python, run via
+   `.claude/commands/`, `.opencode/commands/` (legacy `command/`),
+   `.claude/agents/`, `.opencode/agents/`, `skills/` (Python, run via
    `python -m openharness run <skill>`), `SELF/` (specs/principles),
    `.openharness/ENV.md`, local RAG index.
 
@@ -28,7 +29,8 @@ OpenHarness is simultaneously:
 | Metrics | `metrics.py` + `/api/metrics*` | per-session cost/latency rollups over the same JSONL |
 | RAG | `knowledge/rag.py` | ChromaDB + sentence-transformers, local |
 | Web UI | `web/` (Vite+TS) | observer dashboard — calls same verbs, no logic (D005) |
-| Skills | `skills/{harness,security,legacy_migration}/` | executable Python skills |
+| Skills | `skills/{harness,security,legacy_migration,product}/` | executable Python skills |
+| Delivery loop | `skills/product/ship_loop.py` + `.opencode/commands/ship-loop.md` + `.opencode/agents/*` | deterministic oracle, per-feature `specs/<feature>/LOOP.md` state, subagent roles |
 | Self specs | `SELF/` | PRINCIPLES.md, decision log, domain blocks |
 
 ## Data flow
@@ -39,6 +41,11 @@ OpenHarness is simultaneously:
 - **Observation:** `oh serve` tails those JSONL logs via `observers/` →
   `serve_api` streams to the web UI. Read-only; the harness never injects
   into agent sessions.
+- **Product delivery:** `/ship-loop` → `ship_loop --action=next` reads
+  `specs/<feature>/{SPEC.md,EXAMPLES.feature,BACKLOG.md,WAVES.md,LOOP.md}` →
+  returns one directive → the agent delegates it to a subagent role →
+  outcome recorded back into `LOOP.md`. No harness-side scheduling (D001,
+  D009).
 
 ## State
 
@@ -51,4 +58,4 @@ No database, no cloud.
 See `SELF/PRINCIPLES.md` — D001 (no orchestration), D002 (md specs / py
 execution), D003 (LOC budgets), D005 (UI is observer), D006 (log-tail
 observation only), D007 (REPOS.md + sources/), D008 (no copying into target
-repos).
+repos), D009 (agent-executed delivery loops, state in `specs/`).

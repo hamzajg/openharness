@@ -3,7 +3,7 @@ name: OpenHarness
 version: 0.1.0
 runtime_entry: "python -m openharness"
 principles: [KISS, agent-agnostic, markdown-for-specs, python-for-execution, local-first, ui-observer-only]
-blocks: [skill-system, rag, command-bridge, env-probe, repos, serve]
+blocks: [skill-system, rag, command-bridge, env-probe, repos, serve, delivery-loop]
 ---
 # OpenHarness MANIFEST
 
@@ -14,7 +14,8 @@ The harness folder is the user's working root for an entire multi-repo product/e
 
 **Role B — Context Package (loaded into the agent, in place).**
 Because agent sessions run inside the harness tree, the harness's agent-facing assets are natively discoverable by the agent CLI:
-- `.claude/commands/` and `.opencode/command/` → slash commands
+- `.claude/commands/` and `.opencode/commands/` → slash commands (legacy `.opencode/command/` still discovered)
+- `.claude/agents/` and `.opencode/agents/` → focused subagent roles for the delivery loop
 - `skills/` → Python skills executed via the agent's Bash tool through `python -m openharness run <skill>`
 - `SELF/` → the harness's own specs/principles (agent-readable)
 - `.openharness/ENV.md` → ecosystem profile; optional repo-level `sources/<repo>/.openharness/ENV.md`
@@ -58,3 +59,4 @@ See `SELF/blocks/<name>.md` for full block specs:
 | [env-probe](SELF/blocks/env-probe.md) | Environment probe + drift check vs ENV.md |
 | [repos](SELF/blocks/repos.md) | REPOS.md registry + clone/pull into `sources/` |
 | [serve](SELF/blocks/serve.md) | FastAPI observer API + SSE + SPA web UI |
+| [delivery-loop](SELF/blocks/delivery-loop.md) | `/ship-loop` oracle + subagents; `LOOP.md` state; D001/D009 |
