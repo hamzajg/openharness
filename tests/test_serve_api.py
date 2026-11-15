@@ -1,3 +1,6 @@
+import json
+
+import openharness.serve_api as serve_api
 from fastapi.testclient import TestClient
 
 from openharness.serve import app
@@ -28,3 +31,64 @@ def test_repos_sync_unknown_name_is_a_noop():
     r = client.post("/api/repos/sync", json={"names": ["definitely-not-a-repo"]})
     assert r.status_code == 200
     assert r.json() == {"ok": True}
+
+
+def _write_loop(root, repo, feature, payload):
+    d = root / "sources" / repo / "specs" / feature
+    d.mkdir(parents=True)
+    (d / "LOOP.state.json").write_text(json.dumps(payload))
+
+
+def test_loops_empty_when_no_sources(tmp_path, monkeypatch):
+    monkeypatch.setattr(serve_api, "_loops_root", lambda: tmp_path / "sources")
+    r = client.get("/api/loops")
+    assert r.status_code == 200
+    assert r.json() == {"loops": []}
+
+
+def test_loops_lists_state_files(tmp_path, monkeypatch):
+    _write_loop(tmp_path, "RepoA", "feat-x", {
+        "feature": "feat-x", "status": "running", "iterations": 2,
+        "updated": "2026-01-01T00:00:00Z",
+        "waves": {"1": {"status": "done"}, "2": {"status": "in-progress"}},
+        "gates": {"G1": {"status": "pending"}},
+        "events": ["2026-01-01T00:00:00Z start wave 1"],
+    })
+    _write_loop(tmp_path, "RepoB", "feat-y", {
+        "feature": "feat-y", "status": "done", "iterations": 5,
+        "updated": "2026-01-02T00:00:00Z",
+        "waves": {"1": {"status": "done"}},
+        "gates": {}, "events": [],
+    })
+    # malformed file is skipped, not fatal
+    bad = tmp_path / "sources" / "RepoC" / "specs" / "feat-z"
+    bad.mkdir(parents=True)
+    (bad / "LOOP.state.json").write_text("{not json")
+
+    monkeypatch.setattr(serve_api, "_loops_root", lambda: tmp_path / "sources")
+    loops = client.get("/api/loops").json()["loops"]
+    assert len(loops) == 2
+    # sorted by updated desc
+    assert loops[0]["repo"] == "RepoB"
+    first = next(l for l in loops if l["repo"] == "RepoA")
+    assert first["waves_total"] == 2 and first["waves_done"] == 1
+    assert first["gates_total"] == 1 and first["gates_pending"] == 1
+    assert first["last_event"].endswith("start wave 1")
+
+
+def test_loop_detail_and_404(tmp_path, monkeypatch):
+    _write_loop(tmp_path, "RepoA", "feat-x", {
+        "feature": "feat-x", "status": "blocked", "iterations": 3,
+        "updated": "2026-01-01T00:00:00Z",
+        "waves": {"1": {"status": "done", "branch": "b", "pr": "#1",
+                        "evidence": "green", "updated": "t"}},
+        "gates": {"G1": {"status": "pending", "evidence": "—", "updated": "—"}},
+        "events": ["e1"],
+    })
+    monkeypatch.setattr(serve_api, "_loops_root", lambda: tmp_path / "sources")
+    r = client.get("/api/loops/RepoA/feat-x")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["repo"] == "RepoA" and body["feature"] == "feat-x"
+    assert body["status"] == "blocked" and body["events"] == ["e1"]
+    assert client.get("/api/loops/RepoA/nope").status_code == 404

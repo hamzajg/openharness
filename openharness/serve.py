@@ -44,6 +44,32 @@ async def stream_session(sid: str, request: Request):
                            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
 
 
+@app.get("/api/loops/stream")
+async def stream_loops(request: Request):
+    """SSE feed of ship-loop snapshots; emits `loops` on change, `: hb` otherwise."""
+    from openharness.serve_api import _loops_root, _scan_loops
+
+    last = [""]
+
+    async def gen():
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                snapshot = json.dumps(_scan_loops(_loops_root()), default=str)
+            except Exception:
+                snapshot = ""
+            if snapshot != last[0]:
+                last[0] = snapshot
+                yield f"event: loops\ndata: {snapshot}\n\n"
+            else:
+                yield f": hb {time.time()}\n\n"
+            await asyncio.sleep(1.5)
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                           headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
+
+
 def _spa_fallback(path_str: str) -> Response:
     if not _WEB_DIST.exists():
         return JSONResponse(status_code=404, content={

@@ -1,7 +1,76 @@
+import json
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/api")
+
+
+def _loops_root() -> Path:
+    return Path.cwd() / "sources"
+
+
+def _read_loop_state(path: Path) -> dict | None:
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    data.setdefault("waves", {})
+    data.setdefault("gates", {})
+    data.setdefault("events", [])
+    return data
+
+
+def _scan_loops(root: Path) -> list[dict]:
+    """All specs/<feature>/LOOP.state.json under sources/<repo>/."""
+    loops = []
+    sources = root if root.name == "sources" else root / "sources"
+    if not sources.is_dir():
+        return loops
+    for state_file in sorted(sources.glob("*/specs/*/LOOP.state.json")):
+        data = _read_loop_state(state_file)
+        if data is None:
+            continue
+        spec_dir = state_file.parent
+        waves = data["waves"]
+        gates = data["gates"]
+        loops.append({
+            "repo": spec_dir.parent.parent.name,
+            "feature": spec_dir.name,
+            "status": data.get("status", "running"),
+            "iterations": int(data.get("iterations", 0)),
+            "updated": data.get("updated", ""),
+            "waves_total": len(waves),
+            "waves_done": sum(1 for w in waves.values() if w.get("status") == "done"),
+            "gates_total": len(gates),
+            "gates_pending": sum(
+                1 for g in gates.values() if g.get("status") == "pending"
+            ),
+            "last_event": (data["events"][-1] if data["events"] else ""),
+        })
+    loops.sort(key=lambda l: l["updated"], reverse=True)
+    return loops
+
+
+@router.get("/loops")
+def get_loops():
+    return {"loops": _scan_loops(_loops_root())}
+
+
+@router.get("/loops/{repo}/{feature}")
+def get_loop(repo: str, feature: str):
+    if not repo or not feature or "/" in repo or "/" in feature or ".." in repo or ".." in feature:
+        raise HTTPException(status_code=404, detail="loop not found")
+    state_file = (
+        _loops_root() / repo / "specs" / feature / "LOOP.state.json"
+    )
+    data = _read_loop_state(state_file)
+    if data is None:
+        raise HTTPException(status_code=404, detail="loop not found")
+    return {"repo": repo, "feature": feature, **data}
 
 
 @router.get("/sessions")

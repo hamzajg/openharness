@@ -1,13 +1,1 @@
-{
-    "root": [
-        "./src/App.tsx",
-        "./src/api.ts",
-        "./src/main.tsx",
-        "./src/components/Markdown.tsx",
-        "./src/pages/Knowledge.tsx",
-        "./src/pages/Self.tsx",
-        "./src/pages/Sessions.tsx",
-        "./src/pages/Skills.tsx"
-    ],
-    "version": "5.9.3"
-}
+{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/components/markdown.tsx","./src/pages/knowledge.tsx","./src/pages/loops.tsx","./src/pages/self.tsx","./src/pages/sessions.tsx","./src/pages/skills.tsx"],"version":"5.9.3"}

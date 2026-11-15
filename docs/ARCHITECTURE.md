@@ -24,7 +24,7 @@ OpenHarness is simultaneously:
 | CLI | `openharness/__main__.py` | `oh` verbs: serve, pull, run, catalog |
 | Repo mgmt | `repos.py`, `registry.py` | REPOS.md parse, clone/pull, skill catalog |
 | Specs | `frontmatter.py`, `env.py`, `skill.py` | md+frontmatter parsing, ENV.md, skill runner |
-| Observer | `serve.py`, `serve_api.py` | HTTP API + SSE session stream (:7337) |
+| Observer | `serve.py`, `serve_api.py` | HTTP API + SSE streams (:7337): agent sessions, ship-loop state |
 | Agent adapters | `observers/{base,claude,opencode}.py` | tail agent session JSONL — read-only, thin |
 | Metrics | `metrics.py` + `/api/metrics*` | per-session cost/latency rollups over the same JSONL |
 | RAG | `knowledge/rag.py` | ChromaDB + sentence-transformers, local |
@@ -39,7 +39,9 @@ OpenHarness is simultaneously:
   commands/skills/SELF → executes Python skills via the CLI → writes code
   in `sources/<repo>` → session JSONL lands on disk.
 - **Observation:** `oh serve` tails those JSONL logs via `observers/` →
-  `serve_api` streams to the web UI. Read-only; the harness never injects
+  `serve_api` streams to the web UI; `/api/loops*` likewise streams the
+  ship-loop oracle's `LOOP.state.json` projections read-only. Read-only;
+  the harness never injects
   into agent sessions.
 - **Product delivery:** `/ship-loop` → `ship_loop --action=next` reads
   `specs/<feature>/{SPEC.md,EXAMPLES.feature,BACKLOG.md,GATES.md,WAVES.md,LOOP.md,LOOP.state.json}`

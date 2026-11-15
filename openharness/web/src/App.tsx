@@ -3,11 +3,13 @@ import Sessions from './pages/Sessions'
 import Skills from './pages/Skills'
 import Self from './pages/Self'
 import Knowledge from './pages/Knowledge'
+import Loops from './pages/Loops'
 
 export default function App() {
   const loc = useLocation()
   const nav = [
     { to: '/', label: 'Sessions' },
+    { to: '/loops', label: 'Loops' },
     { to: '/skills', label: 'Skills' },
     { to: '/self', label: 'SELF' },
     { to: '/knowledge', label: 'Knowledge' },
@@ -40,6 +42,7 @@ export default function App() {
       <main className="flex-1 p-4 md:p-6 overflow-y-auto">
         <Routes>
           <Route path="/" element={<Sessions />} />
+          <Route path="/loops" element={<Loops />} />
           <Route path="/skills" element={<Skills />} />
           <Route path="/self" element={<Self />} />
           <Route path="/knowledge" element={<Knowledge />} />
