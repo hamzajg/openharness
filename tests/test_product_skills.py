@@ -221,7 +221,7 @@ def test_ship_validate_resolves_scenario_names_in_ac(tmp_path):
     (d / "WAVES.md").write_text("# Waves\n\n## Wave 1 — iteration 1\n\n| Item |\n")
     _write(repo, "tests/test_demo.py", "def test_unrelated():\n    assert True\n")
     out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
-    assert "| 1 | It works | 1 | @w1 |" in out  # name resolved to scenario+wave
+    assert "| 1 | It works | Create base | 1 |" in out  # name resolved to scenario+wave
 
 
 def test_ship_validate_weak_evidence_marked(tmp_path):
