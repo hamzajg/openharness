@@ -67,6 +67,15 @@ def _scenario_index(feature_text: str):
     return out
 
 
+def _cell(text: str, limit: int = 60) -> str:
+    """Single-line table cell, truncated at a word boundary with ellipsis."""
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:")
+    return cut + "…"
+
+
 def _ac_rows(spec_text: str, scenarios: list):
     """Parse the SPEC.md AC table. The Scenario(s) cell may hold @wN tags
     and/or scenario names written verbatim — names are resolved against
@@ -190,9 +199,11 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
             ev_str = "(weak) " + ", ".join(weak[:2])
         else:
             ev_str = "—"
+        scen_cell = ", ".join(names) if names else "—"
+        wave_cell = ", ".join(str(w) for w in sorted(ac["waves"])) or "—"
         out.append(
-            f"| {i} | {ac['criterion'][:60]} | {len(names)} "
-            f"| {', '.join(f'@w{w}' for w in sorted(ac['waves'])) or '—'} | {ev_str} |"
+            f"| {i} | {_cell(ac['criterion'])} | {scen_cell} "
+            f"| {wave_cell} | {ev_str} |"
         )
     out.append("")
     out.append("## Scenario coverage")
