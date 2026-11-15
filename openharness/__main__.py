@@ -23,7 +23,7 @@ def main():
         for x in rest[1:]:
             if x.startswith("--"):
                 k, _, vv = x[2:].partition("=")
-                kw[k] = vv if _ else "true"
+                kw[k.replace("-", "_")] = vv if _ else "true"
         try:
             r = sk.invoke(**kw)
             print(r if r is not None else "")
