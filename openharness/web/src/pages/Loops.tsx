@@ -115,7 +115,7 @@ function gateTone(status: string) {
   return 'text-neutral-400'
 }
 
-/* ---------- components ---------- */
+/* ---------- small components ---------- */
 
 function StatCard({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
@@ -126,26 +126,38 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
   )
 }
 
+function StatusPill({ status }: { status: string }) {
+  const s = st(status)
+  return (
+    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ring-1 whitespace-nowrap ${s.pill}`}>
+      {s.label}
+    </span>
+  )
+}
+
+/* ---------- list row ---------- */
+
 function LoopRow({
-  loop, detail, open, onToggle,
+  loop, selected, onSelect,
 }: {
   loop: LoopSummary
-  detail: LoopDetail | null
-  open: boolean
-  onToggle: () => void
+  selected: boolean
+  onSelect: () => void
 }) {
   const s = st(loop.status)
   const reason = blockReason(loop)
-  const waveEntries = detail
-    ? Object.entries(detail.waves).sort((a, b) => Number(a[0]) - Number(b[0]))
-    : []
-  const gateEntries = detail ? Object.entries(detail.gates).sort() : []
   const pct = loop.waves_total ? Math.round((loop.waves_done / loop.waves_total) * 100) : 0
 
   return (
-    <div className={`rounded-xl border border-neutral-800 border-l-2 ${s.accent} bg-neutral-900/60 overflow-hidden`}>
-      {/* summary row */}
-      <button onClick={onToggle} className="w-full text-left px-4 py-3.5 hover:bg-neutral-800/30 transition-colors">
+    <button
+      onClick={onSelect}
+      className={`w-full text-left rounded-xl border bg-neutral-900/60 overflow-hidden transition-colors border-l-2 ${
+        selected
+          ? `${s.accent} border-neutral-600 ring-1 ring-sky-500/30`
+          : `${s.accent} border-neutral-800 hover:bg-neutral-800/30`
+      }`}
+    >
+      <div className="px-4 py-3.5">
         <div className="flex items-center gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2 flex-wrap">
@@ -167,9 +179,7 @@ function LoopRow({
           </div>
 
           <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0">
-            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ring-1 ${s.pill}`}>
-              {s.label}
-            </span>
+            <StatusPill status={loop.status} />
             <div className="w-28 h-1 rounded-full bg-neutral-800 overflow-hidden">
               <div
                 className={`h-full rounded-full bg-gradient-to-r ${
@@ -190,87 +200,135 @@ function LoopRow({
             </p>
           </div>
         )}
+      </div>
+    </button>
+  )
+}
 
-        <div className="mt-2 flex items-center gap-1.5 text-neutral-600">
-          <svg className={`w-3 h-3 transition-transform ${open ? 'rotate-90' : ''}`} viewBox="0 0 12 12" fill="currentColor">
-            <path d="M4 2l4 4-4 4V2z" />
-          </svg>
-          <span className="text-[11px]">{open ? 'Hide details' : 'Show details'}</span>
+/* ---------- detail drawer ---------- */
+
+function LoopDrawer({
+  loop, detail, onClose,
+}: {
+  loop: LoopSummary
+  detail: LoopDetail | null
+  onClose: () => void
+}) {
+  const s = st(loop.status)
+  const waveEntries = detail
+    ? Object.entries(detail.waves).sort((a, b) => Number(a[0]) - Number(b[0]))
+    : []
+  const gateEntries = detail ? Object.entries(detail.gates).sort() : []
+
+  return (
+    <div className="fixed inset-0 z-40" role="dialog" aria-modal="true">
+      {/* backdrop */}
+      <button
+        aria-label="Close details"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/60 backdrop-blur-[2px] drawer-backdrop"
+      />
+      {/* panel: full-width sheet on mobile, right drawer on sm+ */}
+      <aside className="absolute inset-y-0 right-0 w-full sm:w-[520px] lg:w-[600px] bg-neutral-950 border-l border-neutral-800 shadow-2xl flex flex-col drawer-panel">
+        {/* header */}
+        <div className={`px-5 py-4 border-b border-neutral-800 ${s.accent} border-l-2`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-neutral-100 truncate">{loop.feature}</h3>
+              <p className="text-xs text-neutral-500 font-mono mt-0.5">{loop.repo} · specs/{loop.feature}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <StatusPill status={loop.status} />
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="p-1.5 rounded-md text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800 transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div className="mt-2.5 flex items-center gap-3 text-xs text-neutral-500 flex-wrap">
+            <span>{loop.waves_done} of {loop.waves_total} waves</span>
+            {loop.gates_total > 0 && (
+              <span className={loop.gates_pending > 0 ? 'text-amber-400/90' : ''}>
+                {loop.gates_total - loop.gates_pending} of {loop.gates_total} gates met
+              </span>
+            )}
+            <span>·</span>
+            <span>{loop.iterations} iteration{loop.iterations === 1 ? '' : 's'}</span>
+            <span>·</span>
+            <span>updated {fmtAgo(loop.updated)}</span>
+          </div>
         </div>
-      </button>
 
-      {/* detail panel */}
-      {open && (
-        <div className="border-t border-neutral-800 px-4 py-4 bg-neutral-950/50">
+        {/* body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
           {!detail && <p className="text-xs text-neutral-500">Loading…</p>}
 
           {detail && (
-            <div className="grid gap-6 lg:grid-cols-2">
-              {/* left: waves + gates */}
-              <div className="space-y-6 min-w-0">
-                {waveEntries.length > 0 && (
-                  <section>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2.5">
-                      Waves
-                    </h3>
-                    <div className="rounded-lg border border-neutral-800 divide-y divide-neutral-800/70">
-                      {waveEntries.map(([n, w]) => (
-                        <div key={n} className="px-3 py-2.5 flex items-start gap-3">
-                          <div className="w-8 shrink-0 pt-0.5">
-                            <span className="text-xs font-mono text-neutral-500">w{n}</span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <WaveDot status={w.status} />
-                              <span className="text-xs text-neutral-300">{WAVE_LABEL[w.status] ?? w.status}</span>
-                              <span className="text-[11px] font-mono text-neutral-600">{w.branch}</span>
-                              {w.pr && w.pr !== '—' && (
-                                <span className="text-[11px] font-mono text-neutral-500">PR {w.pr}</span>
-                              )}
-                              <span className="ml-auto text-[11px] text-neutral-600 shrink-0">
-                                {fmtDateTime(w.updated)}
-                              </span>
-                            </div>
-                            {w.evidence && w.evidence !== '—' && (
-                              <p className="mt-1 text-[11px] text-neutral-500 leading-relaxed">{w.evidence}</p>
+            <>
+              {waveEntries.length > 0 && (
+                <section>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2">
+                    Waves
+                  </h4>
+                  <div className="rounded-lg border border-neutral-800 divide-y divide-neutral-800/70">
+                    {waveEntries.map(([n, w]) => (
+                      <div key={n} className="px-3 py-2.5 flex items-start gap-3">
+                        <span className="w-7 shrink-0 text-xs font-mono text-neutral-500 pt-px">w{n}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <WaveDot status={w.status} />
+                            <span className="text-xs text-neutral-300">{WAVE_LABEL[w.status] ?? w.status}</span>
+                            <span className="text-[11px] font-mono text-neutral-600">{w.branch}</span>
+                            {w.pr && w.pr !== '—' && (
+                              <span className="text-[11px] font-mono text-neutral-500">PR {w.pr}</span>
                             )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {gateEntries.length > 0 && (
-                  <section>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2.5">
-                      Gates
-                    </h3>
-                    <div className="rounded-lg border border-neutral-800 divide-y divide-neutral-800/70">
-                      {gateEntries.map(([gid, g]) => (
-                        <div key={gid} className="px-3 py-2.5 flex items-start gap-3">
-                          <span className="w-8 shrink-0 text-xs font-mono text-neutral-400 pt-px">{gid}</span>
-                          <div className="min-w-0 flex-1">
-                            <span className={`text-xs font-medium ${gateTone(g.status)}`}>
-                              {GATE_LABEL[g.status] ?? g.status}
+                            <span className="ml-auto text-[11px] text-neutral-600 shrink-0">
+                              {fmtDateTime(w.updated)}
                             </span>
-                            {g.evidence && g.evidence !== '—' && (
-                              <p className="mt-0.5 text-[11px] text-neutral-500 leading-relaxed">{g.evidence}</p>
-                            )}
                           </div>
+                          {w.evidence && w.evidence !== '—' && (
+                            <p className="mt-1 text-[11px] text-neutral-500 leading-relaxed">{w.evidence}</p>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-              </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
-              {/* right: event timeline */}
+              {gateEntries.length > 0 && (
+                <section>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2">
+                    Gates
+                  </h4>
+                  <div className="rounded-lg border border-neutral-800 divide-y divide-neutral-800/70">
+                    {gateEntries.map(([gid, g]) => (
+                      <div key={gid} className="px-3 py-2.5 flex items-start gap-3">
+                        <span className="w-7 shrink-0 text-xs font-mono text-neutral-400 pt-px">{gid}</span>
+                        <div className="min-w-0 flex-1">
+                          <span className={`text-xs font-medium ${gateTone(g.status)}`}>
+                            {GATE_LABEL[g.status] ?? g.status}
+                          </span>
+                          {g.evidence && g.evidence !== '—' && (
+                            <p className="mt-0.5 text-[11px] text-neutral-500 leading-relaxed">{g.evidence}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               {detail.events.length > 0 && (
-                <section className="min-w-0">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2.5">
-                    History <span className="text-neutral-600 font-normal">({detail.events.length} events)</span>
-                  </h3>
+                <section>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2">
+                    History <span className="text-neutral-600 font-normal">({detail.events.length})</span>
+                  </h4>
                   <ol className="relative border-l border-neutral-800 ml-1.5 space-y-3">
                     {[...detail.events].reverse().map((e, i) => {
                       const { ts, text } = humanizeEvent(e)
@@ -291,10 +349,10 @@ function LoopRow({
                   </ol>
                 </section>
               )}
-            </div>
+            </>
           )}
         </div>
-      )}
+      </aside>
     </div>
   )
 }
@@ -336,6 +394,14 @@ export default function Loops() {
     return () => { cancelled = true; es.close() }
   }, [])
 
+  // Esc closes the drawer
+  useEffect(() => {
+    if (!openKey) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenKey(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [openKey])
+
   const counts = useMemo(() => ({
     running: loops.filter((l) => l.status === 'running').length,
     blocked: loops.filter((l) => l.status === 'blocked').length,
@@ -355,7 +421,11 @@ export default function Loops() {
     )
   }, [loops, filter])
 
-  const toggle = (l: LoopSummary) => {
+  const openLoop = openKey
+    ? loops.find((l) => `${l.repo}/${l.feature}` === openKey) ?? null
+    : null
+
+  const select = (l: LoopSummary) => {
     const key = `${l.repo}/${l.feature}`
     setOpenKey((cur) => (cur === key ? null : key))
     if (!details[key]) {
@@ -395,12 +465,12 @@ export default function Loops() {
       </div>
 
       {/* filters */}
-      <div className="flex gap-1 border-b border-neutral-800">
+      <div className="flex gap-1 border-b border-neutral-800 overflow-x-auto">
         {FILTERS.map((f) => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
-            className={`px-3 py-2 text-sm transition-colors border-b-2 -mb-px ${
+            className={`px-3 py-2 text-sm transition-colors border-b-2 -mb-px whitespace-nowrap ${
               filter === f.key
                 ? 'border-sky-500 text-neutral-100'
                 : 'border-transparent text-neutral-500 hover:text-neutral-300'
@@ -435,13 +505,21 @@ export default function Loops() {
             <LoopRow
               key={key}
               loop={l}
-              detail={details[key] ?? null}
-              open={openKey === key}
-              onToggle={() => toggle(l)}
+              selected={openKey === key}
+              onSelect={() => select(l)}
             />
           )
         })}
       </div>
+
+      {/* drawer */}
+      {openLoop && openKey && (
+        <LoopDrawer
+          loop={openLoop}
+          detail={details[openKey] ?? null}
+          onClose={() => setOpenKey(null)}
+        />
+      )}
     </div>
   )
 }
