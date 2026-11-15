@@ -14,7 +14,7 @@ from pathlib import Path
 
 from openharness.skill import skill
 
-_ITEM_RE = re.compile(r"^##\s+B(\d+)\s*[—-]\s*(.+)$", re.M)
+_ITEM_RE = re.compile(r"^##\s+(B|US)(\d+)\s*[—-]\s*(.+)$", re.M)
 _SCEN_RE = re.compile(r"^-\s*Scenarios:\s*(.+)$", re.M)
 _DEP_RE = re.compile(r"^-\s*Depends:\s*(.+)$", re.M)
 _TAG_RE = re.compile(r"@w(\d+)")
@@ -26,10 +26,11 @@ def _parse_backlog(text: str):
     items = {}
     matches = list(_ITEM_RE.finditer(text))
     for i, m in enumerate(matches):
-        bid = int(m.group(1))
+        bid = int(m.group(2))
+        ref = f"{m.group(1)}{bid}"
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         block = text[m.end():end]
-        title = m.group(2).strip()
+        title = m.group(3).strip()
 
         def field(rx):
             fm = rx.search(block)
@@ -38,10 +39,11 @@ def _parse_backlog(text: str):
         scen = field(_SCEN_RE)
         waves = {int(w) for w in _TAG_RE.findall(scen)}
         deps_raw = field(_DEP_RE)
-        deps = {int(d) for d in re.findall(r"B(\d+)", deps_raw)}
+        deps = {int(d) for d in re.findall(r"(?:B|US)(\d+)", deps_raw)}
         size_m = re.search(r"^-\s*Size:\s*(\S+)", block, re.M)
         notes_m = re.search(r"^-\s*Notes:\s*(.*)$", block, re.M)
         items[bid] = {
+            "ref": ref,
             "title": title,
             "waves": waves or {1},
             "deps": deps,
@@ -122,7 +124,7 @@ def wave_plan(spec_dir: str = "") -> str:
 
     items = _parse_backlog(backlog.read_text())
     if not items:
-        return "ERROR: no backlog items parsed — expected `## B<n> — title` blocks"
+        return "ERROR: no backlog items parsed — expected `## US<n> — <user story>` blocks"
 
     scenarios = _feature_scenarios(feature.read_text()) if feature.is_file() else {}
     waves, violations = _assign_waves(items)
@@ -140,26 +142,27 @@ def wave_plan(spec_dir: str = "") -> str:
         by_wave[w].sort()
 
     out = [f"# Waves — {d.name}", ""]
-    out.append("Each wave is an independently shippable increment: one branch,")
-    out.append("one PR, green tests. Do not start wave N+1 until wave N merges.")
+    out.append("Each wave IS an iteration: a time-boxed, independently shippable")
+    out.append("increment — one branch, one PR, green tests, demoable outcome.")
+    out.append("Do not start wave N+1 until wave N merges.")
     out.append("")
     if violations or missing_deps or retag:
         out.append("## Warnings")
         out.append("")
         for bid, dep in missing_deps:
-            out.append(f"- B{bid} depends on B{dep} which does not exist in BACKLOG.md")
+            out.append(f"- {items[bid]['ref']} depends on item #{dep} which does not exist in BACKLOG.md")
         for bid, w, tags in retag:
             tagstr = ", ".join(f"@w{t}" for t in tags)
-            out.append(f"- B{bid} lands in wave {w} but its scenarios are tagged {tagstr} — retag EXAMPLES.feature to @w{w} or adjust Depends")
+            out.append(f"- {items[bid]['ref']} lands in wave {w} but its scenarios are tagged {tagstr} — retag EXAMPLES.feature to @w{w} or adjust Depends")
         if violations:
             out.append("Dependency cycle or unresolvable ordering detected — fix BACKLOG.md:")
             for bid, dep in violations:
-                out.append(f"- B{bid} depends on B{dep} but cannot be ordered after it")
+                out.append(f"- {items[bid]['ref']} depends on {items.get(dep,{}).get('ref','#'+str(dep))} but cannot be ordered after it")
         out.append("")
     for w in sorted(by_wave):
         bids = by_wave[w]
         scen_names = scenarios.get(w, [])
-        out.append(f"## Wave {w}")
+        out.append(f"## Wave {w} — iteration {w}")
         out.append("")
         if scen_names:
             out.append("Scenarios proven by this wave:")
@@ -170,8 +173,8 @@ def wave_plan(spec_dir: str = "") -> str:
         out.append("|------|-------|------|------|-------|")
         for bid in bids:
             it = items[bid]
-            deps = ", ".join(f"B{x}" for x in sorted(it["deps"])) or "—"
-            out.append(f"| B{bid} | {it['title']} | {it['size']} | {deps} | {it['notes']} |")
+            deps = ", ".join(items[x]["ref"] for x in sorted(it["deps"]) if x in items) or "—"
+            out.append(f"| {it['ref']} | {it['title']} | {it['size']} | {deps} | {it['notes']} |")
         out.append("")
     (d / "WAVES.md").write_text("\n".join(out))
     return "\n".join(out)

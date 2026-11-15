@@ -137,7 +137,7 @@ def test_wave_plan_orders_by_dependencies(tmp_path):
 def test_wave_plan_detects_missing_dep(tmp_path):
     d = _spec_dir(tmp_path, backlog=_BACKLOG.replace("Depends: B1\n- Size: M\n\n## B3", "Depends: B9\n- Size: M\n\n## B3"))
     out = wave_plan.invoke(spec_dir=str(d))
-    assert "B9" in out and "does not exist" in out
+    assert "#9" in out and "does not exist" in out
 
 
 def test_wave_plan_requires_backlog(tmp_path):
@@ -145,3 +145,63 @@ def test_wave_plan_requires_backlog(tmp_path):
     d.mkdir(parents=True)
     out = wave_plan.invoke(spec_dir=str(d))
     assert out.startswith("ERROR")
+
+
+# ---------- user-story backlog format ----------
+
+def test_wave_plan_accepts_user_story_ids(tmp_path):
+    backlog = textwrap.dedent("""\
+        # Backlog: US format
+
+        ## US1 — As a user, I want login, so that I can save work
+        - Scenarios: @w1
+        - Size: M
+
+        ## US2 — As a user, I want logout, so that I can switch accounts
+        - Scenarios: @w2
+        - Depends: US1
+        - Size: S
+    """)
+    d = _spec_dir(tmp_path, backlog=backlog)
+    out = wave_plan.invoke(spec_dir=str(d))
+    assert "US1" in out and "US2" in out
+    w1 = out.index("## Wave 1"); w2 = out.index("## Wave 2")
+    assert "US1" in out[w1:w2] and "US2" in out[w2:]
+
+
+# ---------- product_map ----------
+
+def test_product_map_aggregates_specs(tmp_path):
+    from skills.product.product_map import product_map
+    d1 = _spec_dir(tmp_path)
+    wave_plan.invoke(spec_dir=str(d1))
+    d2 = tmp_path / "specs" / "other"
+    d2.mkdir(parents=True)
+    (d2 / "SPEC.md").write_text("# Spec: Other Feature\n")
+    (d2 / "BACKLOG.md").write_text("## US1 — story\n- Scenarios: @w1\n")
+    (d2 / "EXAMPLES.feature").write_text("Feature: X\n\n  @w1\n  Scenario: S\n    Given a\n    When b\n    Then c\n")
+    out = product_map.invoke(repo_path=str(tmp_path))
+    assert (tmp_path / "specs" / "PRODUCT.md").is_file()
+    assert "demo" in out and "other" in out
+    assert "Planned" in out
+
+
+# ---------- ship_validate ----------
+
+def test_ship_validate_writes_traceability(tmp_path):
+    from skills.product.ship_validate import ship_validate
+    repo = tmp_path / "repo"
+    d = repo / "specs" / "demo"
+    d.mkdir(parents=True)
+    (d / "SPEC.md").write_text(
+        "# Spec: Demo\n\n## Acceptance criteria\n\n| # | Criterion | Scenario(s) |\n|---|-----------|-------------|\n| 1 | It works | @w1 |\n"
+    )
+    (d / "EXAMPLES.feature").write_text(
+        "Feature: Demo\n\n  @w1 @happy-path\n  Scenario: Create base\n    Given x\n    When y\n    Then z\n"
+    )
+    (d / "WAVES.md").write_text("# Waves\n\n## Wave 1 — iteration 1\n\n| Item |\n")
+    _write(repo, "tests/test_demo.py", "def test_create_base():\n    # covers 'Create base' scenario\n    assert True\n")
+    out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    assert (d / "VALIDATION.md").is_file()
+    assert "Traceability" in out and "Demo script" in out
+    assert "test_demo.py" in out  # evidence found

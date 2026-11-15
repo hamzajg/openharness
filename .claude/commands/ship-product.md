@@ -28,13 +28,21 @@ Read the Product Surface Report. Also read README, AGENTS.md, and any
 existing `specs/` dirs. Identify: what the product IS today, what is
 stubbed (placeholder markers), what routes/features exist but are thin.
 
-### Phase 2 — Frame (ONE feature)
+### Phase 2 — Frame (feature planning)
 Propose 3–5 candidate feature themes that move the repo toward a
 shippable product. Score each: user value × feasibility × differentiation.
 Present the shortlist and get user buy-in on ONE feature before speccing.
 An innovative feature for a kata/legacy repo usually means: the missing
 loop that makes it a product (persistence, auth, notifications, export,
 real data source) — not a new framework.
+
+For multi-feature planning, keep the product map current:
+```
+!`python -m openharness run product_map --repo_path=sources/<repo>`
+```
+It writes `specs/PRODUCT.md` — every feature's stories/scenarios/waves/
+validation state in one table. Sequence features by dependency and user
+value; ship ONE at a time.
 
 ### Phase 3 — Spec (spec driver)
 ```
@@ -52,27 +60,41 @@ Write real Gherkin scenarios in `EXAMPLES.feature`. Rules:
 - Scenario names are the spec's executable vocabulary — tests cite them.
 
 ### Phase 5 — Backlog + Waves
-Add backlog items to `BACKLOG.md` in the parseable format shown there
-(`## B<n> — title`, `- Scenarios:`, `- Depends:`, `- Size:`), then:
+Add USER STORIES to `BACKLOG.md` — each item is a story, not a task:
+`## US<n> — As a <role>, I want <goal>, so that <value>` with
+`- Scenarios: @wN`, optional `- Depends: USk`, `- Size:`, `- Notes:`.
+Order by user value; `Depends:` expresses technical order only. Then:
 ```
 !`python -m openharness run wave_plan --spec_dir=sources/<repo>/specs/<feature>`
 ```
 Review `WAVES.md`. Each wave must be independently shippable: one branch,
 one PR, tests green. Rebalance if a wave is too big or deps are wrong.
 
-### Phase 6 — Implement (wave by wave)
-For each wave, in order:
+### Phase 6 — Implement (iterations = waves)
+Each wave in WAVES.md IS an iteration: a time-boxed increment with a
+demoable outcome. For each wave, in order:
 1. Branch `feat/<feature>-w<N>` from the default branch.
 2. Write failing checks FIRST for that wave's scenarios (SBE: the
    .feature scenarios are the acceptance spec; implement until they pass).
 3. Implement minimally — KISS, match repo conventions.
 4. Verify: build + tests green locally, then CI on the PR.
-5. Merge, delete branch, mark wave done in WAVES.md (commit the marker).
+5. Merge, delete branch, demo the iteration outcome, mark wave done in
+   WAVES.md (commit the marker).
 
-### Phase 7 — Ship
-When all waves merge: update README/AGENTS.md to describe the feature,
-ensure `specs/<feature>/` tells the true story (mark superseded decisions),
-and report what shipped vs what remains.
+### Phase 7 — Validate + Ship
+Run the acceptance walkthrough:
+```
+!`python -m openharness run ship_validate --spec_dir=sources/<repo>/specs/<feature> --repo_path=sources/<repo>`
+```
+It writes `VALIDATION.md`: AC → scenario → wave → test-evidence matrix,
+coverage stats, a manual demo script, and a gaps list. Walk the demo
+script by hand. Close real gaps (missing checks, unproven scenarios)
+before declaring done — "no evidence found" is a prompt to verify, not
+proof of absence.
+
+Then: update README/AGENTS.md, refresh `specs/PRODUCT.md` via
+`product_map`, ensure `specs/<feature>/` tells the true story, and
+report what shipped vs what remains.
 
 ## Rules
 - Specs live in the repo (`specs/`), not in `.openharness/context/` —

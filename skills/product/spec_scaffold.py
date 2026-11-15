@@ -61,17 +61,22 @@ Feature: {title}
 
 _BACKLOG_MD = """# Backlog: {title}
 
-Format per item — keep it parseable by `wave_plan`:
+Items are USER STORIES in the parseable format below — keep the heading
+shape `## US<n> — <story>` and the field lines intact so `wave_plan` can
+parse them. Write the story as: "As a <role>, I want <goal>, so that
+<value>" — the title after the dash IS the story.
 
 ```
-## B<n> — <title>
+## US<n> — As a <role>, I want <goal>, so that <value>
 - Scenarios: @w1, @w2
-- Depends: B1, B3        (optional; omit for wave-1 items)
+- Depends: US1, US3        (optional; omit for wave-1 items)
 - Size: S|M|L
 - Notes: <one line>
 ```
 
-## B1 — {first_item}
+Order stories by user value; dependencies express technical order only.
+
+## US1 — As a user, I want {first_item}, so that {first_value}
 - Scenarios: @w1
 - Size: M
 - Notes:
@@ -121,7 +126,11 @@ def spec_scaffold(repo_path: str = ".", feature: str = "", output_dir: str = "sp
             when="(action)",
             then="(observable outcome)",
         ),
-        "BACKLOG.md": _BACKLOG_MD.format(title=title, first_item="(first backlog item)"),
+        "BACKLOG.md": _BACKLOG_MD.format(
+            title=title,
+            first_item="(first user-facing capability)",
+            first_value="(the user outcome it enables)",
+        ),
     }
 
     written, skipped = [], []
