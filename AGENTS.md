@@ -46,7 +46,8 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
     runtime logic (D005)**.
 - `skills/` — executable Python skills grouped by area (`harness/`,
   `security/` e.g. `scan_secrets`, `legacy_migration/` e.g.
-  `map_architecture`, `strangler_plan`).
+  `map_architecture`, `strangler_plan`, `product/` e.g. `discover_product`,
+  `spec_scaffold`, `wave_plan` — the /ship-product spec-driven pipeline).
 - `SELF/` — the harness's own specs/principles (`PRINCIPLES.md`, decision
   log D001–D008, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
 - `REPOS.md` — YAML-frontmatter registry of managed repos (source of truth).
