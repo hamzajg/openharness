@@ -1,4 +1,6 @@
 import json
+import re
+import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
@@ -198,3 +200,115 @@ def repos_prune(body: dict | None = None):
     names = body.get("names") or []
     remote = bool(body.get("remote", False))
     return repos.prune(*names, remote=remote)
+
+
+# ---------------------------------------------------------------- evolution
+
+_HARNESS_ROOT = Path(__file__).resolve().parent.parent
+_DECISION_RE = re.compile(r"^###\s+(D\d+)\s*[—-]\s*(.+?)\s*$", re.M)
+_CORE_FILES = [
+    "__main__.py", "skill.py", "registry.py", "frontmatter.py",
+    "repos.py", "env.py", "knowledge/rag.py",
+]
+_COMMIT_TYPES = {
+    "feat": "feature", "fix": "fix", "evolve": "evolve",
+    "docs": "docs", "chore": "chore", "refactor": "refactor",
+}
+
+
+def _parse_decisions(path: Path) -> list[dict]:
+    """### D00N — Title / Rule: … / Because: … blocks from PRINCIPLES.md."""
+    try:
+        text = path.read_text()
+    except OSError:
+        return []
+    matches = list(_DECISION_RE.finditer(text))
+    out = []
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        block = text[m.end():end]
+        rule_m = re.search(r"^Rule:\s*(.+?)(?=^Because:|^###|\Z)", block, re.M | re.S)
+        because_m = re.search(r"^Because:\s*(.+?)(?=^###|\Z)", block, re.M | re.S)
+        out.append({
+            "id": m.group(1),
+            "title": m.group(2).strip(),
+            "rule": " ".join(rule_m.group(1).split()) if rule_m else "",
+            "because": " ".join(because_m.group(1).split()) if because_m else "",
+        })
+    return out
+
+
+def _git_log(root: Path, limit: int = 200) -> list[dict]:
+    """Harness self-history: commits on this repo, classified by prefix."""
+    try:
+        res = subprocess.run(
+            ["git", "-C", str(root), "log", f"-{limit}",
+             "--format=%h%x1f%aI%x1f%s"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if res.returncode != 0:
+        return []
+    commits = []
+    for line in res.stdout.splitlines():
+        parts = line.split("\x1f")
+        if len(parts) != 3:
+            continue
+        sha, date, subject = parts
+        prefix = subject.split(":", 1)[0].split("(", 1)[0].strip().lower()
+        commits.append({
+            "sha": sha,
+            "date": date,
+            "subject": subject,
+            "type": _COMMIT_TYPES.get(prefix, "other"),
+        })
+    return commits
+
+
+def _loc(path: Path) -> int:
+    try:
+        return sum(1 for _ in path.open(errors="ignore"))
+    except OSError:
+        return 0
+
+
+def _harness_stats(root: Path) -> dict:
+    pkg = root / "openharness"
+    core_loc = sum(_loc(pkg / f) for f in _CORE_FILES if (pkg / f).is_file())
+    skills_loc = sum(
+        _loc(p) for p in (pkg.parent / "skills").rglob("*.py")
+        if "__pycache__" not in p.parts
+    )
+    observers_loc = sum(_loc(p) for p in (pkg / "observers").glob("*.py"))
+    serve_loc = _loc(pkg / "serve.py") + _loc(pkg / "serve_api.py")
+    tests = 0
+    for p in (root / "tests").glob("test_*.py"):
+        try:
+            tests += sum(1 for ln in p.read_text(errors="ignore").splitlines()
+                         if ln.lstrip().startswith("def test_"))
+        except OSError:
+            pass
+    try:
+        from openharness import registry
+        n_skills = len(registry.all_skills())
+    except Exception:
+        n_skills = len(list((root / "skills").rglob("*.py")))
+    return {
+        "core_loc": core_loc, "core_budget": 300,
+        "skills_loc": skills_loc, "observers_loc": observers_loc,
+        "serve_loc": serve_loc, "serve_budget": 900,
+        "tests": tests,
+        "skills": n_skills,
+        "blocks": len(list((root / "SELF" / "blocks").glob("*.md"))),
+    }
+
+
+@router.get("/evolution")
+def get_evolution():
+    decisions = _parse_decisions(_HARNESS_ROOT / "SELF" / "PRINCIPLES.md")
+    return {
+        "decisions": decisions,
+        "commits": _git_log(_HARNESS_ROOT),
+        "stats": _harness_stats(_HARNESS_ROOT),
+    }

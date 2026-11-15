@@ -62,6 +62,38 @@ export interface LoopDetail extends LoopSummary {
   events: string[]
 }
 
+export interface EvolutionDecision {
+  id: string
+  title: string
+  rule: string
+  because: string
+}
+
+export interface EvolutionCommit {
+  sha: string
+  date: string
+  subject: string
+  type: 'feature' | 'fix' | 'evolve' | 'docs' | 'chore' | 'refactor' | 'other' | string
+}
+
+export interface EvolutionStats {
+  core_loc: number
+  core_budget: number
+  skills_loc: number
+  observers_loc: number
+  serve_loc: number
+  serve_budget: number
+  tests: number
+  skills: number
+  blocks: number
+}
+
+export interface Evolution {
+  decisions: EvolutionDecision[]
+  commits: EvolutionCommit[]
+  stats: EvolutionStats
+}
+
 export const api = {
   sessions: () => _fetch<Record<string, SessionMeta[]>>('/sessions'),
   sessionLines: (id: string) => _fetch<{ lines: unknown[] }>(`/sessions/${encodeURIComponent(id)}`),
@@ -79,4 +111,5 @@ export const api = {
   loops: () => _fetch<{ loops: LoopSummary[] }>('/loops'),
   loopDetail: (repo: string, feature: string) =>
     _fetch<LoopDetail>(`/loops/${encodeURIComponent(repo)}/${encodeURIComponent(feature)}`),
+  evolution: () => _fetch<Evolution>('/evolution'),
 }
