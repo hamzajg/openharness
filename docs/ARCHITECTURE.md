@@ -1,7 +1,7 @@
 # Architecture — openharness
 
 Current-state map. Descriptive, not aspirational; normative decisions live
-in `SELF/PRINCIPLES.md` (D001–D009). See `docs/adr/` for the baseline record.
+in `SELF/PRINCIPLES.md` (D001–D010). See `docs/adr/` for the baseline record.
 
 ## Dual role
 
@@ -30,7 +30,7 @@ OpenHarness is simultaneously:
 | RAG | `knowledge/rag.py` | ChromaDB + sentence-transformers, local |
 | Web UI | `web/` (Vite+TS) | observer dashboard — calls same verbs, no logic (D005) |
 | Skills | `skills/{harness,security,legacy_migration,product}/` | executable Python skills |
-| Delivery loop | `skills/product/ship_loop.py` + `.opencode/commands/ship-loop.md` + `.opencode/agents/*` | deterministic oracle, per-feature `specs/<feature>/LOOP.md` state, subagent roles |
+| Delivery loop | `skills/product/ship_loop.py` + `.opencode/commands/ship-loop.md` + `.opencode/agents/*` | deterministic oracle, per-feature `specs/<feature>/LOOP.md` state, `GATES.md` preconditions, subagent roles |
 | Self specs | `SELF/` | PRINCIPLES.md, decision log, domain blocks |
 
 ## Data flow
@@ -42,10 +42,10 @@ OpenHarness is simultaneously:
   `serve_api` streams to the web UI. Read-only; the harness never injects
   into agent sessions.
 - **Product delivery:** `/ship-loop` → `ship_loop --action=next` reads
-  `specs/<feature>/{SPEC.md,EXAMPLES.feature,BACKLOG.md,WAVES.md,LOOP.md}` →
-  returns one directive → the agent delegates it to a subagent role →
-  outcome recorded back into `LOOP.md`. No harness-side scheduling (D001,
-  D009).
+  `specs/<feature>/{SPEC.md,EXAMPLES.feature,BACKLOG.md,GATES.md,WAVES.md,LOOP.md}`
+  → checks blocking gates for the current phase → returns one directive (or a
+  `GATE:` directive) → the agent delegates it to a subagent role → outcome
+  recorded back into `LOOP.md`. No harness-side scheduling (D001, D009).
 
 ## State
 
@@ -58,4 +58,5 @@ No database, no cloud.
 See `SELF/PRINCIPLES.md` — D001 (no orchestration), D002 (md specs / py
 execution), D003 (LOC budgets), D005 (UI is observer), D006 (log-tail
 observation only), D007 (REPOS.md + sources/), D008 (no copying into target
-repos), D009 (agent-executed delivery loops, state in `specs/`).
+repos), D009 (agent-executed delivery loops, state in `specs/`), D010
+(declared gates guard phase transitions).

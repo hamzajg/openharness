@@ -71,3 +71,20 @@ layer. Product artifacts (`specs/`, `LOOP.md`) are product content, not
 harness files — D008 still forbids copying harness config into target repos.
 The human gate stays explicit: default `--merge=review` leaves every PR open
 for review; `--merge=auto` is opt-in.
+
+### D010 — Gates are declared preconditions, not checkboxes
+Rule: Phase transitions in the delivery loop are guarded by gates declared in
+`specs/<feature>/GATES.md` and tracked in `LOOP.md`. A blocking gate stops the
+phase it is attached to (`spec`/`plan`/`wave:<n>`/`validate`/`finish`) until it
+is `met` with evidence or `waived` by a named human. Overdue gates keep
+blocking; invalid `Before` values block every phase; advisory (`Blocking: no`)
+gates never block. The oracle verifies `file:` evidence; `command:` checks are
+run and recorded by the agent — the oracle never executes repo-provided
+commands.
+Because: Complex domains (regulated claims, billing, healthcare, data
+pipelines) fail when code is written against undecided business rules or
+missing access. Gates make those preconditions explicit, owned, and
+falsifiable before a wave starts, so the loop stops honestly instead of
+inventing rules or silently skipping sign-off. The agent resolves only
+agent-owned gates; human-owned gates are handed back via `block`, preserving
+the human-in-the-loop boundary in D001/D009.

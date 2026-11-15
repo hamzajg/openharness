@@ -54,7 +54,35 @@ report that you need a target repo.
    `- Scenarios: @wN`, optional `- Depends: USk`, `- Size: S|M|L`,
    `- Notes:`. Order by user value; `Depends:` expresses technical order.
 
-7. **Plan waves.**
+7. **GATES.md — preconditions.** Derive the gates the feature needs from the
+   acceptance criteria and business rules. For each AC ask: *what must be
+   decided, known, or available before this can be built or proven?*
+   Write each gate as:
+   ```
+   ## G1 — <short title>
+   - Before: spec | plan | wave:<n> | validate | finish
+   - Type: decision | artifact | external | technical | quality | data
+   - Owner: <role, e.g. product-owner, security, platform>
+   - Resolver: human | agent
+   - Blocking: yes | no
+   - Check: manual | file:<repo-relative-path> | command:<exact command>
+   - Why: <which AC / business rule depends on it>
+   ```
+   Rules:
+   - Keep 2–6 gates; every gate must be falsifiable (a decision id, a path, or
+     a command output). "Quality is good" is not a gate.
+   - `Resolver: human` for anything a person must decide or grant access to
+     (domain rules, pricing, legal, credentials, external sign-off).
+     `Resolver: agent` for artifacts and checks you can produce yourself.
+   - Prefer `Check: file:<path>` for artifacts you can create, so the oracle
+     can verify existence. Use `command:<cmd>` for measurable checks; you run
+     it and record the output — the oracle never executes repo commands.
+   - `Blocking: no` only for genuinely optional improvements.
+   - A gate with an invalid `Before:` blocks every phase until fixed — use
+     exactly `spec`, `plan`, `wave:<n>`, `validate`, or `finish`.
+   - Delete the template's "No gates defined yet." line once you add gates.
+
+8. **Plan waves.**
    ```
    python -m openharness run wave_plan --spec_dir=<repo>/specs/<feature>
    ```
@@ -62,15 +90,24 @@ report that you need a target repo.
    fix `BACKLOG.md`/`EXAMPLES.feature` and re-run until clean. Each wave must
    be independently shippable: one branch, one PR, green tests, demoable.
 
-8. **Return** the report below.
+9. **Sanity-check the loop.** Run
+   ```
+   python -m openharness run ship_loop --action=status --repo_path=<repo>
+   ```
+   If it prints `GATE:` for the next phase, confirm each gate is real and
+   correctly owned. Do not mark gates met — that is the orchestrator's call
+   once the evidence exists.
+
+10. **Return** the report below.
 
 ## Output contract
 
 ```
 FEATURE: <slug>
 CHOSEN: <name> — score <n>/125 (<value>,<feasibility>,<differentiation>)
-FILES:  SPEC.md · EXAMPLES.feature · BACKLOG.md · WAVES.md
+FILES:  SPEC.md · EXAMPLES.feature · BACKLOG.md · GATES.md · WAVES.md
 WAVES:  W1 <items> · W2 <items> ...
+GATES:  G1 <title> (<before>, <resolver>) · G2 ... | none
 WARNINGS: none | <list>
 NEXT:   run `ship_loop --action=next --repo_path=<repo>`
 ```
@@ -82,6 +119,8 @@ NEXT:   run `ship_loop --action=next --repo_path=<repo>`
 - Never commit, push, branch, or open a PR — the orchestrator and
   wave-implementer own git.
 - Never overwrite existing specs blindly; preserve decisions already made.
+- Do not invent gates to look thorough, and do not resolve them. Gates are
+  preconditions the loop enforces; only the orchestrator records status.
 - One feature at a time. Do not scaffold a second feature while one is
   unfinished unless the orchestrator explicitly asks.
 - No secrets in specs. No invented metrics or user research.

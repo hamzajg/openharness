@@ -20,20 +20,30 @@ ask.
 
 1. **Gather.** `git status`, the PR diff (`git diff <default>...<branch>` or
    the GitHub API), the PR body, and CI status.
-2. **Spec check.** For each scenario the wave names, confirm:
+2. **Gate evidence.** Read `GATES.md` and the `## Gates` table in `LOOP.md`.
+   For every blocking gate due at or before this wave (`Before: spec|plan|wave:<n>`):
+   - status is `met`, `waived`, or legitimately advisory (`Blocking: no`);
+   - a `met` gate cites real evidence (file exists, command output recorded),
+     not a placeholder like "done";
+   - a `waived` gate names who waived it and why — an agent cannot self-waive;
+   - the diff does not quietly satisfy a human-owned gate (e.g. inventing a
+     domain rule or committing a credential to "unblock" a wave).
+   An unmet or fabricated gate is a **blocker**: the wave must not be recorded
+   complete. Report it; the orchestrator records gate status, not you.
+3. **Spec check.** For each scenario the wave names, confirm:
    - a test exists and cites the scenario name;
    - the test actually exercises the behavior (not a tautology or mock-only);
    - the implementation satisfies the observable outcome.
-3. **Regression check.** Look for changed behavior outside the wave's scope,
+4. **Regression check.** Look for changed behavior outside the wave's scope,
    broken public contracts, removed error handling, or weakened tests.
-4. **Hygiene.** Secrets/credentials/`.env`, debug prints, commented-out code,
+5. **Hygiene.** Secrets/credentials/`.env`, debug prints, commented-out code,
    TODOs without issues, unrelated formatting churn, generated artifacts,
    dependency changes without justification.
-5. **Conventions.** Branch name, commit messages, PR body (spec link, wave,
+6. **Conventions.** Branch name, commit messages, PR body (spec link, wave,
    evidence), one logical change.
-6. **Run the checks** if feasible (`pytest`, `npm test`, `./gradlew test`,
+7. **Run the checks** if feasible (`pytest`, `npm test`, `./gradlew test`,
    repo-specific command) and report the real result. Do not modify files.
-7. **Return** the verdict below.
+8. **Return** the verdict below.
 
 ## Output contract
 
@@ -41,6 +51,7 @@ ask.
 VERDICT: PASS | FAIL
 WAVE: <n> — <feature>
 SPEC: <scenarios covered / missing>
+GATES: <met/waived/pending by id, or "none">
 CI: green | red | pending
 CHECKS: <commands run + results>
 FINDINGS:
@@ -49,8 +60,8 @@ NOTES: <anything the orchestrator must know>
 ```
 
 `FAIL` if any blocker or major finding exists, a named scenario is unproven,
-CI is red, or the PR contains secrets. Minor findings do not fail the wave
-but must be listed.
+a blocking gate is unmet or fabricated, CI is red, or the PR contains secrets.
+Minor findings do not fail the wave but must be listed.
 
 ## Guardrails
 

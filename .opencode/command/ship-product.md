@@ -48,6 +48,28 @@ It writes `specs/PRODUCT.md` — every feature's stories/scenarios/waves/
 validation state in one table. Sequence features by dependency and user
 value; ship ONE at a time.
 
+### Phase 2.5 — Gates (preconditions)
+Complex domains need prerequisites before a phase can start: a signed-off
+glossary or coverage rule, a data contract, sandbox access, seed data, or
+a security/legal review. Write them into `specs/<feature>/GATES.md`:
+
+```
+## G1 — Coverage rules signed off
+- Before: spec | plan | wave:<n> | validate | finish
+- Type: decision | artifact | external | technical | quality | data
+- Owner: <role>
+- Resolver: human | agent
+- Blocking: yes | no
+- Check: manual | file:<repo-relative-path> | command:<exact command>
+- Why: <which AC / business rule depends on it>
+```
+
+Derive gates from the acceptance criteria and business rules: for each one
+ask "what must be decided, known, or available before we can build or prove
+this?". Keep 2–6 gates; each must be falsifiable (a path, a decision id, or
+a command output). `/ship-loop` enforces them; in manual mode treat them as
+hard prerequisites. Revisit the gates in Phase 3 once the AC table is final.
+
 ### Phase 3 — Spec (spec driver)
 ```
 python -m openharness run spec_scaffold --repo_path=sources/<repo> --feature="<name>"
@@ -82,8 +104,10 @@ demoable outcome. For each wave, in order:
    .feature scenarios are the acceptance spec; implement until they pass).
 3. Implement minimally — KISS, match repo conventions.
 4. Verify: build + tests green locally, then CI on the PR.
-5. Merge, delete branch, demo the iteration outcome, mark wave done in
-   WAVES.md (commit the marker).
+5. Open one PR; merge only per the merge policy (default: leave it open for
+   review), delete the branch after merge, demo the iteration outcome. Record
+   the wave with `ship_loop --action=complete` — `LOOP.md` is execution
+   state; `WAVES.md` stays the plan.
 
 ### Phase 7 — Validate + Ship
 Run the acceptance walkthrough:
@@ -94,7 +118,8 @@ It writes `VALIDATION.md`: AC → scenario → wave → test-evidence matrix,
 coverage stats, a manual demo script, and a gaps list. Walk the demo
 script by hand. Close real gaps (missing checks, unproven scenarios)
 before declaring done — "no evidence found" is a prompt to verify, not
-proof of absence.
+proof of absence. Every `Before: finish` gate in `GATES.md` must be met or
+explicitly waived before the feature is declared shipped.
 
 Then: update README/AGENTS.md, refresh `specs/PRODUCT.md` via
 `product_map`, ensure `specs/<feature>/` tells the true story, and
