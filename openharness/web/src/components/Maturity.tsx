@@ -137,7 +137,7 @@ export default function Maturity() {
                 label="Core LOC"
                 value={`${s.core_loc}/${s.core_budget}`}
                 tone={s.core_loc > s.core_budget ? 'text-amber-300' : 'text-emerald-300'}
-                sub={s.core_loc > s.core_budget ? 'over D003 budget' : 'within D003 budget'}
+                sub={s.core_loc > s.core_budget ? 'over D012 budget' : 'within D012 budget'}
                 bar={{ pct: corePct, over: s.core_loc > s.core_budget }}
               />
               <StatCard
