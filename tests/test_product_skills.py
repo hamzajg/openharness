@@ -205,3 +205,38 @@ def test_ship_validate_writes_traceability(tmp_path):
     assert (d / "VALIDATION.md").is_file()
     assert "Traceability" in out and "Demo script" in out
     assert "test_demo.py" in out  # evidence found
+
+
+def test_ship_validate_resolves_scenario_names_in_ac(tmp_path):
+    from skills.product.ship_validate import ship_validate
+    repo = tmp_path / "repo"
+    d = repo / "specs" / "demo"
+    d.mkdir(parents=True)
+    (d / "SPEC.md").write_text(
+        "# Spec: Demo\n\n## Acceptance criteria\n\n| # | Criterion | Scenario(s) |\n|---|-----------|-------------|\n| 1 | It works | Create base |\n"
+    )
+    (d / "EXAMPLES.feature").write_text(
+        "Feature: Demo\n\n  @w1 @happy-path\n  Scenario: Create base\n    Given x\n"
+    )
+    (d / "WAVES.md").write_text("# Waves\n\n## Wave 1 — iteration 1\n\n| Item |\n")
+    _write(repo, "tests/test_demo.py", "def test_unrelated():\n    assert True\n")
+    out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    assert "| 1 | It works | 1 | @w1 |" in out  # name resolved to scenario+wave
+
+
+def test_ship_validate_weak_evidence_marked(tmp_path):
+    from skills.product.ship_validate import ship_validate
+    repo = tmp_path / "repo"
+    d = repo / "specs" / "demo"
+    d.mkdir(parents=True)
+    (d / "SPEC.md").write_text(
+        "# Spec: Demo\n\n## Acceptance criteria\n\n| # | Criterion | Scenario(s) |\n|---|-----------|-------------|\n| 1 | It works | @w1 |\n"
+    )
+    (d / "EXAMPLES.feature").write_text(
+        "Feature: Demo\n\n  @w1\n  Scenario: Order history shows own orders\n    Given x\n"
+    )
+    (d / "WAVES.md").write_text("# Waves\n\n## Wave 1 — iteration 1\n\n| Item |\n")
+    _write(repo, "tests/test_orders.py",
+           "def test_orders_list_only_own_orders_history():\n    assert True\n")
+    out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    assert "~" in out and "weak" in out
