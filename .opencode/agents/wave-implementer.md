@@ -28,34 +28,45 @@ changing anything.
 ## Procedure
 
 1. **Read before writing.** `SPEC.md`, `EXAMPLES.feature`, `BACKLOG.md`,
-   `WAVES.md`, `LOOP.md`, the repo's `README`/`AGENTS.md`, and the build
-   manifests. Run `git status` and `git branch --show-current`.
+   `WAVES.md`, `GATES.md`, `LOOP.md`, the repo's `README`/`AGENTS.md`, and the
+   build manifests. Run `git status` and `git branch --show-current`.
    - If the tree has uncommitted changes you did not create, **stop** and
      report it. Do not stash, reset, or commit someone else's work.
    - If the repo has no remote, stop and report.
 
-2. **Branch.** Determine the default branch (`git symbolic-ref
+2. **Entry gates.** A wave may declare preconditions in `GATES.md`
+   (`Before: wave:<n>`). Before changing anything, confirm every blocking gate
+   due at or before this wave is `met` or `waived` in `LOOP.md`:
+   ```
+   python -m openharness run ship_loop --action=status --repo_path=<repo>
+   ```
+   If the output contains `GATE:` naming this wave, **stop and report it**.
+   Do not work around an unmet gate, and never record a gate yourself — the
+   orchestrator owns gate status. Missing credentials, seed data, or a
+   data contract is a block, not something to fake.
+
+3. **Branch.** Determine the default branch (`git symbolic-ref
    refs/remotes/origin/HEAD` or the repo's convention), fetch it, and create
    `feat/<feature>-w<N>` from it. Never commit to the default branch.
 
-3. **Tests first.** For every scenario the wave names, add a failing check
+4. **Tests first.** For every scenario the wave names, add a failing check
    that cites the scenario name (test name, docstring, or describe/it text).
    Run it and confirm it fails for the right reason. A wave without a
    failing-first check is not a wave.
 
-4. **Implement minimally.** Match the repo's conventions and existing
+5. **Implement minimally.** Match the repo's conventions and existing
    patterns. No new frameworks, no drive-by refactors, no scope creep.
 
-5. **Verify for real.** Run the repo's actual build + test commands (from
+6. **Verify for real.** Run the repo's actual build + test commands (from
    `AGENTS.md`, CI config, or manifests). Fix until green. Report the exact
    commands and counts — never claim green without running them.
 
-6. **Commit** conventionally (`feat:`, `fix:`, `test:`, `chore:`) in a
+7. **Commit** conventionally (`feat:`, `fix:`, `test:`, `chore:`) in a
    small, logical series. Include the updated `specs/<feature>/LOOP.md` if
    the orchestrator already wrote it. Never commit secrets, `.env` files,
    credentials, or generated build output that is gitignored.
 
-7. **Push and open one PR** against the default branch. Use `gh pr create`
+8. **Push and open one PR** against the default branch. Use `gh pr create`
    if available, otherwise the GitHub REST API with the user's existing git
    credentials. PR body must include:
    - the spec path and the wave number (`Wave N of M`);
@@ -64,18 +75,18 @@ changing anything.
    - `Stacked on #<n>` and the merge order when the base is another PR;
    - known gaps / follow-ups.
 
-8. **CI.** Wait for checks on the PR (poll with short sleeps, do not busy
+9. **CI.** Wait for checks on the PR (poll with short sleeps, do not busy
    loop). If red, read the logs, fix, push; at most **two** fix attempts,
    then stop and report the failure verbatim.
 
-9. **Merge policy.**
+10. **Merge policy.**
    - `review` (default): leave the PR open. Report its number and URL.
    - `auto`: merge only when CI is green and the diff is exactly this wave
      (squash unless the repo convention says otherwise), then delete the
      branch. Never merge a red or pending PR, never force-push the default
      branch.
 
-10. **Return** the report below.
+11. **Return** the report below.
 
 ## Output contract
 
@@ -101,3 +112,5 @@ NOTES: <gaps, flaky checks, decisions>
 - Do not launch subagents.
 - If the spec is ambiguous or the wave is too large, stop and report the
   ambiguity instead of guessing — the orchestrator can block the loop.
+- If a blocking entry gate is pending, stop and report it. Never bypass or
+  self-approve a gate; the orchestrator records `met`/`waived`/`failed`.

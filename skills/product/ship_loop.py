@@ -32,8 +32,17 @@ _STATE_ROW_RE = re.compile(
 )
 _STATUS_RE = re.compile(r"^Status:\s*(\S+)\s*$", re.M)
 _ITER_RE = re.compile(r"^Iterations:\s*(\d+)\s*$", re.M)
+_GATE_RE = re.compile(r"^##\s+(G\d+)\s*[—-]\s*(.+)$", re.M)
+_GATE_STATE_RE = re.compile(
+    r"^\|\s*(G\d+)\s*\|\s*([a-z-]+)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*$",
+    re.M,
+)
 _WAVE_STATUSES = ("pending", "in-progress", "done")
 _FEATURE_STATUSES = ("running", "blocked", "done")
+_GATE_STATUSES = ("pending", "met", "waived", "failed")
+_GATE_PHASES = ("spec", "plan", "validate", "finish")
+_GATE_TYPES = ("decision", "artifact", "external", "technical", "quality", "data")
+_AGENT_GATE_TYPES = ("artifact", "technical", "data")
 
 
 def _now() -> str:
@@ -120,7 +129,20 @@ def _load_state(spec_dir: Path) -> dict:
             for line in text.split("## Events", 1)[1].splitlines()
             if line.startswith("- ") and line[2:].strip() != "(none)"
         ]
-    return {"status": status, "iterations": iterations, "waves": waves, "events": events}
+    gates = {}
+    for m in _GATE_STATE_RE.finditer(text):
+        gates[m.group(1).upper()] = {
+            "status": m.group(2) if m.group(2) in _GATE_STATUSES else "pending",
+            "evidence": m.group(3),
+            "updated": m.group(4),
+        }
+    return {
+        "status": status,
+        "iterations": iterations,
+        "waves": waves,
+        "gates": gates,
+        "events": events,
+    }
 
 
 def _save_state(spec_dir: Path, state: dict) -> None:
@@ -142,6 +164,24 @@ def _save_state(spec_dir: Path, state: dict) -> None:
             f"| {row.get('pr', '—')} | {row.get('evidence', '—')} "
             f"| {row.get('updated', '—')} |"
         )
+    gate_numbers = sorted(
+        set(state.get("gates", {})) | set(_parse_gates(spec_dir)),
+        key=lambda g: int(g[1:]) if g[1:].isdigit() else 10**6,
+    )
+    if gate_numbers:
+        out += [
+            "",
+            "## Gates",
+            "",
+            "| Gate | Status | Evidence | Updated |",
+            "|------|--------|----------|---------|",
+        ]
+        for gid in gate_numbers:
+            row = state["gates"].get(gid, {})
+            out.append(
+                f"| {gid} | {row.get('status', 'pending')} "
+                f"| {row.get('evidence', '—')} | {row.get('updated', '—')} |"
+            )
     out += ["", "## Events", ""]
     out += [f"- {e}" for e in state["events"][-200:]] or ["- (none)"]
     (spec_dir / "LOOP.md").write_text("\n".join(out) + "\n")
@@ -153,8 +193,179 @@ def _wave(state: dict, n: int) -> dict:
     )
 
 
+def _gate(state: dict, gid: str) -> dict:
+    return state["gates"].setdefault(
+        gid, {"status": "pending", "evidence": "—", "updated": "—"}
+    )
+
+
 def _event(state: dict, text: str) -> None:
     state["events"].append(f"{_now()} {text}")
+
+
+# --------------------------------------------------------------------- gates
+
+def _field(block: str, name: str, default: str = "") -> str:
+    m = re.search(rf"^-\s*{re.escape(name)}:\s*(.*)$", block, re.M | re.I)
+    return m.group(1).strip() if m else default
+
+
+def _normalize_before(raw: str) -> tuple[str, bool]:
+    value = raw.strip().lower()
+    if value in _GATE_PHASES:
+        return value, True
+    m = re.match(r"^(?:wave|w)[:\s]*(\d+)$", value)
+    if m:
+        return f"wave:{int(m.group(1))}", True
+    return raw.strip(), False
+
+
+def _parse_gates(spec_dir: Path) -> dict[str, dict]:
+    """Gate definitions from GATES.md, keyed by id (G1, G2, ...)."""
+    text = _read(spec_dir / "GATES.md")
+    gates: dict[str, dict] = {}
+    matches = list(_GATE_RE.finditer(text))
+    for i, m in enumerate(matches):
+        gid = m.group(1).upper()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        block = text[m.end():end]
+        gtype = _field(block, "Type", "decision").lower()
+        if gtype not in _GATE_TYPES:
+            gtype = "decision"
+        resolver = _field(block, "Resolver", "").lower()
+        if resolver not in ("agent", "human"):
+            resolver = "agent" if gtype in _AGENT_GATE_TYPES else "human"
+        blocking_raw = _field(block, "Blocking", "yes").lower()
+        before, valid = _normalize_before(_field(block, "Before", "spec"))
+        gates[gid] = {
+            "id": gid,
+            "title": m.group(2).strip(),
+            "before": before,
+            "before_valid": valid,
+            "type": gtype,
+            "owner": _field(block, "Owner", "unassigned"),
+            "resolver": resolver,
+            "blocking": blocking_raw not in ("no", "false", "advisory"),
+            "check": _field(block, "Check", "manual").strip(),
+            "why": _field(block, "Why", ""),
+        }
+    return gates
+
+
+def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
+    """(effective status, evidence) — `stale` means met but evidence vanished."""
+    row = state["gates"].get(gate["id"], {})
+    status = row.get("status", "pending")
+    evidence = row.get("evidence", "—")
+    if status == "waived":
+        return "waived", evidence
+    if status == "met" and gate["check"].lower().startswith("file:"):
+        rel = gate["check"].split(":", 1)[1].strip()
+        if not rel or not (root / rel).exists():
+            return "stale", evidence
+    if status in ("met", "failed"):
+        return status, evidence
+    return "pending", evidence
+
+
+def _phase_rank(phase: str) -> int:
+    if phase == "spec":
+        return 10
+    if phase == "plan":
+        return 20
+    if phase.startswith("wave:"):
+        try:
+            return 30 + int(phase.split(":", 1)[1])
+        except ValueError:
+            return 30
+    if phase == "validate":
+        return 1000
+    if phase == "finish":
+        return 1001
+    return 10**6
+
+
+def _blocking_gates(spec_dir: Path, state: dict, phase: str, root: Path) -> list[tuple[dict, str]]:
+    """Blocking gates due at or before `phase` that are not met/waived.
+
+    Overdue gates keep blocking: filling artifacts out of order must not let a
+    pending `Before: spec` gate slip past by jumping straight to a wave.
+    """
+    out = []
+    limit = _phase_rank(phase)
+    for gate in _parse_gates(spec_dir).values():
+        if not gate["blocking"]:
+            continue
+        if not gate["before_valid"]:
+            out.append((gate, "invalid"))
+            continue
+        if _phase_rank(gate["before"]) > limit:
+            continue
+        status, _ = _gate_effective(gate, state, root)
+        if status in ("pending", "failed", "stale"):
+            out.append((gate, status))
+    return out
+
+
+def _phase_label(phase: str) -> str:
+    if phase.startswith("wave:"):
+        return f"starting wave {phase.split(':', 1)[1]}"
+    return {
+        "spec": "writing the spec",
+        "plan": "planning waves",
+        "validate": "validation",
+        "finish": "closing the feature",
+    }.get(phase, phase)
+
+
+def _gate_directive(root: Path, spec_dir: Path, phase: str, blocking: list[tuple[dict, str]]) -> str:
+    rel = _rel(root, spec_dir)
+    overdue = any(
+        gate["before_valid"] and _phase_rank(gate["before"]) < _phase_rank(phase)
+        for gate, _ in blocking
+    )
+    suffix = " (including overdue)" if overdue else ""
+    lines = [
+        f"GATE: {len(blocking)} blocking precondition(s) before {_phase_label(phase)}"
+        f"{suffix} — {spec_dir.name}",
+        "",
+    ]
+    for gate, status in blocking:
+        lines.append(f"- {gate['id']} — {gate['title']}  [{status}]")
+        lines.append(
+            f"  before {gate['before']} · {gate['type']} · owner {gate['owner']} "
+            f"· resolver {gate['resolver']} · check {gate['check']}"
+        )
+        if gate["why"]:
+            lines.append(f"  why: {gate['why']}")
+        if status == "invalid":
+            lines.append(
+                f"  fix: set `- Before:` to spec|plan|wave:<n>|validate|finish "
+                f"in `{rel}/GATES.md`"
+            )
+        elif status == "stale":
+            lines.append("  fix: the evidence file is gone — restore it or re-record the gate")
+        elif gate["resolver"] == "agent":
+            hint = "create the artifact" if gate["type"] in ("artifact", "data") else "run the check"
+            lines.append(f"  next (agent): {hint}, then record it:")
+            lines.append(
+                f"    python -m openharness run ship_loop --action=gate --spec_dir={rel} "
+                f"--gate={gate['id']} --status=met --evidence=\"<path or command output>\""
+            )
+        else:
+            lines.append("  next (human): stop and hand this back:")
+            lines.append(
+                f"    python -m openharness run ship_loop --action=block --spec_dir={rel} "
+                f"--note=\"{gate['id']}: <what the human must decide or provide>\""
+            )
+        lines.append("")
+    lines += [
+        "Resolve agent-owned gates inline; block for human-owned gates. A waiver is",
+        "a human decision and must be recorded, never assumed:",
+        "  python -m openharness run ship_loop --action=gate --gate=<G> "
+        "--status=waived --waived-by=\"<name>\" --note=\"<reason>\"",
+    ]
+    return "\n".join(lines)
 
 
 # ------------------------------------------------------------------ decisions
@@ -238,6 +449,9 @@ def _decide(root: Path, spec_dir: Path, state: dict, waves: dict) -> str:
         if not (spec_dir / name).is_file()
     ]
     if missing:
+        blocked = _blocking_gates(spec_dir, state, "spec", root)
+        if blocked:
+            return _gate_directive(root, spec_dir, "spec", blocked)
         return "\n".join([
             f"NEXT: complete the spec for {spec_dir.name}",
             "",
@@ -249,6 +463,9 @@ def _decide(root: Path, spec_dir: Path, state: dict, waves: dict) -> str:
             "and user stories in BACKLOG.md.",
         ])
     if not waves:
+        blocked = _blocking_gates(spec_dir, state, "plan", root)
+        if blocked:
+            return _gate_directive(root, spec_dir, "plan", blocked)
         return "\n".join([
             f"NEXT: plan waves for {spec_dir.name}",
             "",
@@ -272,22 +489,47 @@ def _decide(root: Path, spec_dir: Path, state: dict, waves: dict) -> str:
 
     pending = [n for n in sorted(waves) if _wave(state, n)["status"] != "done"]
     if pending:
+        phase = f"wave:{pending[0]}"
+        blocked = _blocking_gates(spec_dir, state, phase, root)
+        if blocked:
+            return _gate_directive(root, spec_dir, phase, blocked)
         return _wave_brief(root, spec_dir, state, pending[0], waves)
 
     if not (spec_dir / "VALIDATION.md").is_file():
+        blocked = _blocking_gates(spec_dir, state, "validate", root)
+        if blocked:
+            return _gate_directive(root, spec_dir, "validate", blocked)
         return _validate_brief(root, spec_dir)
 
+    blocked = _blocking_gates(spec_dir, state, "finish", root)
+    if blocked:
+        return _gate_directive(root, spec_dir, "finish", blocked)
     return "FEATURE-DONE"
 
 
-def _summary(spec_dir: Path, state: dict, waves: dict, budget: int) -> str:
+def _summary(root: Path, spec_dir: Path, state: dict, waves: dict, budget: int) -> str:
     done = sum(1 for w in waves if _wave(state, w)["status"] == "done")
     progress = sum(1 for w in waves if _wave(state, w)["status"] == "in-progress")
+    gates = _parse_gates(spec_dir)
+    gate_text = ""
+    if gates:
+        met = sum(
+            1 for g in gates.values()
+            if _gate_effective(g, state, root)[0] in ("met", "waived")
+        )
+        pending = sum(
+            1 for g in gates.values()
+            if g["blocking"] and _gate_effective(g, state, root)[0] in ("pending", "failed", "stale")
+        )
+        gate_text = f" · gates {met}/{len(gates)} met"
+        if pending:
+            gate_text += f" ({pending} blocking pending)"
     return (
         f"Feature: `{spec_dir.name}` · status {state['status']} · "
         f"iteration {state['iterations']}/{budget} · "
         f"waves {done}/{len(waves)} done"
         + (f", {progress} in progress" if progress else "")
+        + gate_text
     )
 
 
@@ -302,16 +544,25 @@ def ship_loop(
     note: str = "",
     pr: str = "",
     branch: str = "",
+    gate: str = "",
+    status: str = "",
+    evidence: str = "",
+    waived_by: str = "",
     max_iterations: int = 25,
     force: bool = False,
 ) -> str:
-    """Drive one delivery-loop iteration: report the next action and record wave outcomes.
+    """Drive one delivery-loop iteration: report the next action and record wave/gate outcomes.
 
     Actions: `next` (default; increments the iteration counter and prints the
-    next action or DONE/BLOCKED/STOP), `status` (same without incrementing),
+    next action or DONE/BLOCKED/GATE/STOP), `status` (same without incrementing),
     `start` (mark a wave in progress), `complete` (mark it done with evidence),
-    `block` (stop the loop with a reason), `resume` (clear blocked), `reset`
-    (clear wave state), `finish` (mark a validated feature done).
+    `gate` (record a precondition as met/waived/failed/pending), `block` (stop
+    the loop with a reason), `resume` (clear blocked), `reset` (clear wave
+    state), `finish` (mark a validated feature done).
+
+    Gates are preconditions declared in `specs/<feature>/GATES.md`; their
+    status is recorded in `LOOP.md`. A blocking gate prevents the phase it is
+    attached to (`spec`, `plan`, `wave:<n>`, `validate`, `finish`).
 
     State is `specs/<feature>/LOOP.md`; the plan stays in WAVES.md. The agent
     executes the action — the harness never launches agents (D001).
@@ -319,11 +570,15 @@ def ship_loop(
     Params:
       repo_path: Repository root containing specs/.
       spec_dir: Feature dir; defaults to the first unfinished feature.
-      action: next|status|start|complete|block|resume|reset|finish.
+      action: next|status|start|complete|gate|block|resume|reset|finish.
       wave: Wave number for start/complete/reset.
-      note: Evidence (complete) or reason (block).
+      note: Evidence (complete), reason (block), or waiver/failure reason (gate).
       pr: PR reference recorded on complete.
       branch: Branch name recorded on start (default feat/<feature>-w<N>).
+      gate: Gate id for `gate` (e.g. G1).
+      status: Gate status for `gate`: pending|met|waived|failed.
+      evidence: Proof recorded when a gate is marked met.
+      waived_by: Human who approved a waiver (required with `--status=waived`).
       max_iterations: Hard stop after this many `next` calls (default 25).
       force: Allow out-of-order start/complete or a full reset.
     """
@@ -331,8 +586,14 @@ def ship_loop(
     root = Path(repo_path).resolve()
     if not root.is_dir():
         return f"ERROR: {repo_path} is not a directory"
-    if action not in ("next", "status", "start", "complete", "block", "resume", "reset", "finish"):
-        return f"ERROR: unknown action {action!r} (next|status|start|complete|block|resume|reset|finish)"
+    if action not in (
+        "next", "status", "start", "complete", "gate",
+        "block", "resume", "reset", "finish",
+    ):
+        return (
+            f"ERROR: unknown action {action!r} "
+            "(next|status|start|complete|gate|block|resume|reset|finish)"
+        )
 
     dirs = _feature_dirs(root)
     explicit = bool(spec_dir)
@@ -353,6 +614,50 @@ def ship_loop(
         state = _load_state(d)
         waves = _parse_waves(d)
 
+        if action == "gate":
+            gates = _parse_gates(d)
+            gid = gate.strip().upper()
+            if not gid:
+                return "ERROR: --gate is required (e.g. --gate=G1)"
+            if gid not in gates:
+                return f"ERROR: gate {gid} is not defined in {_rel(root, d)}/GATES.md"
+            if status not in _GATE_STATUSES:
+                return "ERROR: --status must be pending|met|waived|failed"
+            g = gates[gid]
+            row = _gate(state, gid)
+            if status == "met":
+                if not evidence.strip():
+                    return "ERROR: --evidence is required to mark a gate met"
+                if g["check"].lower().startswith("file:"):
+                    rel = g["check"].split(":", 1)[1].strip()
+                    if not rel or not (root / rel).exists():
+                        return f"ERROR: evidence file `{rel}` does not exist — create it first"
+                row.update({"status": "met", "evidence": _clean(evidence), "updated": _now()})
+                _event(state, f"gate {gid} met: {_clean(evidence)}")
+            elif status == "waived":
+                if not waived_by.strip() or not note.strip():
+                    return "ERROR: --waived-by and --note (reason) are required to waive a gate"
+                row.update({
+                    "status": "waived",
+                    "evidence": _clean(f"waived by {waived_by}: {note}"),
+                    "updated": _now(),
+                })
+                _event(state, f"gate {gid} waived by {_clean(waived_by)}: {_clean(note)}")
+            elif status == "failed":
+                reason = note.strip() or evidence.strip()
+                if not reason:
+                    return "ERROR: --note or --evidence is required to mark a gate failed"
+                row.update({"status": "failed", "evidence": _clean(reason), "updated": _now()})
+                _event(state, f"gate {gid} failed: {_clean(reason)}")
+            else:
+                row.update({"status": "pending", "evidence": "—", "updated": _now()})
+                _event(state, f"gate {gid} reset to pending")
+            _save_state(d, state)
+            return (
+                f"Gate {gid} {status}.\n\n" + _summary(root, d, state, waves, budget)
+                + "\n\n" + _decide(root, d, state, waves)
+            )
+
         if action == "start":
             if not wave:
                 return "ERROR: --wave is required"
@@ -363,6 +668,9 @@ def ship_loop(
             for earlier in sorted(w for w in waves if w < wave):
                 if _wave(state, earlier)["status"] != "done" and not force:
                     return f"ERROR: wave {earlier} is not done — finish it first (or --force)"
+            blocked = _blocking_gates(d, state, f"wave:{wave}", root)
+            if blocked:
+                return _gate_directive(root, d, f"wave:{wave}", blocked)
             if _wave(state, wave)["status"] == "done" and not force:
                 return f"ERROR: wave {wave} is already done (or --force)"
             row = _wave(state, wave)
@@ -374,7 +682,7 @@ def ship_loop(
             state["status"] = "running"
             _event(state, f"start wave {wave} on {row['branch']}")
             _save_state(d, state)
-            return f"Recorded wave {wave} in progress (`{row['branch']}`).\n\n" + _summary(d, state, waves, budget)
+            return f"Recorded wave {wave} in progress (`{row['branch']}`).\n\n" + _summary(root, d, state, waves, budget)
 
         if action == "complete":
             if not wave:
@@ -394,7 +702,7 @@ def ship_loop(
             })
             _event(state, f"complete wave {wave}" + (f" ({pr})" if pr else "") + f": {_clean(note)}")
             _save_state(d, state)
-            return (f"Recorded wave {wave} done.\n\n" + _summary(d, state, waves, budget)
+            return (f"Recorded wave {wave} done.\n\n" + _summary(root, d, state, waves, budget)
                     + "\n\n" + _decide(root, d, state, waves))
 
         if action == "block":
@@ -409,7 +717,7 @@ def ship_loop(
             state["status"] = "running"
             _event(state, "resumed")
             _save_state(d, state)
-            return f"Resumed {d.name}.\n\n" + _summary(d, state, waves, budget)
+            return f"Resumed {d.name}.\n\n" + _summary(root, d, state, waves, budget)
 
         if action == "reset":
             if wave:
@@ -422,7 +730,7 @@ def ship_loop(
                 state.update({"status": "running", "iterations": 0, "waves": {}})
                 _event(state, "full reset")
             _save_state(d, state)
-            return f"Reset {d.name}.\n\n" + _summary(d, state, waves, budget)
+            return f"Reset {d.name}.\n\n" + _summary(root, d, state, waves, budget)
 
         if action == "finish":
             undone = [n for n in sorted(waves) if _wave(state, n)["status"] != "done"]
@@ -433,6 +741,9 @@ def ship_loop(
                 )
             if not (d / "VALIDATION.md").is_file():
                 return "ERROR: VALIDATION.md is missing — run ship_validate first"
+            blocked = _blocking_gates(d, state, "finish", root)
+            if blocked:
+                return _gate_directive(root, d, "finish", blocked)
             state["status"] = "done"
             _event(state, "feature validated and shipped")
             _save_state(d, state)
@@ -466,7 +777,7 @@ def ship_loop(
             _event(state, "feature validated and shipped")
             _save_state(d, state)
             continue
-        head = f"# Delivery loop — {d.name}\n\n{_summary(d, state, waves, budget)}\n"
+        head = f"# Delivery loop — {d.name}\n\n{_summary(root, d, state, waves, budget)}\n"
         return head + "\n" + verdict
 
     return "\n".join([

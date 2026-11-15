@@ -1,9 +1,10 @@
-"""Scaffold a spec-driven feature directory: SPEC.md + EXAMPLES.feature + BACKLOG.md.
+"""Scaffold a spec-driven feature directory: SPEC.md + EXAMPLES.feature + BACKLOG.md + GATES.md.
 
-Creates specs/<feature>/ inside the target repo with three artifacts:
+Creates specs/<feature>/ inside the target repo with four artifacts:
 - SPEC.md — the spec driver (problem, users, scope, out-of-scope, acceptance criteria)
 - EXAMPLES.feature — specifications by example (Gherkin scenarios, tagged @w<N>)
 - BACKLOG.md — ordered work items referencing scenario tags and dependency hints
+- GATES.md — preconditions for phase transitions (status lives in LOOP.md)
 
 The agent fills the templates; this skill only writes deterministic skeletons
 so the artifact contract is identical across repos. Deterministic file writer.
@@ -85,6 +86,36 @@ Order stories by user value; dependencies express technical order only.
 - Notes:
 """
 
+_GATES_MD = """# Gates: {title}
+
+> Preconditions for phase transitions. Each `## G<n> — <title>` block is a
+> gate. `ship_loop` refuses to advance past a phase while a blocking gate is
+> pending. Definitions live here; status and evidence live in `LOOP.md`.
+>
+> Gate phases: `spec` (before writing the spec), `plan` (before planning
+> waves), `wave:<n>` (before starting wave n), `validate` (before validation),
+> `finish` (before closing the feature).
+>
+> Gate types: decision | artifact | external | technical | quality | data.
+> Resolver: `human` (needs a person to decide/provide something) or `agent`
+> (the agent can satisfy it). Check: `manual`, `file:<repo-relative-path>`, or
+> `command:<exact command>` (the agent runs it and records the output as
+> evidence — the oracle never executes it).
+
+<!-- Example (indented so it is not parsed):
+  ## G1 — Domain glossary agreed
+  - Before: spec
+  - Type: decision
+  - Owner: product-owner
+  - Resolver: human
+  - Blocking: yes
+  - Check: manual
+  - Why: AC-2 and AC-3 use domain terms that must be defined once.
+-->
+
+No gates defined yet.
+"""
+
 
 def _slug(feature: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", feature.strip().lower()).strip("-")
@@ -93,12 +124,12 @@ def _slug(feature: str) -> str:
 
 @skill
 def spec_scaffold(repo_path: str = ".", feature: str = "", output_dir: str = "specs") -> str:
-    """Create specs/<feature>/ with SPEC.md, EXAMPLES.feature, BACKLOG.md skeletons.
+    """Create specs/<feature>/ with SPEC.md, EXAMPLES.feature, BACKLOG.md, GATES.md skeletons.
 
-    Writes three artifacts into <repo_path>/<output_dir>/<feature-slug>/.
-    Never overwrites an existing SPEC.md unless force=true. The agent fills
-    the placeholders; keep the section headers and tag conventions intact so
-    `wave_plan` can parse BACKLOG.md later.
+    Writes four artifacts into <repo_path>/<output_dir>/<feature-slug>/.
+    Never overwrites an existing file. The agent fills the placeholders; keep
+    the section headers and tag conventions intact so `wave_plan` can parse
+    BACKLOG.md later.
 
     Params:
       repo_path: Repository root.
@@ -134,6 +165,7 @@ def spec_scaffold(repo_path: str = ".", feature: str = "", output_dir: str = "sp
             first_item="(first user-facing capability)",
             first_value="(the user outcome it enables)",
         ),
+        "GATES.md": _GATES_MD.format(title=title),
     }
 
     written, skipped = [], []
@@ -153,6 +185,7 @@ def spec_scaffold(repo_path: str = ".", feature: str = "", output_dir: str = "sp
         out.append(f"- kept existing `{s}`")
     out.append("")
     out.append("Next: fill SPEC.md (problem/users/scope/AC table), write real")
-    out.append("Gherkin scenarios in EXAMPLES.feature with @w<N> tags, then add")
-    out.append("backlog items to BACKLOG.md and run `wave_plan`.")
+    out.append("Gherkin scenarios in EXAMPLES.feature with @w<N> tags, add")
+    out.append("backlog items to BACKLOG.md, define preconditions in GATES.md,")
+    out.append("then run `wave_plan`.")
     return "\n".join(out)
