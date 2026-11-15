@@ -38,6 +38,9 @@ _SPEC_MD = """# Spec: {title}
 
 ## Acceptance criteria
 
+<!-- Scenario(s): use scenario names verbatim from EXAMPLES.feature and/or
+     @w<N> tags — ship_validate resolves both for traceability. -->
+
 | # | Criterion | Scenario(s) |
 |---|-----------|-------------|
 | 1 |             | @w1         |

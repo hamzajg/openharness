@@ -8,9 +8,10 @@ writes VALIDATION.md containing:
 - Demo script: the happy-path scenarios ordered as a manual walkthrough.
 - Gaps: scenarios with no evidence, unplanned waves, missing artifacts.
 
-Evidence matching is literal (scenario name, case-insensitive) — absence of
-a match is a prompt for the agent to verify, not proof of missing tests.
-Deterministic.
+Evidence matching: literal scenario-name hits are strong; a token-overlap
+match (>=50% of significant words on one test line) is reported as weak.
+Absence of either is a prompt for the agent to verify, not proof of
+missing tests. Deterministic.
 """
 
 import os
@@ -66,27 +67,65 @@ def _scenario_index(feature_text: str):
     return out
 
 
-def _ac_rows(spec_text: str):
+def _ac_rows(spec_text: str, scenarios: list):
+    """Parse the SPEC.md AC table. The Scenario(s) cell may hold @wN tags
+    and/or scenario names written verbatim — names are resolved against
+    EXAMPLES.feature (case-insensitive substring)."""
     rows = []
     for m in _AC_ROW_RE.finditer(spec_text):
         criterion, scen_refs = m.group(1).strip(), m.group(2)
         if criterion.lower() in ("criterion", "---") or set(criterion) <= {"-", ":"}:
             continue
-        refs = set(_TAG_RE.findall(scen_refs))
-        rows.append({"criterion": criterion, "waves": {int(w) for w in refs}})
+        waves = {int(w) for w in _TAG_RE.findall(scen_refs)}
+        cell = scen_refs.lower()
+        linked = {s["name"] for s in scenarios if s["name"].lower() in cell}
+        for s in scenarios:
+            if s["name"] in linked:
+                waves |= s["waves"]
+        rows.append({"criterion": criterion, "waves": waves, "scenarios": linked})
     return rows
 
 
+_STOPWORDS = {
+    "the", "and", "for", "with", "that", "this", "from", "have", "has",
+    "are", "was", "were", "will", "would", "could", "should", "into",
+    "only", "when", "then", "given", "she", "her", "his", "our", "your",
+    "their", "they", "them", "you", "can", "per", "via", "not", "all",
+    "any", "see", "shows", "show", "gets", "get", "new", "its",
+}
+
+
+def _tokens(name: str) -> set:
+    return {w for w in re.findall(r"[a-z0-9]+", name.lower())
+            if len(w) >= 4 and w not in _STOPWORDS}
+
+
 def _evidence_for(name: str, test_texts: dict[Path, str]):
-    """Return list of 'path:line' where scenario name appears (ci)."""
+    """Return {'strong': [...], 'weak': [...]} evidence hits.
+
+    Strong = the full scenario name appears on a test-file line.
+    Weak = one line contains >=50% of the scenario's significant tokens
+    (>=2 tokens) — heuristic, reported separately, never counted as proof.
+    """
     needle = name.lower()
-    hits = []
+    tokens = _tokens(name)
+    strong, weak = [], []
     for path, text in test_texts.items():
-        for i, line in enumerate(text.splitlines(), 1):
-            if needle in line.lower():
-                hits.append(f"{path.name}:{i}")
+        file_strong = file_weak = False
+        for line in text.splitlines():
+            low = line.lower()
+            if needle in low:
+                file_strong = True
                 break
-    return hits
+            if tokens and not file_weak:
+                matched = sum(1 for t in tokens if t in low)
+                if matched >= 2 and matched / len(tokens) >= 0.5:
+                    file_weak = True
+        if file_strong:
+            strong.append(path.name)
+        elif file_weak:
+            weak.append(path.name)
+    return {"strong": strong, "weak": weak}
 
 
 @skill
@@ -112,7 +151,7 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
         return f"ERROR: missing artifacts in {d}: {', '.join(missing)}"
 
     scenarios = _scenario_index(feat_f.read_text())
-    acs = _ac_rows(spec_f.read_text()) if spec_f.is_file() else []
+    acs = _ac_rows(spec_f.read_text(), scenarios) if spec_f.is_file() else []
     waves_text = waves_f.read_text() if waves_f.is_file() else ""
     planned_waves = {int(w) for w in _WAVE_ITEM_RE.findall(waves_text)}
 
@@ -125,7 +164,9 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
             continue
 
     evidence = {s["name"]: _evidence_for(s["name"], test_texts) for s in scenarios}
-    covered = sum(1 for s in scenarios if evidence[s["name"]])
+    covered = sum(1 for s in scenarios if evidence[s["name"]]["strong"])
+    weak_only = sum(1 for s in scenarios
+                    if not evidence[s["name"]]["strong"] and evidence[s["name"]]["weak"])
 
     out = [f"# Validation — {d.name}", ""]
     out.append("## Traceability")
@@ -137,11 +178,18 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
         for w in s["waves"]:
             scen_by_wave.setdefault(w, []).append(s["name"])
     for i, ac in enumerate(acs, 1):
-        names = [n for w in sorted(ac["waves"]) for n in scen_by_wave.get(w, [])]
-        ev = []
-        for n in names:
-            ev += evidence.get(n, [])
-        ev_str = ", ".join(sorted(set(ev))[:3]) if ev else "—"
+        names = set(ac.get("scenarios", ()))
+        for w in sorted(ac["waves"]):
+            names.update(scen_by_wave.get(w, []))
+        names = sorted(names)
+        strong = sorted({h for n in names for h in evidence.get(n, {}).get("strong", [])})
+        weak = sorted({h for n in names for h in evidence.get(n, {}).get("weak", [])} - set(strong))
+        if strong:
+            ev_str = ", ".join(strong[:3])
+        elif weak:
+            ev_str = "(weak) " + ", ".join(weak[:2])
+        else:
+            ev_str = "—"
         out.append(
             f"| {i} | {ac['criterion'][:60]} | {len(names)} "
             f"| {', '.join(f'@w{w}' for w in sorted(ac['waves'])) or '—'} | {ev_str} |"
@@ -149,9 +197,11 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
     out.append("")
     out.append("## Scenario coverage")
     out.append("")
-    out.append(f"- Scenarios: {len(scenarios)} total, {covered} with detected test evidence, {len(scenarios) - covered} without")
+    out.append(f"- Scenarios: {len(scenarios)} total, {covered} with detected test evidence"
+               + (f", {weak_only} with weak (token-match) evidence only" if weak_only else "")
+               + f", {len(scenarios) - covered - weak_only} without")
     for s in scenarios:
-        mark = "✓" if evidence[s["name"]] else "✗"
+        mark = "✓" if evidence[s["name"]]["strong"] else ("~" if evidence[s["name"]]["weak"] else "✗")
         waves = ", ".join(f"@w{w}" for w in sorted(s["waves"])) or "untagged"
         out.append(f"- {mark} `{s['name']}` ({waves})")
     out.append("")
@@ -169,15 +219,18 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
     unproven = [w for w in sorted({w for s in scenarios for w in s['waves']}) if w not in planned_waves]
     if unproven:
         gaps.append(f"Scenario waves {', '.join(f'@w{w}' for w in unproven)} not covered by WAVES.md")
-    if len(scenarios) - covered:
-        gaps.append(f"{len(scenarios) - covered} scenario(s) lack detected test evidence — verify manually or add checks")
+    no_evidence = [s for s in scenarios
+                   if not evidence[s["name"]]["strong"] and not evidence[s["name"]]["weak"]]
+    if no_evidence:
+        gaps.append(f"{len(no_evidence)} scenario(s) lack detected test evidence — verify manually or add checks")
     out.append("## Gaps")
     out.append("")
     for g in gaps or ["none — spec is fully traced"]:
         out.append(f"- {g}")
     out.append("")
-    out.append("Note: 'no evidence' means the scenario name was not found in")
-    out.append("test files — verify by hand before treating it as a real gap.")
+    out.append("Note: 'no evidence' means neither the scenario name nor a")
+    out.append("token match was found in test files — verify by hand before")
+    out.append("treating it as a real gap. '~' marks weak token-match evidence.")
 
     (d / "VALIDATION.md").write_text("\n".join(out))
     return "\n".join(out)
