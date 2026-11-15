@@ -104,3 +104,20 @@ into ceremony and gives a reviewer veto power over the product. Separating a
 deterministic brief from an evidence-based agent review keeps the challenge
 rigorous and cheap while preserving D001/D009: the agent chooses to run it,
 and the harness never schedules it.
+
+### D012 — Complexity budget splits into core and platform buckets
+Rule: D003's single 300-LOC core budget is superseded by two buckets.
+**Core** — the agent-facing runtime (`__main__.py`, `skill.py`,
+`registry.py`, `frontmatter.py`, `env.py`, `knowledge/rag.py`) — stays
+≤ 300 LOC. **Platform** — workspace + observation plumbing (`repos.py`,
+`metrics.py`, `observers/*`, `serve.py`, `serve_api.py`) — gets ≤ 1100
+LOC. D003's separate ~900 serve+observers+UI budget is absorbed into
+platform. Both budgets are enforced on every commit exactly as D003
+required; only the file enumeration is redrawn.
+Because: D003's file list predates `metrics.py`, `observers/`, and the
+growth of `serve_api.py`. `repos.py` is workspace plumbing shared by the
+CLI (`oh pull`) and the serve API — forcing it into the skill-runtime
+bucket or into the serve block would both be bad layering. The budget's
+intent was always to discipline the small contract surface agents depend
+on; two honest buckets preserve that pressure without gaming the metric
+or contorting the architecture.

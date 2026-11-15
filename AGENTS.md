@@ -86,8 +86,9 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - **Agent-agnostic (D006):** no vendor SDK imports in runtime code; agent
   differences live in markdown commands + thin observer tailers.
 - **Local-first:** no cloud deps; RAG runs locally.
-- **Complexity budget (D003):** runtime core ≤ ~300 LOC; serve block has
-  its own ~900 LOC budget. Respects KISS — don't grow the core casually.
+- **Complexity budgets (D003, split by D012):** core runtime ≤ 300 LOC;
+  platform (repos/metrics/observers/serve) ≤ 1100 LOC. Check via
+  `GET /api/evolution` stats. Respects KISS — don't grow casually.
 - **D008:** harness files are never copied into target repos.
 - **D009:** delivery loops are agent-executed, not harness-scheduled. The
   oracle (`skills/product/ship_loop.py`) owns `specs/<feature>/LOOP.md`; the

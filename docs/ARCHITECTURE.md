@@ -63,7 +63,7 @@ No database, no cloud.
 ## Key decisions
 
 See `SELF/PRINCIPLES.md` — D001 (no orchestration), D002 (md specs / py
-execution), D003 (LOC budgets), D005 (UI is observer), D006 (log-tail
+execution), D003/D012 (LOC budgets: core ≤300, platform ≤1100), D005 (UI is observer), D006 (log-tail
 observation only), D007 (REPOS.md + sources/), D008 (no copying into target
 repos), D009 (agent-executed delivery loops, state in `specs/`), D010
 (declared gates guard phase transitions), D011 (optional advisory decision
