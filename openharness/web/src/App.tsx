@@ -4,14 +4,12 @@ import Skills from './pages/Skills'
 import Self from './pages/Self'
 import Knowledge from './pages/Knowledge'
 import Loops from './pages/Loops'
-import Evolution from './pages/Evolution'
 
 export default function App() {
   const loc = useLocation()
   const nav = [
     { to: '/', label: 'Sessions' },
     { to: '/loops', label: 'Loops' },
-    { to: '/evolution', label: 'Evolution' },
     { to: '/skills', label: 'Skills' },
     { to: '/self', label: 'SELF' },
     { to: '/knowledge', label: 'Knowledge' },
@@ -45,7 +43,6 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Sessions />} />
           <Route path="/loops" element={<Loops />} />
-          <Route path="/evolution" element={<Evolution />} />
           <Route path="/skills" element={<Skills />} />
           <Route path="/self" element={<Self />} />
           <Route path="/knowledge" element={<Knowledge />} />
