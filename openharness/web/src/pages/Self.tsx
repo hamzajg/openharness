@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import Markdown from '../components/Markdown'
+import Maturity from '../components/Maturity'
 
 const BLOCKS = [
   'MANIFEST',
@@ -14,6 +15,8 @@ const BLOCKS = [
   'serve',
 ]
 
+const MATURITY = 'MATURITY'
+
 export default function Self() {
   const [block, setBlock] = useState<string>('MANIFEST')
   const [text, setText] = useState<string>('')
@@ -21,6 +24,11 @@ export default function Self() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    if (block === MATURITY) {
+      setText('')
+      setLoading(false)
+      return
+    }
     const b = block === 'MANIFEST' ? undefined : block
     setLoading(true)
     api.self(b)
@@ -28,6 +36,24 @@ export default function Self() {
       .catch((e) => setErr(e?.message || 'Failed to load'))
       .finally(() => setLoading(false))
   }, [block])
+
+  const navItem = (id: string, label: string, accent = false) => {
+    const active = block === id
+    return (
+      <button
+        key={id}
+        onClick={() => setBlock(id)}
+        className={`px-3 py-2 rounded-lg text-left text-sm whitespace-nowrap transition-colors border-l-2 ${
+          active
+            ? 'border-sky-500 bg-neutral-800/70 text-neutral-100 font-medium'
+            : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/40'
+        }`}
+      >
+        {label}
+        {accent && <span className="ml-1.5 text-[10px] text-sky-400/70">live</span>}
+      </button>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -41,43 +67,39 @@ export default function Self() {
       {err && <div className="text-sm text-red-400">{err}</div>}
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* block nav: horizontal scroll on mobile, sticky rail on lg */}
+        {/* nav: maturity view first, then spec blocks */}
         <nav className="lg:w-48 shrink-0">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-neutral-600 mb-2 px-1 hidden lg:block">
-            Blocks
+            Harness
           </div>
           <div className="flex lg:flex-col gap-0.5 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
-            {BLOCKS.map((b) => {
-              const active = block === b
-              return (
-                <button
-                  key={b}
-                  onClick={() => setBlock(b)}
-                  className={`px-3 py-2 rounded-lg text-left text-sm whitespace-nowrap transition-colors border-l-2 ${
-                    active
-                      ? 'border-sky-500 bg-neutral-800/70 text-neutral-100 font-medium'
-                      : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/40'
-                  }`}
-                >
-                  {b}
-                </button>
-              )
-            })}
+            {navItem(MATURITY, 'Maturity', true)}
+            <div className="hidden lg:block border-t border-neutral-800 my-2 mx-1" />
+            <div className="hidden lg:block text-[11px] font-semibold uppercase tracking-wider text-neutral-600 mb-1 px-1">
+              Spec blocks
+            </div>
+            {BLOCKS.map((b) => navItem(b, b))}
           </div>
         </nav>
 
-        {/* content — constrained measure for comfortable reading */}
-        <article className="flex-1 min-w-0 lg:max-w-3xl">
-          <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 px-6 py-6 md:px-8 md:py-7">
-            <header className="flex items-center gap-2 pb-4 mb-2 border-b border-neutral-800">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 font-mono">
-                {block}
-              </span>
-              {loading && <span className="text-[11px] text-neutral-600">loading…</span>}
-            </header>
-            <Markdown text={text} />
+        {/* content */}
+        {block === MATURITY ? (
+          <div className="flex-1 min-w-0">
+            <Maturity />
           </div>
-        </article>
+        ) : (
+          <article className="flex-1 min-w-0 lg:max-w-3xl">
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 px-6 py-6 md:px-8 md:py-7">
+              <header className="flex items-center gap-2 pb-4 mb-2 border-b border-neutral-800">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 font-mono">
+                  {block}
+                </span>
+                {loading && <span className="text-[11px] text-neutral-600">loading…</span>}
+              </header>
+              <Markdown text={text} />
+            </div>
+          </article>
+        )}
       </div>
     </div>
   )
