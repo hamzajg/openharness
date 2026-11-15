@@ -81,9 +81,9 @@ function CommitRow({ c }: { c: EvolutionCommit }) {
   )
 }
 
-/* ---------- page ---------- */
+/* ---------- maturity dashboard (embedded in SELF) ---------- */
 
-export default function Evolution() {
+export default function Maturity() {
   const [data, setData] = useState<Evolution | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<string>('all')
@@ -118,13 +118,6 @@ export default function Evolution() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-neutral-100">Evolution</h2>
-        <p className="text-sm text-neutral-500 mt-1">
-          How the harness matured — binding decisions, self-applied changes, and health budgets.
-        </p>
-      </div>
-
       {err && <div className="text-sm text-red-400">{err}</div>}
       {!data && !err && <p className="text-sm text-neutral-500">Loading…</p>}
 
