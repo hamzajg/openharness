@@ -2,16 +2,16 @@
 description: Autonomously drive product delivery end to end — the oracle picks the next action, focused subagents execute it, every wave ships as a reviewed PR
 allowed-tools: [Bash, Read, Grep, Glob, Edit, Write, Task]
 ---
-# /ship-loop — Autonomous product delivery, one iteration at a time
+# /ship-loop — Autonomous product delivery
 
-Arguments (`$ARGUMENTS`), all optional:
+Arguments (`$ARGUMENTS`). All are optional:
 
 | Arg | Default | Meaning |
 |---|---|---|
-| `--repo=sources/<repo>` | cwd inside `sources/` | Target repo (must be registered in REPOS.md) |
-| `--feature=<name>` | first unfinished | Restrict the loop to one `specs/<feature>/` |
-| `--merge=review\|auto` | `review` | `review` leaves each PR open for a human; `auto` merges green PRs |
-| `--max=<N>` | `25` | Iteration budget before the loop stops and reports |
+| `--repo=sources/<repo>` | cwd inside `sources/` | Target repo. Must be in REPOS.md. |
+| `--feature=<name>` | first unfinished | Limit the loop to one `specs/<feature>/`. |
+| `--merge=review\|auto` | `review` | `review` keeps each PR open. `auto` merges green PRs. |
+| `--max=<N>` | `25` | Iteration limit before the loop stops. |
 
 ## Context
 
@@ -19,25 +19,35 @@ Arguments (`$ARGUMENTS`), all optional:
 !`python -m openharness env`
 !`python -m openharness run ship_loop --action=status --repo_path=<repo>`
 
-## The contract
+## The loop contract
 
-`skills/product/ship_loop.py` is the **deterministic oracle**. It owns loop
-state in `specs/<feature>/LOOP.md` + `LOOP.state.json` (status, iteration counter, wave table,
-append-only event log) and answers exactly one question per call: *what is
-the next action?* `WAVES.md` remains the plan; `LOOP.md` is the human render
-and `LOOP.state.json` the machine-readable state — both written by the skill. `LOOP.md` is the execution
-record. Both are product artifacts committed with the feature's PRs.
+`skills/product/ship_loop.py` is the deterministic oracle. It owns the loop
+state in `specs/<feature>/`:
 
-**The agent is the loop (D001).** The harness never launches agents, never
-schedules tasks, never runs a DAG. You call the oracle, you do the work, you
-write the outcome back. Never hand-edit `LOOP.md`/`LOOP.state.json` — the skill is their only
-writer. Never skip the oracle "because you remember" — re-read it every
-iteration so the loop survives context loss and session restarts.
+- `LOOP.md` — human-readable status. Committed with the PRs.
+- `LOOP.state.json` — machine-readable state. Committed with the PRs.
+- `WAVES.md` — the plan. Do not change it during the loop.
 
-One iteration = one `--action=next` call + the work that directive names +
-one state write (`start` / `complete` / `block` / `finish`).
+The oracle answers one question per call: *what is the next action?*
 
-## Loop
+**The agent is the loop (D001).** The harness does not start agents. The
+harness does not schedule work. You do three things:
+
+1. Call the oracle.
+2. Do the work that the directive names.
+3. Record the result.
+
+Rules:
+
+- Never edit `LOOP.md` or `LOOP.state.json` by hand. The skill is the only
+  writer.
+- Call the oracle at each iteration. Do not use memory. The loop must
+  survive context loss and session restarts.
+
+One iteration = one `--action=next` call + the named work + one state write
+(`start`, `complete`, `block`, or `finish`).
+
+## The loop
 
 ```
 ship_loop --action=next   → read directive
@@ -52,141 +62,158 @@ ship_loop --action=next   → read directive
 ```
 
 After each delegated action, call `ship_loop --action=next` again. Do not
-batch iterations or assume the next action; the oracle re-derives it from
-the artifacts on disk.
+batch iterations. Do not guess the next step. The oracle reads the files on
+disk.
 
-### Recording rules
+## Record each step
 
 | Moment | Command |
 |---|---|
-| Before touching code | `--action=start --wave=N` |
+| Before you touch code | `--action=start --wave=N` |
 | After green CI + review | `--action=complete --wave=N --pr="#<n>" --note="<tests N/N, CI green, demo: ...>"` |
-| Agent-owned gate satisfied | `--action=gate --gate=G1 --status=met --evidence="file:docs/x.md / command output"` |
+| Agent-owned gate is satisfied | `--action=gate --gate=G1 --status=met --evidence="file:docs/x.md / command output"` |
 | Gate needs a human | `--action=block --note="G1: <decision or access needed>"`; after resolution record `met`/`waived`, then `--action=resume` |
-| Gate waived by a human | `--action=gate --gate=G1 --status=waived --waived-by="<name>" --note="<reason>"` |
-| Human decision needed | `--action=block --note="<exactly what must be decided>"` |
+| Human waived a gate | `--action=gate --gate=G1 --status=waived --waived-by="<name>" --note="<reason>"` |
+| Human must decide something | `--action=block --note="<exactly what must be decided>"` |
 | Human resolved it | `--action=resume` |
-| Validation walked | `--action=finish` (requires `VALIDATION.md`, all waves done, finish gates met) |
-| Wave went sideways | `--action=reset --wave=N` (or `--force` for a full reset) |
+| Validation is walked | `--action=finish` (needs `VALIDATION.md`, all waves done, finish gates met) |
+| Wave went wrong | `--action=reset --wave=N` (or `--force` for a full reset) |
 
-Evidence is not optional: `--note` must name the tests that ran and their
-result. "Done" without evidence is how loops lie to themselves.
+Evidence is mandatory. `--note` must name the tests that ran and their
+result. A "done" without evidence is a false record.
 
-## Gates — preconditions for phase transitions
+## Gates
 
-Complex domains need decisions, artifacts, access, or sign-offs **before** a
-phase can start. Those are gates, declared in `specs/<feature>/GATES.md`
-(definitions) and tracked in `LOOP.md` (status/evidence). A blocking gate
-stops the phase it is attached to:
+A gate is a precondition for a phase. Declare gates in
+`specs/<feature>/GATES.md`. Track their status in `LOOP.md` and
+`LOOP.state.json`. A blocking gate stops its phase.
 
 | `Before:` | Blocks |
 |---|---|
-| `spec` | writing/refining the spec (domain glossary, regulatory rules) |
-| `plan` | planning waves (architecture decisions, data contracts) |
-| `wave:<n>` | starting wave n (credentials, seed data, schema) |
-| `validate` | running validation (UAT environment, test data) |
-| `finish` | closing the feature (legal/security/product sign-off) |
+| `spec` | spec writing (glossary, rules) |
+| `plan` | wave planning (architecture, data contracts) |
+| `wave:<n>` | wave n start (credentials, seed data, schema) |
+| `validate` | validation (UAT environment, test data) |
+| `finish` | feature close (sign-offs) |
 
-Overdue gates keep blocking: if a `Before: spec` gate is still pending when
-the artifacts already exist, the loop refuses wave 1 until it is met or
-waived. Gates are not checkboxes to route around.
+Overdue gates keep blocking. If a `Before: spec` gate is pending but the
+spec exists, the loop refuses wave 1 until the gate is `met` or `waived`.
+Do not route around a gate.
 
 When the oracle prints `GATE:`:
 
-1. Read each gate's `owner`, `resolver`, and `check`.
-2. **Resolver `agent`** — create the artifact or run the check, then record
-   it with `--action=gate --gate=Gx --status=met --evidence="..."`.
-   `Check: file:<path>` is verified by the oracle (the file must exist);
-   `Check: command:<cmd>` is run by you, and you record the output — the
-   oracle never executes repo-provided commands.
-3. **Resolver `human`** — do not guess or self-approve. Record
-   `--action=block --note="Gx: <what the person must decide/provide>"`,
-   report, and exit. When the human answers, record the evidence and
+1. Read the gate's `owner`, `resolver`, and `check`.
+2. Resolver `agent`: make the artifact or run the check. Record it with
+   `--action=gate --gate=Gx --status=met --evidence="..."`.
+   - `Check: file:<path>` — the oracle verifies the file exists.
+   - `Check: command:<cmd>` — you run it and record the output. The oracle
+     does not run repo commands.
+3. Resolver `human`: do not guess. Do not self-approve. Run
+   `--action=block --note="Gx: <what the person must decide>"`. Report and
+   exit. When the human answers, record the evidence and run
    `--action=resume`.
-4. **Waivers** are human decisions. Record one only when a human explicitly
-   approved it: `--status=waived --waived-by="<name>" --note="<reason>"`.
-5. Advisory gates (`Blocking: no`) are reported but never stop the loop.
+4. Waivers are human decisions only. Record one only after a human says
+   yes: `--status=waived --waived-by="<name>" --note="<reason>"`.
+5. Advisory gates (`Blocking: no`) are reported. They do not stop the loop.
 
-If a gate turns out to be wrong (not a real precondition), fix `GATES.md` —
-do not silently mark it met. If a check fails, record `--status=failed` with
-the failure so the loop stops honestly.
+If a gate is wrong, fix `GATES.md`. Do not mark it `met` silently. If a
+check fails, record `--status=failed` with the failure.
 
-## Optional — challenge a design decision
+## Challenge a design decision (optional)
 
-Gates check *whether* a precondition exists; they do not judge *how* a
-decision was made. When a spec records a high-impact decision (data ownership,
-schema, public contract, service split, security control) or the domain is
-contested, run `/challenge-decision` before the wave that inherits it:
+Gates check *if* a precondition exists. They do not check *how* a decision
+was made. For a high-impact decision (data ownership, schema, public
+contract, service split, security control) or a contested domain, run
+`/challenge-decision` before the wave that uses it:
 
 ```
 python -m openharness run challenge_decision --repo_path=<repo> \
   --spec_dir=<repo>/specs/<feature> --paths="<paths>" --write
 ```
 
-Delegate the judgment to **decision-challenger**. It returns
-`ACCEPT`/`REVISE`/`REVISIT`/`SPLIT` plus the smallest next step. This is
-**advisory** (D011): it is not a gate, it never stops the loop, and a `REVISE`
-becomes a backlog item or a new wave — not a silent edit during review. If the
-review changes the decision, update `SPEC.md` → Decisions and, when it affects
-a precondition, `GATES.md`.
+Give the review to **decision-challenger**. It returns
+`ACCEPT`/`REVISE`/`REVISIT`/`SPLIT` plus the smallest next step. The review
+is advisory (D011). It is not a gate. It does not stop the loop. A `REVISE`
+becomes a backlog item or a new wave. Do not edit the decision silently
+during review. If the review changes the decision, update `SPEC.md` →
+Decisions. If it changes a precondition, update `GATES.md`.
 
-Skip it for small reversible choices; a review that fires constantly stops
-being read.
+Skip the review for small reversible choices. A review that fires too
+often stops being read.
 
-## Wave execution protocol
+## Wave steps
 
-1. Delegate to **wave-implementer** with: repo path, spec dir, wave number,
-   scenarios/backlog items from the directive, and `merge=review|auto`.
-2. The implementer branches `feat/<feature>-w<N>` from the default branch,
-   writes failing checks first for that wave's scenarios, implements
-   minimally, runs the real build + tests, commits conventionally, pushes,
-   and opens one PR (`feat:`/`fix:` etc.; body cites the spec and scenarios).
-3. Wait for CI. Green → delegate to **wave-reviewer** (diff vs. spec,
-   regressions, secrets, scope creep). Red → send the failure back to
-   wave-implementer; retry once for flakiness, then block.
-4. Review passes → apply the merge policy:
-   - `review` (default): leave the PR open, record its number, continue to
-     the next wave. The user merges later in order.
-   - `auto`: merge only after green CI and a passing review, delete the
-     branch, then record.
-5. Record `complete` with the PR number and evidence.
+1. Give **wave-implementer**: repo path, spec dir, wave number, the wave's
+   scenarios and backlog items, and `merge=review|auto`.
+2. The implementer must:
+   - Branch `feat/<feature>-w<N>` from the default branch.
+   - Write failing checks first for the wave's scenarios.
+   - Implement the smallest correct change. Match repo conventions (KISS).
+   - Run the real build and tests.
+   - Commit with conventional messages. Push. Open one PR. The PR body
+     cites the spec and the scenarios.
+3. Wait for CI.
+   - Green: give the diff to **wave-reviewer**. Check spec fit,
+     regressions, secrets, and scope.
+   - Red: return the failure to wave-implementer. Retry once for flake.
+     Then block.
+4. Review passes. Apply the merge policy:
+   - `review` (default): leave the PR open. Record its number. Continue.
+   - `auto`: merge only after green CI and a passing review. Delete the
+     branch. Record the merge.
+5. Record `complete` with the PR number and the evidence.
 
-Never merge a PR whose CI is red or pending. Never force-push a default
+Never merge a PR with red or pending CI. Never force-push a default
 branch. Never commit secrets or `.env` files. One logical change per PR.
 
-## Spec / planning protocol
+## Spec and plan steps
 
-Delegate to **product-framer** with the repo path and any feature hint. It
-runs `discover_product`, proposes 3–5 scored candidates (value ×
-feasibility × differentiation), picks the highest in autonomous mode,
-scaffolds `specs/<feature>/`, fills SPEC.md / EXAMPLES.feature (tagged
-`@w<N>`) / BACKLOG.md (user stories with `Depends:`), derives preconditions
-into GATES.md, and runs `wave_plan` until warnings are clean. It may write
-**only** under `specs/`.
+Give **product-framer** the repo path and an optional feature hint. It
+must:
 
-The orchestrator then calls `ship_loop --action=next` again to enter wave 1.
+1. Run `discover_product`.
+2. Propose 3–5 candidate features. Score each: user value × feasibility ×
+   differentiation.
+3. Pick the best candidate in autonomous mode.
+4. Scaffold `specs/<feature>/`.
+5. Fill `SPEC.md`, `EXAMPLES.feature` (tags `@w<N>`), `BACKLOG.md` (user
+   stories with `Depends:`).
+6. Derive preconditions into `GATES.md`.
+7. Run `wave_plan` until it reports no warnings.
 
-## Validation protocol
+The framer writes only under `specs/`.
 
-Delegate to **delivery-verifier**. It runs `ship_validate`, walks the demo
-script, verifies each acceptance criterion has scenario + wave + test
-evidence, refreshes `specs/PRODUCT.md` via `product_map`, and updates
-README/AGENTS.md for what shipped. It also verifies that every `Before:
-validate` and `Before: finish` gate is met or explicitly waived. Real gaps
-are reported back — do not paper over them. Only then call `--action=finish`.
+Then call `ship_loop --action=next` again to enter wave 1.
 
-## Stop conditions (report and exit the loop)
+## Validation steps
 
-- `DONE` / `FEATURE-DONE` from the oracle — close out.
-- `STOP` — iteration budget exhausted; report progress and the next action.
-- `BLOCKED` — the note says what a human must decide (scope, pricing,
-  credentials, destructive migration, product direction).
-- A `GATE:` directive whose resolver is `human` — record `block`, report, exit.
-- A failed gate check that needs a human decision or a re-plan.
-- Two consecutive CI failures on the same wave after one flaky rerun.
-- A merge conflict, a dirty worktree with changes you did not make, or a
-  repo that is not registered / has no remote.
-- Anything requiring secrets, credential rotation, or deleting user data.
+Give **delivery-verifier** the spec dir. It must:
+
+1. Run `ship_validate`.
+2. Walk the demo script by hand.
+3. Verify that each acceptance criterion has scenario + wave + test
+   evidence.
+4. Refresh `specs/PRODUCT.md` with `product_map`.
+5. Update `README.md` and `AGENTS.md` for what shipped.
+6. Verify that each `Before: validate` and `Before: finish` gate is `met`
+   or `waived`.
+
+Report real gaps. Do not hide them. Only then call `--action=finish`.
+
+## Stop conditions
+
+Report and exit the loop when:
+
+- The oracle says `DONE` or `FEATURE-DONE`.
+- The oracle says `STOP` (iteration budget).
+- The oracle says `BLOCKED`. The note names the human decision.
+- A `GATE:` directive has `resolver: human`. Record `block`. Report. Exit.
+- A gate check fails and needs a human decision or a re-plan.
+- CI fails twice on the same wave after one flaky retry.
+- A merge conflict occurs.
+- The worktree is dirty with changes you did not make.
+- The repo is not registered or has no remote.
+- The task needs secrets, credential rotation, or data deletion.
 - The user interrupts.
 
 ## Close-out report
@@ -204,18 +231,19 @@ Gaps:     <known gaps or "none">
 Next:     <exact oracle directive or "needs human decision: ...">
 ```
 
-Also update `specs/PRODUCT.md` (`product_map`) and leave `LOOP.md` committed
-so the next session resumes exactly where this one stopped.
+Then refresh `specs/PRODUCT.md` (`product_map`). Commit `LOOP.md` and
+`LOOP.state.json`. The next session must resume exactly where this one
+stopped.
 
 ## Guardrails
 
-- Specs and loop state live in the target repo under `specs/` — product
-  content, committed via PRs. Harness config files are never copied into
+- Specs and loop state live in the target repo under `specs/`. They are
+  product content. Commit them through PRs. Never copy harness files into
   target repos (D008).
-- Do not touch uncommitted changes you did not create; check
-  `git status` before every wave and stop if the tree is dirty.
-- Re-check PR state via the GitHub API before merging — another process or
-  human may have merged or edited it.
-- Respect the target repo's own AGENTS.md, build commands, and conventions.
-- If the oracle's directive and reality disagree (e.g. LOOP.md says done but
-  the PR is unmerged), trust reality, `--action=reset --wave=N`, and redo.
+- Check `git status` before each wave. Stop if the tree is dirty with
+  changes you did not make.
+- Re-check PR state through the GitHub API before each merge. A human or
+  another process can merge or edit a PR.
+- Follow the target repo's `AGENTS.md`, build commands, and conventions.
+- If the oracle and reality disagree (for example: `LOOP.md` says done but
+  the PR is open), trust reality. Run `--action=reset --wave=N`. Redo.
