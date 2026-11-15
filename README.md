@@ -9,7 +9,8 @@ The harness folder is your working root for an entire multi-repo product/ecosyst
 
 **Role B — Context Package (loaded into the agent, in place).**
 Because agent sessions run inside the harness tree, the harness's agent-facing assets are natively discoverable:
-- `.claude/commands/` and `.opencode/command/` → slash commands
+- `.claude/commands/` and `.opencode/commands/` → slash commands (legacy `.opencode/command/` still discovered)
+- `.claude/agents/` and `.opencode/agents/` → focused subagent roles for the delivery loop
 - `skills/` → Python skills executed via `python -m openharness run <skill>`
 - `SELF/` → the harness's own specs/principles (agent-readable)
 - `.openharness/ENV.md` → ecosystem profile; optional repo-level `sources/<repo>/.openharness/ENV.md`
@@ -52,3 +53,26 @@ opencode                                        # terminal 2 (or claude)
 - **Terminal 2:** `cd sources/portal-api && opencode` → `/scan-secrets`
 - **Terminal 3:** `cd sources/portal-web && opencode` → `/map-architecture`
 - **Browser:** http://localhost:7337 — all sessions, grouped per repo
+
+## Product delivery
+
+Two commands take a managed repo from "code exists" to "product ships":
+
+| Command | Shape |
+|---|---|
+| `/ship-product` | Phased, human-in-the-loop: discover → frame → spec → examples → waves → implement → validate. One feature at a time. |
+| `/ship-loop` | Autonomous loop over the same pipeline: the oracle picks the next action, subagents execute it, every wave is one PR. Stops on `DONE`, `BLOCKED`, or the iteration budget. |
+
+```
+/ship-loop --repo=sources/portal-api --merge=review --max=25
+```
+
+The loop is **agent-driven** (D001/D009): `skills/product/ship_loop.py` is a
+deterministic oracle that owns state in `specs/<feature>/LOOP.md`; the agent
+calls `--action=next`, delegates to `product-framer` / `wave-implementer` /
+`wave-reviewer` / `delivery-verifier`, and records outcomes. The harness never
+launches or schedules agents. `--merge=review` (default) leaves PRs open for a
+human; `--merge=auto` is opt-in. Loop state and specs are product artifacts
+committed with the feature's PRs.
+
+See `SELF/blocks/delivery-loop.md` for the state model and action contract.

@@ -3,6 +3,9 @@ description: Take a managed repo from "code exists" to "product ships" — disco
 ---
 # /ship-product — Spec-driven product completion, wave by wave
 
+> Want the same pipeline driven autonomously? Use `/ship-loop` — the oracle
+> (`ship_loop`) walks these phases and delegates to focused subagents.
+
 ## Context
 
 Run via Bash and read output:
