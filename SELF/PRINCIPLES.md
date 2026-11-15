@@ -88,3 +88,19 @@ falsifiable before a wave starts, so the loop stops honestly instead of
 inventing rules or silently skipping sign-off. The agent resolves only
 agent-owned gates; human-owned gates are handed back via `block`, preserving
 the human-in-the-loop boundary in D001/D009.
+
+### D011 — Design decisions get an optional challenge, not a gate
+Rule: A design/architecture decision may be reviewed with `/challenge-decision`
+(`skills/product/challenge_decision.py` + the `decision-challenger` subagent).
+The deterministic skill assembles a brief — record completeness, heuristic code
+signals, design moves, and lens questions for DDD, architecture, testability,
+and craftsmanship — and the agent supplies the judgment, alternatives,
+tradeoff matrix, scores, and verdict (`ACCEPT`/`REVISE`/`REVISIT`/`SPLIT`).
+The review is advisory: it never blocks a gate, wave, merge, or loop
+iteration, and it writes only a review document under `specs/` or `docs/adr/`.
+Because: Complex domains need their design challenged before the cost of
+change is high, but making every design opinion a blocking gate turns the loop
+into ceremony and gives a reviewer veto power over the product. Separating a
+deterministic brief from an evidence-based agent review keeps the challenge
+rigorous and cheap while preserving D001/D009: the agent chooses to run it,
+and the harness never schedules it.

@@ -19,7 +19,7 @@ Verified 2026-11-15 against CI (`.github/workflows/ci.yml`) and README.
 | Task | Command |
 |---|---|
 | Install | `pip install -e .` (full); tests need `pip install pytest && pip install -e . --no-deps` |
-| Test | `pytest` (89 tests; stdlib-only — CI skips heavy RAG deps) |
+| Test | `pytest` (114 tests; stdlib-only — CI skips heavy RAG deps) |
 | CLI | `oh <command>` / `python -m openharness <command>` |
 | Run a skill | `python -m openharness run <skill>` |
 | Delivery loop | `/ship-loop` (agent-driven) · oracle: `python -m openharness run ship_loop --action=next --repo_path=sources/<repo>` |
@@ -49,13 +49,15 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   `security/` e.g. `scan_secrets`, `legacy_migration/` e.g.
   `map_architecture`, `strangler_plan`, `product/` e.g. `discover_product`,
   `spec_scaffold`, `wave_plan`, `ship_validate`, `product_map`,
-  `ship_loop` — the /ship-product pipeline and its delivery loop).
+  `ship_loop`, `challenge_decision` — the /ship-product pipeline, its
+  delivery loop, and the optional decision review).
 - `.opencode/commands/`, `.claude/commands/` — slash commands (`ship-loop`,
-  `ship-product`, `sync`, ...). `.opencode/agents/`, `.claude/agents/` —
-  subagent roles for the loop (`product-framer`, `wave-implementer`,
-  `wave-reviewer`, `delivery-verifier`).
+  `ship-product`, `challenge-decision`, `sync`, ...). `.opencode/agents/`,
+  `.claude/agents/` — subagent roles for the loop (`product-framer`,
+  `wave-implementer`, `wave-reviewer`, `delivery-verifier`) and the review
+  (`decision-challenger`).
 - `SELF/` — the harness's own specs/principles (`PRINCIPLES.md`, decision
-  log D001–D010, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
+  log D001–D011, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
 - `REPOS.md` — YAML-frontmatter registry of managed repos (source of truth).
 - `tests/` — unittest-style pytest files per module.
 
@@ -90,6 +92,10 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   `specs/<feature>/GATES.md` and tracked in `LOOP.md`. A blocking gate stops
   its phase; only a named human can waive one. Agent-owned gates are resolved
   with evidence; human-owned gates are handed back with `block`.
+- **D011:** design decisions get an optional, advisory review
+  (`/challenge-decision` + `decision-challenger`). The deterministic skill
+  judges record completeness and surfaces signals; the agent judges design
+  with evidence. It never blocks a gate, wave, or merge.
 
 ## Landmines
 
@@ -100,7 +106,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   registry.
 - `oh serve` observes session JSONL files the agent CLIs already write —
   don't add instrumentation hooks into agents.
-- Decision log D001–D010 in `SELF/PRINCIPLES.md` is normative — read it
+- Decision log D001–D011 in `SELF/PRINCIPLES.md` is normative — read it
   before structural changes.
 - The web UI must call the same verbs as the CLI (D005) — no business
   logic in TSX.
@@ -108,6 +114,8 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   The loop is driven by the agent, not by a daemon or cron (D001/D009).
 - Never mark a gate `met` without evidence or `waived` without a human's name
   and reason. Fix a wrong gate in `GATES.md`; do not route around it.
+- `/challenge-decision` is advisory: never make its verdict a gate or a merge
+  blocker, and never let the reviewer edit product code.
 
 ## Agent rules
 
@@ -116,7 +124,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - Verify before claiming: run `pytest` (with `--no-deps` install path) and
   report the real result.
 - Keep changes minimal and consistent with surrounding code. Respect the
-  D001–D010 decision log.
+  D001–D011 decision log.
 - For product work, prefer `/ship-loop` (autonomous) or `/ship-product`
   (phased); both keep specs and loop state in the target repo under
   `specs/` and ship one wave per PR.
