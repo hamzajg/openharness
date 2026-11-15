@@ -30,7 +30,7 @@ export default function Self() {
   }, [block])
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-neutral-100">SELF</h2>
         <p className="text-sm text-neutral-500 mt-1">
@@ -40,36 +40,44 @@ export default function Self() {
 
       {err && <div className="text-sm text-red-400">{err}</div>}
 
-      <div className="flex flex-col lg:flex-row gap-5">
-        {/* block nav: horizontal scroll on mobile, vertical rail on lg */}
-        <nav className="lg:w-44 shrink-0">
-          <div className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
-            {BLOCKS.map((b) => (
-              <button
-                key={b}
-                onClick={() => setBlock(b)}
-                className={`px-3 py-2 rounded-lg text-left text-sm whitespace-nowrap transition-colors ${
-                  block === b
-                    ? 'bg-neutral-800 text-neutral-100 font-medium'
-                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'
-                }`}
-              >
-                {b}
-              </button>
-            ))}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* block nav: horizontal scroll on mobile, sticky rail on lg */}
+        <nav className="lg:w-48 shrink-0">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-neutral-600 mb-2 px-1 hidden lg:block">
+            Blocks
+          </div>
+          <div className="flex lg:flex-col gap-0.5 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
+            {BLOCKS.map((b) => {
+              const active = block === b
+              return (
+                <button
+                  key={b}
+                  onClick={() => setBlock(b)}
+                  className={`px-3 py-2 rounded-lg text-left text-sm whitespace-nowrap transition-colors border-l-2 ${
+                    active
+                      ? 'border-sky-500 bg-neutral-800/70 text-neutral-100 font-medium'
+                      : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/40'
+                  }`}
+                >
+                  {b}
+                </button>
+              )
+            })}
           </div>
         </nav>
 
-        {/* content */}
-        <div className="flex-1 min-w-0 rounded-xl border border-neutral-800 bg-neutral-900/60 p-5">
-          <div className="flex items-center gap-2 mb-3 pb-3 border-b border-neutral-800">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
-              {block}
-            </span>
-            {loading && <span className="text-[11px] text-neutral-600">loading…</span>}
+        {/* content — constrained measure for comfortable reading */}
+        <article className="flex-1 min-w-0 lg:max-w-3xl">
+          <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 px-6 py-6 md:px-8 md:py-7">
+            <header className="flex items-center gap-2 pb-4 mb-2 border-b border-neutral-800">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 font-mono">
+                {block}
+              </span>
+              {loading && <span className="text-[11px] text-neutral-600">loading…</span>}
+            </header>
+            <Markdown text={text} />
           </div>
-          <Markdown text={text} />
-        </div>
+        </article>
       </div>
     </div>
   )
