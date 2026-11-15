@@ -151,7 +151,7 @@ function LoopRow({
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left rounded-xl border bg-neutral-900/60 overflow-hidden transition-colors border-l-2 ${
+      className={`group w-full text-left cursor-pointer rounded-xl border bg-neutral-900/60 overflow-hidden transition-colors border-l-2 ${
         selected
           ? `${s.accent} border-neutral-600 ring-1 ring-sky-500/30`
           : `${s.accent} border-neutral-800 hover:bg-neutral-800/30`
@@ -164,23 +164,27 @@ function LoopRow({
               <span className="text-[15px] font-semibold text-neutral-100">{loop.feature}</span>
               <span className="text-xs text-neutral-500 font-mono">{loop.repo}</span>
             </div>
-            <div className="mt-1 flex items-center gap-3 text-xs text-neutral-500">
-              <span>{loop.waves_done} of {loop.waves_total} waves</span>
+            <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500 flex-wrap">
+              <span>{loop.waves_done}/{loop.waves_total} waves</span>
               {loop.gates_total > 0 && (
                 <span className={loop.gates_pending > 0 ? 'text-amber-400/90' : ''}>
-                  {loop.gates_total - loop.gates_pending} of {loop.gates_total} gates
+                  · {loop.gates_total - loop.gates_pending}/{loop.gates_total} gates
                 </span>
               )}
-              <span>·</span>
-              <span>{loop.iterations} iteration{loop.iterations === 1 ? '' : 's'}</span>
-              <span>·</span>
-              <span>updated {fmtAgo(loop.updated)}</span>
+              {loop.status === 'blocked' && <span className="text-amber-400/90">· needs you</span>}
+              <span className="hidden sm:inline">· {loop.iterations} iter · {fmtAgo(loop.updated)}</span>
             </div>
           </div>
 
-          <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0">
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
             <StatusPill status={loop.status} />
-            <div className="w-28 h-1 rounded-full bg-neutral-800 overflow-hidden">
+            <div className="flex items-center gap-1 text-[11px] font-medium text-sky-400/90 transition-colors">
+              <span className="hidden sm:inline">Details</span>
+              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
+                <path d="M4.5 2.5L8.5 6l-4 3.5v-7z" />
+              </svg>
+            </div>
+            <div className="hidden sm:block w-28 h-1 rounded-full bg-neutral-800 overflow-hidden">
               <div
                 className={`h-full rounded-full bg-gradient-to-r ${
                   loop.status === 'running' ? 'from-sky-500 to-cyan-400'
