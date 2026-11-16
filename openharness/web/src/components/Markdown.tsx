@@ -67,19 +67,19 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
     } catch {}
   }
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-950 overflow-hidden my-4">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-neutral-800/70 bg-neutral-900/60">
-        <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+    <div className="rounded-lg border border-line bg-canvas overflow-hidden my-4">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-line/70 bg-surface/60">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-ink-mute">
           {lang || 'code'}
         </span>
         <button
           onClick={copy}
-          className="text-[10px] font-medium text-neutral-500 hover:text-neutral-200 transition-colors"
+          className="text-[10px] font-medium text-ink-mute hover:text-ink transition-colors"
         >
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <pre className="p-3.5 overflow-x-auto text-[13px] leading-6 font-mono text-neutral-300">
+      <pre className="p-3.5 overflow-x-auto text-[13px] leading-6 font-mono text-ink-body">
         {code}
       </pre>
     </div>
@@ -90,48 +90,48 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
 
 const components = {
   h1: ({ children, ...p }: any) => (
-    <h1 className="text-xl font-bold text-neutral-100 border-b border-neutral-800 pb-2 mt-2 mb-4" {...p}>
+    <h1 className="text-xl font-bold text-ink border-b border-line pb-2 mt-2 mb-4" {...p}>
       {children}
     </h1>
   ),
   h2: ({ children, ...p }: any) => (
-    <h2 className="text-base font-semibold text-neutral-100 border-b border-neutral-800/70 pb-1.5 mt-6 mb-3" {...p}>
+    <h2 className="text-base font-semibold text-ink border-b border-line/70 pb-1.5 mt-6 mb-3" {...p}>
       {children}
     </h2>
   ),
   h3: ({ children, ...p }: any) => (
-    <h3 className="text-sm font-semibold text-neutral-200 mt-5 mb-2" {...p}>{children}</h3>
+    <h3 className="text-sm font-semibold text-ink mt-5 mb-2" {...p}>{children}</h3>
   ),
   h4: ({ children, ...p }: any) => (
-    <h4 className="text-sm font-medium text-neutral-300 mt-4 mb-1.5" {...p}>{children}</h4>
+    <h4 className="text-sm font-medium text-ink-body mt-4 mb-1.5" {...p}>{children}</h4>
   ),
   p: ({ children, ...p }: any) => (
-    <p className="leading-7 text-neutral-300 my-3" {...p}>{children}</p>
+    <p className="leading-7 text-ink-body my-3" {...p}>{children}</p>
   ),
   ul: ({ children, ...p }: any) => (
-    <ul className="list-disc pl-5 space-y-1.5 marker:text-neutral-600 my-3" {...p}>{children}</ul>
+    <ul className="list-disc pl-5 space-y-1.5 marker:text-ink-faint my-3" {...p}>{children}</ul>
   ),
   ol: ({ children, ...p }: any) => (
-    <ol className="list-decimal pl-5 space-y-1.5 marker:text-neutral-600 my-3" {...p}>{children}</ol>
+    <ol className="list-decimal pl-5 space-y-1.5 marker:text-ink-faint my-3" {...p}>{children}</ol>
   ),
   li: ({ children, ...p }: any) => (
-    <li className="leading-6 text-neutral-300" {...p}>{children}</li>
+    <li className="leading-6 text-ink-body" {...p}>{children}</li>
   ),
   strong: ({ children, ...p }: any) => (
-    <strong className="text-neutral-100 font-semibold" {...p}>{children}</strong>
+    <strong className="text-ink font-semibold" {...p}>{children}</strong>
   ),
   em: ({ children, ...p }: any) => (
-    <em className="text-neutral-200" {...p}>{children}</em>
+    <em className="text-ink" {...p}>{children}</em>
   ),
   a: ({ children, ...p }: any) => (
     <a className="text-sky-400 hover:text-sky-300 underline underline-offset-2" target="_blank" rel="noreferrer" {...p}>
       {children}
     </a>
   ),
-  hr: (p: any) => <hr className="border-neutral-800 my-6" {...p} />,
+  hr: (p: any) => <hr className="border-line my-6" {...p} />,
   // inline code only — fenced blocks are handled by `pre` below
   code: ({ children, ...p }: any) => (
-    <code className="rounded bg-neutral-800/80 px-1.5 py-0.5 font-mono text-[13px] text-sky-300" {...p}>
+    <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[13px] text-sky-300" {...p}>
       {children}
     </code>
   ),
@@ -160,29 +160,29 @@ const components = {
       )
     }
     return (
-      <blockquote className="border-l-2 border-neutral-700 pl-4 text-neutral-400 my-4" {...p}>
+      <blockquote className="border-l-2 border-line-strong pl-4 text-ink-dim my-4" {...p}>
         {children}
       </blockquote>
     )
   },
   table: ({ children, ...p }: any) => (
-    <div className="overflow-x-auto rounded-lg border border-neutral-800 my-4">
+    <div className="overflow-x-auto rounded-lg border border-line my-4">
       <table className="w-full text-sm" {...p}>{children}</table>
     </div>
   ),
   th: ({ children, ...p }: any) => (
-    <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-400 bg-neutral-900/70 border-b border-neutral-800 whitespace-nowrap" {...p}>
+    <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-dim bg-surface/70 border-b border-line whitespace-nowrap" {...p}>
       {children}
     </th>
   ),
   td: ({ children, ...p }: any) => (
-    <td className="px-3 py-2 border-b border-neutral-800/60 text-neutral-300 align-top" {...p}>
+    <td className="px-3 py-2 border-b border-line/60 text-ink-body align-top" {...p}>
       {children}
     </td>
   ),
   img: ({ src, alt, ...p }: any) => (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt ?? ''} className="rounded-lg border border-neutral-800 my-4 max-w-full" {...p} />
+    <img src={src} alt={alt ?? ''} className="rounded-lg border border-line my-4 max-w-full" {...p} />
   ),
 }
 
@@ -195,7 +195,7 @@ function preprocess(text: string): string {
 
 export default function Markdown({ text }: { text: string }) {
   return (
-    <div className="text-[15px] leading-7 text-neutral-300 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+    <div className="text-[15px] leading-7 text-ink-body [&>:first-child]:mt-0 [&>:last-child]:mb-0">
       <ReactMarkdown components={components}>{preprocess(text)}</ReactMarkdown>
     </div>
   )
