@@ -36,12 +36,20 @@ brief; `--force` to overwrite an existing review.
 - **Readiness** (`INCOMPLETE` / `CHALLENGE` / `READY`) from six record
   elements: context, decision, alternatives (≥2), consequences, forces,
   evidence. This is record quality, **not** design quality.
+  - Alternatives come from an `## Alternatives`/`## Options considered`
+    section, or from conservative prose detection (`Options were A vs. B`);
+    rhetorical "rather than" does not count.
+  - For a spec, `## Scope (out)` / `## Non-goals` counts as the
+    consequence record — the spec's way of naming what the decision excludes.
 - **Reversibility** — stated or not; one-way doors get more scrutiny.
 - **Detected type** — architecture, data, api, persistence, integration,
   security, domain, ux, process — which selects extra questions and moves.
 - **Evidence signals** — labelled heuristic: framework/IO in domain code,
   missing tests, getter/setter-heavy models, domain-event/invariant
-  vocabulary, repo layout.
+  vocabulary, repo layout. Paths inferred from backticks are code paths only;
+  a decision that cites only markdown is reported as document-only. A
+  non-domain path is reported as inspected-but-not-layering-checked, so the
+  reviewer knows it was examined.
 - **Design moves** — neutral moves to test (invert a dependency, shrink the
   decision, separate read/write shapes, introduce an ACL).
 - **Challenge questions** across seven lenses, each with "good looks like".

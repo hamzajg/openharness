@@ -94,7 +94,8 @@ def test_complete_adr_has_all_elements_and_alternatives(tmp_path):
     out = _run(tmp_path, adr="docs/adr/0007-order-store.md")
     assert "Readiness: **CHALLENGE** (6/6 record elements)" in out
     assert "**Reversibility:** stated" in out
-    assert "Keep the JSON file" not in out  # alternatives are counted, not dumped
+    assert "Alternatives on record" in out
+    assert "Keep the JSON file" in out  # shown so the reviewer can test for strawmen
 
 
 def test_spec_decisions_are_read(tmp_path):
@@ -296,6 +297,71 @@ def test_focus_reorders_lenses(tmp_path):
     questions = out.split("## Challenge questions", 1)[1]
     assert "- Focus: ddd" in out
     assert questions.index("Domain fit (DDD)") < questions.index("Problem & forces")
+
+
+def test_inline_alternatives_are_detected_in_prose(tmp_path):
+    out = _run(tmp_path, decision=(
+        "How does one service consume another? Options were direct REST calls "
+        "vs. domain events; a saga is overkill at this scale. Evidence: "
+        "`src/order/OrderApi.java` and ADR 0003."
+    ))
+    assert "`alternatives`" not in out
+    assert "Alternatives on record" in out
+    assert "direct REST calls" in out and "domain events" in out
+
+
+def test_spec_scope_out_counts_as_consequences(tmp_path):
+    d = tmp_path / "specs" / "orders"
+    d.mkdir(parents=True)
+    (d / "SPEC.md").write_text(textwrap.dedent("""\
+        # Spec: Orders
+
+        ## Problem
+        Checkout needs durable orders, and support needs to read them.
+
+        ## Scope (in)
+        Place and cancel orders.
+
+        ## Scope (out)
+        Payment, inventory reservation, and cross-context queries.
+
+        ## Decisions
+        - Persist Order as an aggregate; one repository per aggregate.
+        - Evidence: `docs/adr/0007-order-store.md`.
+        """))
+    out = _run(tmp_path, spec_dir="specs/orders")
+    missing = out.split("**Missing before this is reviewable:**", 1)[1].split("##", 1)[0] \
+        if "**Missing before this is reviewable:**" in out else ""
+    assert "`consequences`" not in missing
+
+
+def test_inferred_paths_ignore_markdown_docs(tmp_path):
+    out = _run(tmp_path, decision=(
+        "Keep the order model pure. See `specs/PRODUCT.md` and `docs/adr/0003.md`. "
+        "Evidence: `specs/PRODUCT.md`."
+    ))
+    assert "document-only" in out
+    assert "Inspected: `specs/PRODUCT.md`" not in out
+
+
+def test_non_domain_path_reports_neutral_signal(tmp_path):
+    p = tmp_path / "src" / "api" / "handler.py"
+    p.parent.mkdir(parents=True)
+    p.write_text("def handle():\n    return 'ok'\n")
+    out = _run(tmp_path, decision=(
+        "Expose a REST endpoint for orders. Evidence: `src/api/handler.py`. Reversible."
+    ), paths="src/api")
+    assert "not a domain path, so layering checks were skipped" in out
+    assert "domain code imports a framework" not in out
+
+
+def test_section_prefers_exact_heading():
+    from skills.product.challenge_decision import _section, _sections
+    sections = _sections(
+        "## Decision Drivers\n- cost\n\n## Decision\nUse Postgres for orders.\n"
+    )
+    assert "Use Postgres" in _section(sections, "decision")
+    assert "cost" not in _section(sections, "decision")
 
 
 def test_type_specific_question_is_added(tmp_path):

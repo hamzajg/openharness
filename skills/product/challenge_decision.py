@@ -38,7 +38,14 @@ _MAX_FILES = 400
 
 _HEADING_RE = re.compile(r"^##\s+(.+?)\s*$", re.M)
 _BULLET_RE = re.compile(r"^(?:[-*+]|\d+[.)])\s+(.{3,})$")
-_OPTION_RE = re.compile(r"(?:option|alternative)\s+[a-z0-9][^\n.]*", re.I)
+_ALT_MARKER_RE = re.compile(r"\b(?:options?|alternatives?)\b", re.I)
+_CONTRAST_RE = re.compile(r"\s+(?:vs\.?|versus)\s+", re.I)
+_SENTENCE_SPLIT_RE = re.compile(r"""(?<=[.!?])\s+(?=[A-Z("'])""")
+_OPTION_PREFIX_RE = re.compile(
+    r"^\s*(?:the\s+)?(?:options?|alternatives?)\s+"
+    r"(?:were|are|include|included|considered)?\s*[:\-—]?\s*",
+    re.I,
+)
 _EVIDENCE_RE = re.compile(
     r"`[^`]+`|https?://|\b[\w./-]+\.(?:md|py|ts|tsx|js|java|kt|cs|go|rb|sql|json|ya?ml)\b"
     r"|\bADR[- ]?\d+\b|#\d+|\b\d+(?:\.\d+)?\s*(?:ms|s|%|rps|qps|MB|GB)\b",
@@ -135,6 +142,10 @@ def _sections(text: str) -> dict[str, str]:
 
 
 def _section(sections: dict[str, str], *names: str) -> str:
+    # Exact heading first: `## Decision` must beat `## Decision Drivers`.
+    for name in names:
+        if name in sections:
+            return sections[name]
     for key, body in sections.items():
         if any(n in key for n in names):
             return body
@@ -150,14 +161,69 @@ def _options(body: str) -> list[str]:
     return opts
 
 
+def _paragraphs(text: str):
+    """Join hard-wrapped lines so a sentence split is not fooled by line breaks."""
+    block: list[str] = []
+    for line in text.splitlines():
+        s = line.strip()
+        if not s:
+            if block:
+                yield " ".join(block)
+                block = []
+            continue
+        block.append(s)
+    if block:
+        yield " ".join(block)
+
+
+def _inline_alternatives(text: str) -> list[str]:
+    """Options named in prose, e.g. "Options were A vs. B".
+
+    Deliberately conservative: a noun marker ("option"/"alternative") or a
+    real contrast ("vs."/"versus") must be present, questions are ignored,
+    and rhetorical "rather than"/"instead of" do not count. A bare list of
+    decisions (a spec's `## Decisions`) does not.
+    """
+    out: list[str] = []
+    for paragraph in _paragraphs(text):
+        paragraph = paragraph.replace("**", "").replace("`", "")
+        for sentence in _SENTENCE_SPLIT_RE.split(paragraph):
+            sentence = sentence.strip()
+            sentence = re.sub(r"^[-*+]\s+", "", sentence)
+            if not sentence or sentence.endswith("?"):
+                continue
+            if not (_ALT_MARKER_RE.search(sentence) or _CONTRAST_RE.search(sentence)):
+                continue
+            sides = _CONTRAST_RE.split(sentence, maxsplit=1)
+            if len(sides) == 2:
+                left = _OPTION_PREFIX_RE.sub("", sides[0]).strip(" ,;:-")
+                right = re.split(r";", sides[1], maxsplit=1)[0].strip(" ,;:-")
+                for side in (left, right):
+                    if len(side) >= 3:
+                        out.append(_norm(side, 160))
+            else:
+                out.append(_norm(sentence, 160))
+    seen, uniq = set(), []
+    for alt in out:
+        key = alt.lower()
+        if key not in seen:
+            seen.add(key)
+            uniq.append(alt)
+    return uniq[:8]
+
+
 def _alternatives(parts: dict, kind: str) -> list[str]:
-    body = _section(parts["sections"], "alternative", "options considered", "trade-off")
+    body = _section(
+        parts["sections"], "alternative", "options considered", "option",
+        "trade-off", "tradeoff",
+    )
     opts = _options(body) if body else []
-    if not opts:
-        # Inline "Option A ... Option B" prose still counts, but a bare list of
-        # decisions (a spec's Decisions section) must not.
-        for m in _OPTION_RE.finditer(parts["full"]):
-            opts.append(_norm(m.group(0), 160))
+    if len(opts) < 2:
+        seen = {o.lower() for o in opts}
+        for alt in _inline_alternatives(parts["full"]):
+            if alt.lower() not in seen:
+                seen.add(alt.lower())
+                opts.append(alt)
     return opts
 
 
@@ -227,11 +293,24 @@ def _source(repo: Path, spec_dir: str, adr: str, decision: str):
         body = _section(sections, "decisions", "decision log")
     else:
         body = _section(sections, "decision", "proposal", "approach")
-    consequences = _section(sections, "consequence", "trade-off", "impact", "risk")
+    consequences = _section(
+        sections, "consequence", "trade-off", "tradeoff", "impact", "risk"
+    )
+    if kind == "spec":
+        # A spec records consequences as what the decision deliberately
+        # excludes; Scope (out)/Non-goals are the spec's equivalent.
+        consequences = "\n".join(
+            x for x in (
+                consequences,
+                _section(sections, "scope (out)", "out of scope",
+                         "non-goal", "non-goals"),
+            ) if x.strip()
+        )
     if kind == "inline" and not body:
         body = full
     parts = {
         "full": full,
+        "kind": kind,
         "sections": sections,
         "context": context,
         "decision": body,
@@ -246,6 +325,11 @@ def _source(repo: Path, spec_dir: str, adr: str, decision: str):
 def _completeness(parts: dict) -> list[tuple[str, bool, str]]:
     text = parts["full"]
     alts = parts["alternatives"]
+    consequence_hint = "record positive and negative consequences"
+    if parts.get("kind") == "spec":
+        consequence_hint += (
+            " or state what the decision explicitly excludes (Scope out / Non-goals)"
+        )
     return [
         ("context", len(_norm(parts["context"], 2000)) >= 40,
          "state the problem, users, and forces driving the decision"),
@@ -254,7 +338,7 @@ def _completeness(parts: dict) -> list[tuple[str, bool, str]]:
         ("alternatives", len(alts) >= 2,
          "list at least two credible alternatives, including the simplest one"),
         ("consequences", len(_norm(parts["consequences"], 2000)) >= 20,
-         "record positive and negative consequences"),
+         consequence_hint),
         ("forces", bool(_FORCES_RE.search(text)),
          "name the constraints and quality attributes that dominate"),
         ("evidence", bool(_EVIDENCE_RE.search(text)),
@@ -279,10 +363,15 @@ def _candidate_paths(root: Path, raw: str, text: str) -> list[Path]:
             if token:
                 found.append(Path(token) if Path(token).is_absolute() else root / token)
     if not found:
+        # Infer code paths only. A spec that cites `specs/PRODUCT.md` or an
+        # ADR should not be "inspected" as source; if only docs are named,
+        # the review is honestly document-only.
         for token in re.findall(r"`([^`]+)`", text):
             t = token.strip()
-            if "/" in t or Path(t).suffix.lower() in _CODE_EXTS | {".md", ".sql", ".json", ".yaml", ".yml"}:
-                p = Path(t) if Path(t).is_absolute() else root / t
+            if not t or t.startswith(("http://", "https://")):
+                continue
+            p = Path(t) if Path(t).is_absolute() else root / t
+            if p.is_dir() or p.suffix.lower() in _CODE_EXTS:
                 found.append(p)
     out, seen = [], set()
     for p in found:
@@ -353,6 +442,11 @@ def _signals(root: Path, paths: list[Path]) -> list[str]:
             referenced = bool(stems) and any(s in test_text for s in stems)
         if files and not referenced:
             signals.append(f"`{rel}` — no test file references this code (heuristic)")
+        if not domain and files:
+            signals.append(
+                f"`{rel}` — {len(files)} source file(s); not a domain path, "
+                "so layering checks were skipped"
+            )
 
         framework_hits = 0
         external_hits = 0
@@ -549,6 +643,11 @@ def _brief(parts, label, types, checks, readiness, signals, style, paths, root, 
     if style:
         out.append(f"**Repo shape:** {style}")
     out.append("")
+    if parts["alternatives"]:
+        out.append("**Alternatives on record (verify they are credible, not strawmen):**")
+        for alt in parts["alternatives"][:4]:
+            out.append(f"- {alt}")
+        out.append("")
 
     out += ["## Evidence signals (heuristic — verify before acting)", ""]
     out += [f"- {s}" for s in signals]
