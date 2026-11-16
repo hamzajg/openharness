@@ -62,7 +62,8 @@ feature:
 | Command | Shape |
 |---|---|
 | `/ship-product` | Phased, human-in-the-loop: discover → frame → spec/outcome hypothesis → examples → waves → implement → validate. One feature at a time. |
-| `/ship-loop` | Autonomous loop over the same pipeline: the oracle picks the next action, subagents execute it, every wave is one PR. Stacks on open predecessor PRs; `done` means acceptance-validated, not necessarily merged or deployed. |
+| `/ship-loop` | Autonomous loop over the same pipeline: the oracle picks the next action, subagents execute it, every wave is one PR. Stacks on open predecessor PRs; `done` means acceptance-validated, not necessarily merged or deployed. Runs with `--review=required`: a spec audit gates planning and a delivery audit gates `finish`. |
+| `/review-delivery` | Independent audit of one feature's spec or delivery: a deterministic brief checks claims against the repo, then `delivery-auditor` re-verifies the code and tests and returns `PASS`/`CONCERNS`/`BLOCK`. |
 | `/challenge-decision` | Optional, advisory design review: steelman a decision, generate alternatives, weigh tradeoffs, apply DDD/architecture/testability/craftsmanship lenses. Never blocks. |
 
 ```
@@ -105,6 +106,21 @@ signals, design moves, lens questions) and delegates the judgment to the
 scores with evidence, verdict `ACCEPT`/`REVISE`/`REVISIT`/`SPLIT`. It is
 advisory (D011) — it never blocks a gate, wave, or merge.
 
+**Independent audit.** Gates check whether a precondition exists; they do not
+prove the spec is grounded in the repo or that the delivery matches the spec.
+`/review-delivery` runs `review_delivery` to build an evidence brief (artifact
+presence, AC → scenario → wave → backlog → LOOP traceability, existence of
+every claimed path/script/endpoint/ADR, placeholder evidence, scope drift,
+unfinished markers), then hands it to the independent `delivery-auditor`
+subagent. The auditor opens the cited code and tests, re-verifies each finding,
+and fills one verdict: `BLOCK` on any confirmed blocker, hallucinated claim, or
+unproven acceptance criterion; `CONCERNS` only when every remaining item is
+accepted; `PASS` only when all lists are empty. `/ship-loop` enforces two
+checkpoints with `ship_loop --review=required`: `SPEC-AUDIT.md` before
+planning, `DELIVERY-AUDIT.md` before `finish`. The audit never marks a gate,
+merges, or edits product code (D013).
+
 See `SELF/blocks/delivery-loop.md` for the state model, gate contract, and
-action contract, and `SELF/blocks/decision-review.md` for the review lenses
-and guardrails.
+action contract, `SELF/blocks/delivery-audit.md` for the audit checkpoints and
+verdict rules, and `SELF/blocks/decision-review.md` for the review lenses and
+guardrails.

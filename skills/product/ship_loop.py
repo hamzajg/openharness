@@ -474,7 +474,74 @@ def _validate_brief(root: Path, spec_dir: Path) -> str:
     ])
 
 
-def _decide(root: Path, spec_dir: Path, state: dict, waves: dict) -> str:
+_AUDIT_VERDICT_RE = re.compile(
+    r"^AUDIT:\s*(PASS|CONCERNS|BLOCK)\s*$", re.M | re.I
+)
+
+
+def _audit_status(spec_dir: Path, filename: str) -> str:
+    """Review artifact status: missing | unverified | pass | concerns | block.
+
+    `unverified` means the deterministic brief exists but no reviewer filled a
+    single-value verdict. The template line (`AUDIT: PASS | CONCERNS | BLOCK`)
+    does not count.
+    """
+    path = spec_dir / filename
+    if not path.is_file():
+        return "missing"
+    match = _AUDIT_VERDICT_RE.search(_read(path))
+    return match.group(1).lower() if match else "unverified"
+
+
+def _audit_brief(root: Path, spec_dir: Path, phase: str, status: str) -> str:
+    rel = _rel(root, spec_dir)
+    filename = "SPEC-AUDIT.md" if phase == "spec" else "DELIVERY-AUDIT.md"
+    why = (
+        f"`{rel}/{filename}` is missing"
+        if status == "missing"
+        else f"`{rel}/{filename}` has no filled verdict"
+    )
+    lines = [
+        f"NEXT: audit the {phase} for {spec_dir.name}",
+        "",
+        f"{why}. The loop runs with `--review=required`.",
+        "",
+        "1. Build the deterministic evidence brief:",
+        f"   `python -m openharness run review_delivery --repo_path={root} "
+        f"--spec_dir={rel} --phase={phase} --write`",
+        "2. Give the brief to the `delivery-auditor` subagent. It re-verifies",
+        "   every finding against the code, checks the tests assert the",
+        "   scenarios, and fills `AUDIT: PASS|CONCERNS|BLOCK`.",
+        "3. Fix every confirmed blocker, then re-run and re-audit.",
+        "",
+        "A `BLOCK` verdict stops the loop. `PASS` or `CONCERNS` lets it",
+        "continue; `CONCERNS` must be explicitly accepted.",
+    ]
+    return "\n".join(lines)
+
+
+def _audit_block_brief(root: Path, spec_dir: Path, phase: str) -> str:
+    rel = _rel(root, spec_dir)
+    filename = "SPEC-AUDIT.md" if phase == "spec" else "DELIVERY-AUDIT.md"
+    return "\n".join([
+        f"AUDIT-BLOCK: {spec_dir.name} — the {phase} audit says BLOCK",
+        "",
+        f"Read `{rel}/{filename}`. Fix every confirmed blocker, then re-run",
+        f"`python -m openharness run ship_validate --spec_dir={rel} "
+        f"--repo_path={root}` (delivery) and",
+        f"`python -m openharness run review_delivery --repo_path={root} "
+        f"--spec_dir={rel} --phase={phase} --write`,",
+        "and have the `delivery-auditor` re-review.",
+        "",
+        "The loop will not continue while the audit says BLOCK. Do not edit",
+        "the verdict by hand; fix the delivery or the spec.",
+    ])
+
+
+def _decide(
+    root: Path, spec_dir: Path, state: dict, waves: dict,
+    review: str = "advisory",
+) -> str:
     missing = [
         name for name in ("SPEC.md", "EXAMPLES.feature", "BACKLOG.md")
         if not (spec_dir / name).is_file()
@@ -497,6 +564,12 @@ def _decide(root: Path, spec_dir: Path, state: dict, waves: dict) -> str:
         blocked = _blocking_gates(spec_dir, state, "plan", root)
         if blocked:
             return _gate_directive(root, spec_dir, "plan", blocked)
+        if review == "required":
+            status = _audit_status(spec_dir, "SPEC-AUDIT.md")
+            if status in ("missing", "unverified"):
+                return _audit_brief(root, spec_dir, "spec", status)
+            if status == "block":
+                return _audit_block_brief(root, spec_dir, "spec")
         return "\n".join([
             f"NEXT: plan waves for {spec_dir.name}",
             "",
@@ -535,10 +608,19 @@ def _decide(root: Path, spec_dir: Path, state: dict, waves: dict) -> str:
     blocked = _blocking_gates(spec_dir, state, "finish", root)
     if blocked:
         return _gate_directive(root, spec_dir, "finish", blocked)
+    if review == "required":
+        status = _audit_status(spec_dir, "DELIVERY-AUDIT.md")
+        if status in ("missing", "unverified"):
+            return _audit_brief(root, spec_dir, "delivery", status)
+        if status == "block":
+            return _audit_block_brief(root, spec_dir, "delivery")
     return "FEATURE-DONE"
 
 
-def _summary(root: Path, spec_dir: Path, state: dict, waves: dict, budget: int) -> str:
+def _summary(
+    root: Path, spec_dir: Path, state: dict, waves: dict, budget: int,
+    review: str = "advisory",
+) -> str:
     done = sum(1 for w in waves if _wave(state, w)["status"] == "done")
     progress = sum(1 for w in waves if _wave(state, w)["status"] == "in-progress")
     gates = _parse_gates(spec_dir)
@@ -555,12 +637,18 @@ def _summary(root: Path, spec_dir: Path, state: dict, waves: dict, budget: int) 
         gate_text = f" · gates {met}/{len(gates)} met"
         if pending:
             gate_text += f" ({pending} blocking pending)"
+    review_text = ""
+    if review == "required":
+        spec = _audit_status(spec_dir, "SPEC-AUDIT.md")
+        delivery = _audit_status(spec_dir, "DELIVERY-AUDIT.md")
+        review_text = f" · review spec:{spec} delivery:{delivery}"
     return (
         f"Feature: `{spec_dir.name}` · status {state['status']} · "
         f"iteration {state['iterations']}/{budget} · "
         f"waves {done}/{len(waves)} done"
         + (f", {progress} in progress" if progress else "")
         + gate_text
+        + review_text
     )
 
 
@@ -580,6 +668,7 @@ def ship_loop(
     evidence: str = "",
     waived_by: str = "",
     max_iterations: int = 25,
+    review: str = "advisory",
     force: bool = False,
 ) -> str:
     """Drive one delivery-loop iteration: report the next action and record wave/gate outcomes.
@@ -611,9 +700,16 @@ def ship_loop(
       evidence: Proof recorded when a gate is marked met.
       waived_by: Human who approved a waiver (required with `--status=waived`).
       max_iterations: Hard stop after this many `next` calls (default 25).
+      review: `advisory` (default) or `required`. When required, the loop
+        refuses to plan waves until `SPEC-AUDIT.md` has a filled verdict, and
+        refuses to finish until `DELIVERY-AUDIT.md` has one. A `BLOCK` verdict
+        stops the loop. `advisory` keeps existing loops working and never
+        enforces the audit.
       force: Allow out-of-order start/complete or a full reset.
     """
     budget = max(1, int(max_iterations))
+    if review not in ("advisory", "required"):
+        return "ERROR: --review must be advisory|required"
     root = Path(repo_path).resolve()
     if not root.is_dir():
         return f"ERROR: {repo_path} is not a directory"
@@ -685,8 +781,8 @@ def ship_loop(
                 _event(state, f"gate {gid} reset to pending")
             _save_state(d, state)
             return (
-                f"Gate {gid} {status}.\n\n" + _summary(root, d, state, waves, budget)
-                + "\n\n" + _decide(root, d, state, waves)
+                f"Gate {gid} {status}.\n\n" + _summary(root, d, state, waves, budget, review)
+                + "\n\n" + _decide(root, d, state, waves, review)
             )
 
         if action == "start":
@@ -713,7 +809,7 @@ def ship_loop(
             state["status"] = "running"
             _event(state, f"start wave {wave} on {row['branch']}")
             _save_state(d, state)
-            return f"Recorded wave {wave} in progress (`{row['branch']}`).\n\n" + _summary(root, d, state, waves, budget)
+            return f"Recorded wave {wave} in progress (`{row['branch']}`).\n\n" + _summary(root, d, state, waves, budget, review)
 
         if action == "complete":
             if not wave:
@@ -733,8 +829,8 @@ def ship_loop(
             })
             _event(state, f"complete wave {wave}" + (f" ({pr})" if pr else "") + f": {_clean(note)}")
             _save_state(d, state)
-            return (f"Recorded wave {wave} done.\n\n" + _summary(root, d, state, waves, budget)
-                    + "\n\n" + _decide(root, d, state, waves))
+            return (f"Recorded wave {wave} done.\n\n" + _summary(root, d, state, waves, budget, review)
+                    + "\n\n" + _decide(root, d, state, waves, review))
 
         if action == "block":
             if not note.strip():
@@ -748,7 +844,7 @@ def ship_loop(
             state["status"] = "running"
             _event(state, "resumed")
             _save_state(d, state)
-            return f"Resumed {d.name}.\n\n" + _summary(root, d, state, waves, budget)
+            return f"Resumed {d.name}.\n\n" + _summary(root, d, state, waves, budget, review)
 
         if action == "reset":
             if wave:
@@ -761,7 +857,7 @@ def ship_loop(
                 state.update({"status": "running", "iterations": 0, "waves": {}})
                 _event(state, "full reset")
             _save_state(d, state)
-            return f"Reset {d.name}.\n\n" + _summary(root, d, state, waves, budget)
+            return f"Reset {d.name}.\n\n" + _summary(root, d, state, waves, budget, review)
 
         if action == "finish":
             undone = [n for n in sorted(waves) if _wave(state, n)["status"] != "done"]
@@ -775,10 +871,16 @@ def ship_loop(
             blocked = _blocking_gates(d, state, "finish", root)
             if blocked:
                 return _gate_directive(root, d, "finish", blocked)
+            if review == "required":
+                audit = _audit_status(d, "DELIVERY-AUDIT.md")
+                if audit in ("missing", "unverified"):
+                    return _audit_brief(root, d, "delivery", audit)
+                if audit == "block":
+                    return _audit_block_brief(root, d, "delivery")
             state["status"] = "done"
             _event(state, "feature validated and shipped")
             _save_state(d, state)
-            return f"Feature {d.name} marked done.\n\n" + _next_feature(root, d)
+            return f"Feature {d.name} marked done.\n\n" + _next_feature(root, d, review)
 
     # status / next: pick the first unfinished feature.
     for d in dirs:
@@ -802,13 +904,13 @@ def ship_loop(
                 + (state["events"][-1] if state["events"] else "")
                 + "\n\nResolve it, then run `--action=resume`."
             )
-        verdict = _decide(root, d, state, waves)
+        verdict = _decide(root, d, state, waves, review)
         if verdict == "FEATURE-DONE":
             state["status"] = "done"
             _event(state, "feature validated and shipped")
             _save_state(d, state)
             continue
-        head = f"# Delivery loop — {d.name}\n\n{_summary(root, d, state, waves, budget)}\n"
+        head = f"# Delivery loop — {d.name}\n\n{_summary(root, d, state, waves, budget, review)}\n"
         return head + "\n" + verdict
 
     return "\n".join([
@@ -822,7 +924,9 @@ def ship_loop(
     ])
 
 
-def _next_feature(root: Path, current: Path) -> str:
+def _next_feature(
+    root: Path, current: Path, review: str = "advisory",
+) -> str:
     remaining = [d for d in _feature_dirs(root)
                  if d != current and _load_state(d)["status"] != "done"]
     if not remaining:
@@ -830,4 +934,4 @@ def _next_feature(root: Path, current: Path) -> str:
     d = remaining[0]
     state = _load_state(d)
     waves = _parse_waves(d)
-    return f"Next feature: `{d.name}`.\n\n" + _decide(root, d, state, waves)
+    return f"Next feature: `{d.name}`.\n\n" + _decide(root, d, state, waves, review)
