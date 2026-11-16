@@ -1,6 +1,54 @@
 @import "tailwindcss";
 
-html, body, #root { height: 100%; }
+/* ------------------------------------------------------------------ *
+ * Design tokens — the single source of truth for color.
+ * Values mirror the previous neutral-* palette, so the look is stable
+ * while every page now shares one vocabulary (bg-surface, text-ink…).
+ * ------------------------------------------------------------------ */
+@theme {
+  --color-canvas: #0a0a0a;    /* app background        (neutral-950) */
+  --color-surface: #171717;   /* cards, panels         (neutral-900) */
+  --color-line: #262626;      /* borders, tracks       (neutral-800) */
+  --color-line-strong: #404040; /* dots, emphasis      (neutral-700) */
+
+  --color-ink: #f5f5f5;       /* headings              (neutral-100) */
+  --color-ink-body: #d4d4d4;  /* body text             (neutral-300) */
+  --color-ink-dim: #a3a3a3;   /* secondary text        (neutral-400) */
+  --color-ink-mute: #8a8a8a;  /* labels, meta          (neutral-500) */
+  --color-ink-faint: #525252; /* hints, placeholders   (neutral-600) */
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: rgb(14 165 233 / 0.3);
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(14 165 233 / 0.7);
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3f3f46 transparent;
+  }
+}
 
 @keyframes drawer-in {
   from { transform: translateX(24px); opacity: 0.6; }
@@ -12,3 +60,12 @@ html, body, #root { height: 100%; }
 }
 .drawer-panel { animation: drawer-in 0.18s ease-out; }
 .drawer-backdrop { animation: backdrop-in 0.15s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-panel,
+  .drawer-backdrop,
+  .animate-pulse,
+  .animate-spin {
+    animation: none !important;
+  }
+}
