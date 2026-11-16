@@ -56,12 +56,13 @@ opencode                                        # terminal 2 (or claude)
 
 ## Product delivery
 
-Two commands take a managed repo from "code exists" to "product ships":
+Two commands take a managed repo from "code exists" to an acceptance-validated
+feature:
 
 | Command | Shape |
 |---|---|
-| `/ship-product` | Phased, human-in-the-loop: discover → frame → spec → examples → waves → implement → validate. One feature at a time. |
-| `/ship-loop` | Autonomous loop over the same pipeline: the oracle picks the next action, subagents execute it, every wave is one PR. Stops on `DONE`, `BLOCKED`, or the iteration budget. |
+| `/ship-product` | Phased, human-in-the-loop: discover → frame → spec/outcome hypothesis → examples → waves → implement → validate. One feature at a time. |
+| `/ship-loop` | Autonomous loop over the same pipeline: the oracle picks the next action, subagents execute it, every wave is one PR. Stacks on open predecessor PRs; `done` means acceptance-validated, not necessarily merged or deployed. |
 | `/challenge-decision` | Optional, advisory design review: steelman a decision, generate alternatives, weigh tradeoffs, apply DDD/architecture/testability/craftsmanship lenses. Never blocks. |
 
 ```
@@ -73,8 +74,10 @@ deterministic oracle that owns state in `specs/<feature>/LOOP.md`; the agent
 calls `--action=next`, delegates to `product-framer` / `wave-implementer` /
 `wave-reviewer` / `delivery-verifier`, and records outcomes. The harness never
 launches or schedules agents. `--merge=review` (default) leaves PRs open for a
-human; `--merge=auto` is opt-in. Loop state and specs are product artifacts
-committed with the feature's PRs.
+human; `--merge=auto` is opt-in and requires verified branch protection and
+CI/security checks. Dependent waves stack on open predecessor PRs and are
+retargeted/retested after the parent merges. Loop state and specs are product
+artifacts committed with the feature's PRs.
 
 **Gates.** Complex domains need preconditions before a phase can start — a
 signed-off business rule, a data contract, sandbox credentials, seed data, a
@@ -83,6 +86,15 @@ security/legal review. Declare them in `specs/<feature>/GATES.md`
 `Check: manual|file:<path>|command:<cmd>`); the oracle refuses to advance
 past a phase while a blocking gate is `pending`/`failed`, and only a named
 human can waive one. Status and evidence live in `LOOP.md`.
+
+**Product learning.** Feature specs record an outcome hypothesis, its
+evidence or assumption, an observable signal, and a follow-up owner/date
+when known. Post-release results can be recorded in `VALIDATION.md`; this
+follow-up does not block acceptance validation. Close-out distinguishes
+validated behavior from merged/deployed state and reports flow timing only
+when real timestamps are available. The protocol does not itself sandbox
+agents; target-repo permissions and agent-host isolation remain the
+environment's responsibility.
 
 **Decision review.** Complex domains also need their *design* challenged —
 where the boundary sits, what owns the invariant, whether the domain depends on
