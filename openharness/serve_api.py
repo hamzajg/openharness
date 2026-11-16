@@ -137,9 +137,14 @@ def run_skill(name: str, body: dict | None = None):
     s = registry.get(name)
     if not s:
         raise HTTPException(status_code=404, detail=f"unknown skill: {name}")
+    from openharness.skill import SkillError
+
     try:
         result = s.invoke(**(body or {}))
         return {"ok": True, "result": result if result is not None else ""}
+    except SkillError as ex:
+        # A refusal is the caller's problem to fix, not a server fault.
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(ex)})
     except Exception as ex:
         return JSONResponse(status_code=500, content={"ok": False, "error": str(ex)})
 

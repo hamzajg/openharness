@@ -1,6 +1,11 @@
+import subprocess
+import sys
 import textwrap
 from pathlib import Path
 
+import pytest
+
+from openharness.skill import SkillError
 from skills.product.discover_product import discover_product
 from skills.product.spec_scaffold import spec_scaffold
 from skills.product.wave_plan import wave_plan
@@ -150,6 +155,51 @@ def test_wave_plan_requires_backlog(tmp_path):
     d.mkdir(parents=True)
     out = wave_plan.invoke(spec_dir=str(d))
     assert out.startswith("ERROR")
+
+
+def test_wave_plan_refuses_empty_backlog_loudly(tmp_path):
+    # A BACKLOG.md with no `## US<n>` / `## B<n>` blocks must raise, not return
+    # an "ERROR" string that every caller reads as success.
+    d = tmp_path / "specs" / "empty"
+    d.mkdir(parents=True)
+    (d / "BACKLOG.md").write_text("# Backlog: Empty\n\nNothing approved yet.\n")
+
+    with pytest.raises(SkillError) as err:
+        wave_plan.invoke(spec_dir=str(d))
+
+    assert "no backlog items parsed" in str(err.value)
+    assert "WAVES.md was not written" in str(err.value)
+    assert not (d / "WAVES.md").exists()
+
+
+def test_wave_plan_refuses_a_fresh_scaffold(tmp_path):
+    # Regression: the scaffold used to ship a parseable placeholder story, so
+    # `wave_plan` happily planned the placeholders (the ship-loop run shipped a
+    # plan reading "(first user-facing capability)").
+    spec_scaffold.invoke(repo_path=str(tmp_path), feature="demo feature", output_dir="specs")
+    d = tmp_path / "specs" / "demo-feature"
+
+    with pytest.raises(SkillError):
+        wave_plan.invoke(spec_dir=str(d))
+    assert not (d / "WAVES.md").exists()
+
+
+def test_wave_plan_cli_exits_nonzero_without_a_backlog(tmp_path):
+    d = tmp_path / "specs" / "empty"
+    d.mkdir(parents=True)
+    (d / "BACKLOG.md").write_text("# Backlog: Empty\n")
+
+    run = subprocess.run(
+        [sys.executable, "-m", "openharness", "run", "wave_plan", f"--spec_dir={d}"],
+        cwd=Path(__file__).resolve().parent.parent,
+        capture_output=True,
+        text=True,
+    )
+
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert "no backlog items parsed" in run.stderr
+    assert "Traceback" not in run.stderr
+    assert not (d / "WAVES.md").exists()
 
 
 # ---------- user-story backlog format ----------
