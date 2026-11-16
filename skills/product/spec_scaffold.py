@@ -87,10 +87,16 @@ parse them. Write the story as: "As a <role>, I want <goal>, so that
 
 Order stories by user value; dependencies express technical order only.
 
-## US1 — As a user, I want {first_item}, so that {first_value}
-- Scenarios: @w1
-- Size: M
-- Notes:
+<!-- Replace this comment with your stories, highest value first, e.g.
+     (indented so the example itself is never parsed as a real story)
+       ## US1 — As an editor, I want to save a draft, so that work survives reload
+       - Scenarios: @w1
+       - Size: M
+       - Notes: <one line>
+
+     Until a real story exists `wave_plan` refuses to plan: a scaffold must
+     never be mistaken for an approved backlog.
+-->
 """
 
 _GATES_MD = """# Gates: {title}
