@@ -100,7 +100,16 @@ _UNRESOLVED_RE = re.compile(
     r"\b(?:TBD|TODO|FIXME|XXX|\?\?\?|to be decided|to be determined)\b", re.I
 )
 _ASPIRATIONAL_RE = re.compile(
-    r"\b(?:should|will|planned|TBD|coming soon)\b", re.I
+    r"\b(?:planned|TBD|coming soon|"
+    r"not yet (?:validated|covered|tested)|"
+    r"will be (?:validated|covered|tested|added)|"
+    r"to be (?:validated|covered|tested))\b",
+    re.I,
+)
+_GAP_NOISE_RE = re.compile(
+    r"\b(?:out of scope|not applicable|heuristic artifact|not evidence|"
+    r"disregarded|acceptable per spec)\b",
+    re.I,
 )
 _HALLUCINATION_RE = re.compile(
     r"\b(?:TODO|FIXME|XXX|not implemented|coming soon|placeholder)\b", re.I
@@ -112,7 +121,8 @@ _PLACEHOLDER_EVIDENCE = re.compile(
     re.I,
 )
 _EVIDENCE_SIGNAL = re.compile(
-    r"(?:#\d+|\b\d+/\d+\b|CI\b|\btests?\b|\bpytest\b|\bnpm\b|"
+    r"(?:#\d+|\b\d+/\d+\b|\b\d{5,}\b|\b[0-9a-f]{7,40}\b|https?://|"
+    r"CI\b|\btests?\b|\bpytest\b|\bnpm\b|"
     r"\bgradlew\b|\bGET\b|\bPOST\b|\bPATCH\b|\bDELETE\b|`|/)",
     re.I,
 )
@@ -288,6 +298,12 @@ def _looks_like_path(token: str) -> bool:
         return False
     if re.match(r"^[@#]", token) or re.match(r"^(?:G|US|B)\d+$", token, re.I):
         return False
+    # `/identity/me`, `/api/v1/orders/create` — HTTP routes, not repo paths.
+    if token.startswith("/"):
+        return False
+    # `VALID/INVALID/UNAVAILABLE` — an enum list, not a path.
+    if re.match(r"^[A-Z][A-Z0-9_]*(?:/[A-Z][A-Z0-9_]*)+$", token):
+        return False
     if any(c in token for c in "<>*{}[]"):
         return False
     # `org.json`, `com.google.gson` — package/group ids, not files.
@@ -370,7 +386,11 @@ def _command_scripts(text: str):
 def _endpoints(text: str):
     for i, line in enumerate(text.splitlines(), 1):
         for m in _ENDPOINT_RE.finditer(line):
-            yield m.group(1).upper(), m.group(2), i
+            # `GET /customers/by-email.` — the period ends the sentence, it is
+            # not part of the route.
+            path = m.group(2).rstrip(".,;:")
+            if path and path != "/":
+                yield m.group(1).upper(), path, i
 
 
 def _source_files(root: Path):
@@ -871,13 +891,31 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
             rest = validation_text[gaps.end():]
             nxt = re.search(r"^##\s+", rest, re.M)
             block = rest[:nxt.start()] if nxt else rest
+            bullets: list[list[str]] = []
+            indent = None
             for line in block.splitlines():
-                s = line.strip()
-                if s.startswith("- ") and "none" not in s.lower():
-                    findings.append(Finding(
-                        "concern", "validation-gap", "VALIDATION.md",
-                        f"unresolved validation gap: {s[2:][:110]}",
-                    ))
+                m = re.match(r"^(\s*)-\s+", line)
+                if m:
+                    if indent is None:
+                        indent = len(m.group(1))
+                    if len(m.group(1)) == indent:
+                        bullets.append([line.strip()])
+                        continue
+                if bullets and line.strip():
+                    bullets[-1].append(line.strip())
+            for parts in bullets:
+                first = parts[0]
+                if "none" in first.lower():
+                    continue
+                # A bullet that explains scope or dismisses an artifact is not
+                # an unresolved gap, even when the qualifier wraps to the next
+                # line.
+                if _GAP_NOISE_RE.search(" ".join(parts)):
+                    continue
+                findings.append(Finding(
+                    "concern", "validation-gap", "VALIDATION.md",
+                    f"unresolved validation gap: {first[2:][:110]}",
+                ))
         for i, line in enumerate(validation_text.splitlines(), 1):
             if _ASPIRATIONAL_RE.search(line):
                 findings.append(Finding(

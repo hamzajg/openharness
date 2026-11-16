@@ -419,6 +419,48 @@ def test_url_without_scheme_is_not_a_path(tmp_path):
     assert "viaviweb.in" not in out.split("## Concerns")[1].split("## Unverified")[0]
 
 
+def test_http_route_is_not_a_filesystem_path(tmp_path):
+    d = _spec_only(tmp_path)
+    _write(tmp_path, "src/IdentityController.java", textwrap.dedent("""\
+        @RequestMapping("/identity")
+        class IdentityController {
+            @GetMapping("/me")
+            void me() {}
+        }
+        """))
+    (d / "SPEC.md").write_text(
+        (d / "SPEC.md").read_text() + "\nIdentity exposes `/identity/me`.\n"
+    )
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    assert "missing-path" not in out
+
+
+def test_all_caps_enum_list_is_not_a_path(tmp_path):
+    d = _spec_only(tmp_path)
+    (d / "SPEC.md").write_text(
+        (d / "SPEC.md").read_text()
+        + "\nToken outcomes: `VALID/INVALID/UNAVAILABLE`.\n"
+    )
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    assert "VALID/INVALID/UNAVAILABLE" not in out
+
+
+def test_trailing_sentence_period_is_not_part_of_the_route(tmp_path):
+    d = _spec_only(tmp_path)
+    _write(tmp_path, "src/cart/CustomerController.java", textwrap.dedent("""\
+        @RequestMapping("/customers")
+        class CustomerController {
+            @GetMapping("/by-email")
+            void byEmail() {}
+        }
+        """))
+    (d / "SPEC.md").write_text(
+        (d / "SPEC.md").read_text() + "\nCall GET /customers/by-email.\n"
+    )
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    assert "endpoint-not-found" not in out
+
+
 def test_build_gate_acceptance_criterion_needs_no_scenario(tmp_path):
     d = _spec_only(tmp_path)
     (d / "SPEC.md").write_text(
@@ -529,6 +571,22 @@ def test_placeholder_gate_evidence_is_a_blocker(tmp_path):
     assert "[placeholder-gate-evidence]" in out and "G1" in out
 
 
+def test_substantive_run_id_gate_evidence_is_not_a_placeholder(tmp_path):
+    d = _delivery(tmp_path)
+    (d / "GATES.md").write_text(
+        "# Gates: Cart\n\n## G1 — Glossary\n- Before: finish\n- Blocking: yes\n- Check: manual\n"
+    )
+    _run(
+        tmp_path, action="gate", gate="G1", status="met",
+        evidence=(
+            "compose-smoke run 43761667487 on merge 0e97364a: success — "
+            "checkout through the gateway verified"
+        ),
+    )
+    out = _audit(tmp_path, phase="delivery", changed="src/cart/store.py")
+    assert "[placeholder-gate-evidence]" not in out
+
+
 def test_gate_evidence_file_missing_is_a_blocker(tmp_path):
     d = _delivery(tmp_path)
     (d / "GATES.md").write_text(
@@ -589,13 +647,63 @@ def test_validation_gaps_and_weak_evidence_are_concerns(tmp_path):
         ## Gaps
 
         - 1 scenario lacks detected test evidence — verify manually
-        - this line should not read as aspirational
+        - this scenario will be validated later
         """))
     out = _audit(tmp_path, phase="delivery", changed="src/cart/store.py")
     assert "[ac-weak-evidence]" in out
     assert "[ac-no-evidence]" in out
     assert "[validation-gap]" in out
     assert "[aspirational-validation]" in out
+
+
+def test_expected_behavior_language_is_not_aspirational(tmp_path):
+    d = _delivery(tmp_path)
+    (d / "VALIDATION.md").write_text(textwrap.dedent("""\
+        # Validation — cart
+
+        ## Traceability
+
+        | AC | Criterion | Scenarios | Wave(s) | Test evidence |
+        |----|-----------|-----------|---------|---------------|
+        | 1 | Adding an item shows it | add an item | 1 | test_cart.py |
+        | 2 | Checkout creates an order | checkout | 2 | test_cart.py |
+
+        ## Demo script
+
+        1. Open the cart. Existing items should appear only after the load
+           finishes; tapping during the load must not corrupt the list.
+
+        ## Gaps
+
+        - none — spec is fully traced
+        """))
+    out = _audit(tmp_path, phase="delivery", changed="src/cart/store.py")
+    assert "aspirational-validation" not in out
+
+
+def test_scope_and_artifact_gap_bullets_are_not_gaps(tmp_path):
+    d = _delivery(tmp_path)
+    (d / "VALIDATION.md").write_text(textwrap.dedent("""\
+        # Validation — cart
+
+        ## Traceability
+
+        | AC | Criterion | Scenarios | Wave(s) | Test evidence |
+        |----|-----------|-----------|---------|---------------|
+        | 1 | Adding an item shows it | add an item | 1 | test_cart.py |
+        | 2 | Checkout creates an order | checkout | 2 | test_cart.py |
+
+        ## Gaps
+
+        - Deliberately out of scope: executing a checkout job.
+        - `~` weak token-match on AC 1 is a heuristic artifact, not evidence.
+        - **Regenerating IDs on save** is internal-only and
+          acceptable per spec.
+        - **No automated evidence** —
+          this is a heuristic artifact, not evidence.
+        """))
+    out = _audit(tmp_path, phase="delivery", changed="src/cart/store.py")
+    assert "validation-gap" not in out
 
 
 def test_outcome_followup_is_not_a_validation_gap(tmp_path):
