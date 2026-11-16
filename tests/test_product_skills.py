@@ -36,12 +36,17 @@ def test_discover_product_missing_dir(tmp_path):
 
 # ---------- spec_scaffold ----------
 
-def test_spec_scaffold_creates_three_artifacts(tmp_path):
+def test_spec_scaffold_creates_artifacts_with_outcome_hypothesis(tmp_path):
     out = spec_scaffold.invoke(repo_path=str(tmp_path), feature="User Notifications", output_dir="specs")
     d = tmp_path / "specs" / "user-notifications"
     assert (d / "SPEC.md").is_file()
     assert (d / "EXAMPLES.feature").is_file()
     assert (d / "BACKLOG.md").is_file()
+    assert (d / "GATES.md").is_file()
+    spec = (d / "SPEC.md").read_text()
+    assert "## Outcome hypothesis" in spec
+    assert "Opportunity evidence" in spec
+    assert "do not invent targets" in spec
     assert "user-notifications" in out
     assert "@w1" in (d / "EXAMPLES.feature").read_text()
 
@@ -205,6 +210,29 @@ def test_ship_validate_writes_traceability(tmp_path):
     assert (d / "VALIDATION.md").is_file()
     assert "Traceability" in out and "Demo script" in out
     assert "test_demo.py" in out  # evidence found
+
+
+def test_ship_validate_preserves_outcome_followup_on_rerun(tmp_path):
+    from skills.product.ship_validate import ship_validate
+    repo = tmp_path / "repo"
+    d = repo / "specs" / "demo"
+    d.mkdir(parents=True)
+    (d / "SPEC.md").write_text("# Spec: Demo\n")
+    (d / "EXAMPLES.feature").write_text("Feature: Demo\n")
+    (d / "WAVES.md").write_text("# Waves\n")
+    validation = d / "VALIDATION.md"
+
+    ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    text = validation.read_text().replace(
+        "- Status: not yet measured",
+        "- Status: measured\n- Learning or next action: schedule follow-up",
+    )
+    validation.write_text(text)
+
+    out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    assert "- Status: measured" in out
+    assert "- Learning or next action: schedule follow-up" in out
+    assert "not yet measured" not in out
 
 
 def test_ship_validate_resolves_scenario_names_in_ac(tmp_path):

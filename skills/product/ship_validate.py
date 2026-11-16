@@ -7,6 +7,7 @@ writes VALIDATION.md containing:
 - Coverage stats: scenarios with/without detected test evidence.
 - Demo script: the happy-path scenarios ordered as a manual walkthrough.
 - Gaps: scenarios with no evidence, unplanned waves, missing artifacts.
+- Outcome follow-up: preserves optional post-release learning across reruns.
 
 Evidence matching: literal scenario-name hits are strong; a token-overlap
 match (>=50% of significant words on one test line) is reported as weak.
@@ -31,6 +32,9 @@ _AC_ROW_RE = re.compile(r"^\|\s*\d+\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|\s*$", r
 _TAG_RE = re.compile(r"@w(\d+)")
 _ITEM_RE = re.compile(r"^##\s+(?:B|US)(\d+)\s*[—-]\s*(.+)$", re.M)
 _WAVE_ITEM_RE = re.compile(r"^##\s+Wave\s+(\d+)", re.M)
+_OUTCOME_SECTION_RE = re.compile(
+    r"^## Outcome follow-up\s*$([\s\S]*?)(?=^## |\Z)", re.M
+)
 
 
 def _test_files(root: Path):
@@ -163,6 +167,10 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
     acs = _ac_rows(spec_f.read_text(), scenarios) if spec_f.is_file() else []
     waves_text = waves_f.read_text() if waves_f.is_file() else ""
     planned_waves = {int(w) for w in _WAVE_ITEM_RE.findall(waves_text)}
+    validation_f = d / "VALIDATION.md"
+    previous_validation = validation_f.read_text(errors="ignore") if validation_f.is_file() else ""
+    outcome_match = _OUTCOME_SECTION_RE.search(previous_validation)
+    outcome_followup = outcome_match.group(1).strip() if outcome_match else ""
 
     test_texts = {}
     for p in _test_files(root):
@@ -242,6 +250,17 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
     out.append("Note: 'no evidence' means neither the scenario name nor a")
     out.append("token match was found in test files — verify by hand before")
     out.append("treating it as a real gap. '~' marks weak token-match evidence.")
+    out += ["", "## Outcome follow-up", ""]
+    if outcome_followup:
+        out.append(outcome_followup)
+    else:
+        out += [
+            "Optional; this is a post-release learning record, not a finish gate.",
+            "- Status: not yet measured",
+            "- Owner and review date: (record when known)",
+            "- Signal and observed result: (record after release; do not invent)",
+            "- Learning or next action: (record after review)",
+        ]
 
-    (d / "VALIDATION.md").write_text("\n".join(out))
+    validation_f.write_text("\n".join(out))
     return "\n".join(out)

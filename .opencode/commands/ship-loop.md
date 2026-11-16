@@ -10,7 +10,7 @@ Arguments (`$ARGUMENTS`). All are optional:
 |---|---|---|
 | `--repo=sources/<repo>` | cwd inside `sources/` | Target repo. Must be in REPOS.md. |
 | `--feature=<name>` | first unfinished | Limit the loop to one `specs/<feature>/`. |
-| `--merge=review\|auto` | `review` | `review` keeps each PR open. `auto` merges green PRs. |
+| `--merge=review\|auto` | `review` | `review` keeps each PR open. `auto` merges green PRs only when required protections and checks are verified. |
 | `--max=<N>` | `25` | Iteration limit before the loop stops. |
 
 ## Context
@@ -28,6 +28,9 @@ state in `specs/<feature>/`:
 - `LOOP.md` — human-readable status. Committed with the PRs.
 - `LOOP.state.json` — machine-readable state. Committed with the PRs.
 - `WAVES.md` — the plan. Do not change it during the loop.
+
+`done` means acceptance-validated, not necessarily merged or deployed.
+Always report PR merge state and deployment state separately.
 
 The oracle answers one question per call: *what is the next action?*
 
@@ -146,26 +149,54 @@ often stops being read.
 
 1. Give **wave-implementer**: repo path, spec dir, wave number, the wave's
    scenarios and backlog items, and `merge=review|auto`.
-2. The implementer must:
-   - Branch `feat/<feature>-w<N>` from the default branch.
+2. Before dispatching, determine the effective base and PR target:
+   - If the preceding wave PR is open, use its head as the branch base and
+     its branch as this PR's target (stack it).
+   - If the preceding PR has merged, use the default branch for both.
+   - Pass both values to the implementer and record the stack/merge order.
+3. The implementer must:
+   - Branch from the supplied effective base and target the PR at the
+     supplied base PR branch. If either is missing or ambiguous, stop and
+     ask; do not guess.
    - Write failing checks first for the wave's scenarios.
    - Implement the smallest correct change. Match repo conventions (KISS).
    - Run the real build and tests.
    - Commit with conventional messages. Push. Open one PR. The PR body
      cites the spec and the scenarios.
-3. Wait for CI.
+4. Wait for CI.
    - Green: give the diff to **wave-reviewer**. Check spec fit,
      regressions, secrets, and scope.
    - Red: return the failure to wave-implementer. Retry once for flake.
      Then block.
-4. Review passes. Apply the merge policy:
+5. Review passes. Apply the merge policy:
    - `review` (default): leave the PR open. Record its number. Continue.
-   - `auto`: merge only after green CI and a passing review. Delete the
-     branch. Record the merge.
-5. Record `complete` with the PR number and the evidence.
+   - `auto`: first verify target-branch protection and required CI/security
+     checks. If they cannot be confirmed, stop and hand off in review mode.
+     Merge only after green CI and a passing review.
+6. After a parent PR merges, the orchestrator retargets/rebases open
+   descendants onto the default branch and reruns CI before their merge.
+   Do not delete a branch while an open PR depends on it.
+7. Record `complete` with the PR number and the evidence.
 
 Never merge a PR with red or pending CI. Never force-push a default
 branch. Never commit secrets or `.env` files. One logical change per PR.
+
+## Outcomes, execution boundaries, and flow evidence
+
+- In `SPEC.md`, record an outcome hypothesis, the evidence or assumption
+  behind it, an observable signal, and an owner/review date when known.
+  Never invent user research, baselines, or numeric targets.
+- The harness protocol does not sandbox agents. Read the target repo's
+  `AGENTS.md` and layered `.openharness/ENV.md`; follow host permission
+  prompts and least-privilege settings. Do not broaden filesystem, network,
+  or credential access. Stop for a human if required access is unavailable.
+- After release, record an optional outcome follow-up in `VALIDATION.md`.
+  If the feature is not released yet, leave it pending with an owner/date.
+  This is learning evidence, not a finish gate.
+- At close-out, report acceptance status, PR merge status, and deployment
+  status separately. Include elapsed phase/PR review times only when they
+  can be derived from actual timestamps. Use measurements to find friction,
+  not to rank teams.
 
 ## Spec and plan steps
 
@@ -226,15 +257,19 @@ Feature: <name> — <status>
 Iterations: N/max
 Waves:    W1 done (#12) · W2 done (#14) · W3 pending
 Gates:    G1 met · G2 met · G3 pending (owner: security, resolver: human)
-PRs:      #12, #14 (merge order matters; stacked: #14 on #12)
-Evidence: <tests run, CI state>
+PRs:      <open/merged per wave; stacked PRs include merge order>
+Evidence: <tests run, CI/review state>
+Deploy:   deployed | not deployed | unknown — <evidence>
+Outcome:  <observed signal or pending owner/date>
+Flow:     <elapsed/review times, if evidence is available>
 Gaps:     <known gaps or "none">
 Next:     <exact oracle directive or "needs human decision: ...">
 ```
 
 Then refresh `specs/PRODUCT.md` (`product_map`). Commit `LOOP.md` and
 `LOOP.state.json`. The next session must resume exactly where this one
-stopped.
+stopped. Do not describe a validated feature as released unless its actual
+merge/deployment state confirms that.
 
 ## Guardrails
 

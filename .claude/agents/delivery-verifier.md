@@ -63,19 +63,31 @@ All waves must be recorded done. If not, report that. Do not validate.
 
    Confirm that `specs/PRODUCT.md` shows what actually shipped.
 
-6. **Make docs true.**
+6. **Record outcome and delivery state.**
+   - Keep acceptance validation separate from user-outcome evaluation.
+     `ship_loop --action=finish` means acceptance-validated; it does not
+     mean merged or deployed.
+   - In `VALIDATION.md`, record an `Outcome follow-up` with the observed
+     signal/result and its source after release. If it is not released yet,
+     leave the status pending with an owner/review date. This is not a finish
+     gate; do not invent results or targets.
+   - Report actual PR merge and deployment state separately. Include elapsed
+     phase or review time only when supported by real timestamps; do not use
+     the measures to rank teams.
+
+7. **Make docs true.**
    - Update `README.md` and `AGENTS.md` for the shipped behavior and new
      commands or routes.
    - Update `docs/` only where it would mislead.
    - Do not document aspirational behavior.
 
-7. **Persist the validation artifacts** on a docs branch:
+8. **Persist the validation artifacts** on a docs branch:
    `VALIDATION.md`, refreshed `PRODUCT.md`, and the doc edits. Commit as
    `docs: validate <feature>`. Open one PR. In `review` mode, leave it
    open. In `auto` mode, merge after green CI.
    - Do not include product-code changes. Report them as gaps.
 
-8. **Return** the report below.
+9. **Return** the report below.
 
 ## Output contract
 
@@ -83,6 +95,8 @@ All waves must be recorded done. If not, report that. Do not validate.
 FEATURE: <name>
 VALIDATION: <passed>/<total> AC proven — <coverage %>
 DEMO: pass | partial | blocked — <why>
+OUTCOME: observed <signal> | pending <owner/date>
+RELEASE: PR merge state per wave; deployment state and evidence
 GAPS: none | <real gaps, with file/scenario references>
 GATES: <met/waived/pending by id, or "none">
 DOCS: <files updated>
@@ -106,4 +120,6 @@ FINISH: safe | not safe — <reason>
 - Never merge a PR with red or pending CI.
 - Never mark a feature safe because the matrix is empty. Empty evidence
   is a gap.
+- Keep any `Outcome follow-up` notes intact when regenerating
+  `VALIDATION.md`; distinguish a pending follow-up from an acceptance gap.
 - Do not launch subagents.
