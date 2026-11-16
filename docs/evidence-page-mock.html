@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evidence — workflow-definitions · wave 3 · 6c55d0d</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --line: #262b36; --text: #e6e9ef;
+    --muted: #9aa4b2; --pass: #3fb950; --fail: #f85149; --warn: #d29922;
+    --accent: #58a6ff; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f7f9; --panel: #fff; --line: #e2e5ea; --text: #1b1f24;
+      --muted: #5b6570; --pass: #1a7f37; --fail: #cf222e; --warn: #9a6700;
+      --accent: #0969da;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 system-ui, -apple-system, Segoe UI, sans-serif;
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 20px 72px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+       color: var(--muted); margin: 36px 0 12px; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+  .chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+          padding: 3px 10px; font-size: 12px; font-family: var(--mono); color: var(--muted); }
+  .chip b { color: var(--text); font-weight: 600; }
+  .verdict { border-color: color-mix(in srgb, var(--pass) 45%, var(--line));
+             color: var(--pass); }
+  .card { border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+          padding: 16px; }
+  .card + .card { margin-top: 10px; }
+  .notverified { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+  .notverified ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
+  .step { display: grid; grid-template-columns: 20px 1fr auto; gap: 12px;
+          align-items: start; padding: 12px 14px; border: 1px solid var(--line);
+          background: var(--panel); border-radius: 9px; }
+  .step + .step { margin-top: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; }
+  .pill { font-size: 11px; padding: 1px 7px; border-radius: 999px;
+          border: 1px solid currentColor; }
+  .pass { color: var(--pass); } .fail { color: var(--fail); } .skip { color: var(--muted); }
+  .pass .dot, .dot.pass { background: var(--pass); }
+  .fail .dot, .dot.fail { background: var(--fail); }
+  .cmd { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .note { color: var(--muted); font-size: 13px; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+             gap: 12px; }
+  figure { margin: 0; border: 1px solid var(--line); border-radius: 9px;
+           overflow: hidden; background: var(--panel); }
+  .thumb { aspect-ratio: 16 / 10; display: grid; place-items: center;
+           background: repeating-linear-gradient(45deg, var(--bg), var(--bg) 10px,
+           var(--panel) 10px, var(--panel) 20px); color: var(--muted); font-size: 12px; }
+  figcaption { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+  figcaption b { color: var(--text); font-weight: 600; }
+  video { width: 100%; border-radius: 9px; border: 1px solid var(--line);
+          background: #000; }
+  pre { margin: 0; padding: 12px; background: #0b0d11; color: #d7dde6;
+        border-radius: 9px; border: 1px solid var(--line); overflow: auto;
+        font: 12px/1.5 var(--mono); max-height: 220px; }
+  @media (prefers-color-scheme: light) { pre { background: #f0f2f5; color: #1b1f24; } }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td.mono, th.mono { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .footer { margin-top: 40px; color: var(--muted); font-size: 12px;
+            border-top: 1px solid var(--line); padding-top: 14px; }
+  .footer code { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<main>
+  <!-- 1. header -->
+  <p class="sub">Evidence bundle · generated from evidence.json · schema openharness.evidence/1</p>
+  <h1>workflow-definitions — wave 3</h1>
+  <div class="chips">
+    <span class="chip verdict"><b>PASS</b></span>
+    <span class="chip">run <b>20261116T101500Z-6c55d0d</b></span>
+    <span class="chip">head <b>6c55d0d</b></span>
+    <span class="chip">branch <b>feat/agent-workflow-write-tools</b></span>
+    <span class="chip">PR <b>hamzajg/stream-weave-platform#22</b></span>
+    <span class="chip">CI <b>success</b> @ 6c55d0d</span>
+  </div>
+
+  <!-- 2. what this proves -->
+  <h2>What this proves</h2>
+  <div class="card">
+    Create + draft-replacement agent tools behind human confirmation:
+    proposal persists no write, approval executes under the approver's role,
+    and the approval-time re-checks hold when the workflow is deleted or the
+    proposer is demoted.
+    <div class="sub" style="margin-top:8px">
+      steps 5 · tests 97 passed · screenshots 2 · recording 0:21
+    </div>
+  </div>
+  <div class="card notverified">
+    <strong>What was not verified</strong>
+    <ul>
+      <li>A real LLM proposing these tools end to end — the loop is exercised with a scripted model.</li>
+      <li>The webapp approval panel was not opened; layout reviewed by reading the JSX only.</li>
+    </ul>
+  </div>
+
+  <!-- 3. walkthrough -->
+  <h2>Walkthrough</h2>
+  <div class="step pass">
+    <span class="dot"></span>
+    <div>
+      <div><b>Backend tests</b> <span class="pill">pass</span></div>
+      <div class="cmd">pytest -q</div>
+      <div class="note">97 passed in 59.41s · 20 new tests in this wave</div>
+    </div>
+    <span class="note">59.4s</span>
+  </div>
+  <div class="step pass">
+    <span class="dot"></span>
+    <div>
+      <div><b>Frontend build &amp; lint</b> <span class="pill">pass</span></div>
+      <div class="cmd">npm run build &amp;&amp; npm run lint</div>
+      <div class="note">0 errors, 12 pre-existing warnings</div>
+    </div>
+    <span class="note">21.8s</span>
+  </div>
+  <div class="step pass">
+    <span class="dot"></span>
+    <div>
+      <div><b>Propose write tool in the agent</b> <span class="pill">pass</span></div>
+      <div class="cmd">POST /api/agents/conversations/…/messages</div>
+      <div class="note">tool message carries pending_confirmation; workflow count unchanged</div>
+    </div>
+    <span class="note">1.9s</span>
+  </div>
+  <div class="step pass">
+    <span class="dot"></span>
+    <div>
+      <div><b>Approve → workflow created</b> <span class="pill">pass</span></div>
+      <div class="cmd">POST /api/agents/actions/…/approve</div>
+      <div class="note">status=executed · slug invoice-triage-2 · draft v1</div>
+    </div>
+    <span class="note">0.4s</span>
+  </div>
+  <div class="step fail">
+    <span class="dot"></span>
+    <div>
+      <div><b>Approval after demotion</b> <span class="pill">fail</span> <span class="note">(expected failure)</span></div>
+      <div class="cmd">POST /api/agents/actions/…/approve</div>
+      <div class="note">status=failed · “Insufficient permissions” · graph unchanged</div>
+    </div>
+    <span class="note">0.3s</span>
+  </div>
+
+  <!-- 4. screenshots -->
+  <h2>Screenshots</h2>
+  <div class="gallery">
+    <figure>
+      <div class="thumb">raw/s3/agent-approval-card.png<br>1280×800</div>
+      <figcaption><b>Approval card previews name + graph</b><br>step s3 · sha256 4f9c…21ab</figcaption>
+    </figure>
+    <figure>
+      <div class="thumb">raw/s3/workflows-list.png<br>1280×800</div>
+      <figcaption><b>Workflow appears after approval</b><br>step s4 · sha256 8be1…77cd</figcaption>
+    </figure>
+  </div>
+
+  <!-- 5. recording -->
+  <h2>Recording</h2>
+  <div class="card">
+    <video controls preload="metadata" poster="data:,">
+      <source src="raw/s3/session.webm" type="video/webm">
+      Your browser cannot play this recording — <a href="raw/s3/session.webm">download it</a>.
+    </video>
+    <p class="note" style="margin:10px 0 0">
+      0:21 · WebM · captured by the agent's preview recorder, attached as
+      artifact <code>raw/s3/session.webm</code> · sha256 c01d…9fee
+    </p>
+  </div>
+
+  <!-- 6. logs -->
+  <h2>Logs</h2>
+  <details open>
+    <summary>s1 · backend tests (exit 0)</summary>
+    <pre>tests/test_agent_workflow_write_tools.py ....................  [ 82%]
+tests/test_workflow_tools.py ..........                       [100%]
+97 passed in 59.41s</pre>
+  </details>
+  <details>
+    <summary>s4 · approve (redacted 2 lines)</summary>
+    <pre>POST /api/agents/actions/9c1e…/approve
+Authorization: Bearer [REDACTED]
+{"status": "executed", "result": {"slug": "invoice-triage-2", "draft_version": 1}}</pre>
+  </details>
+
+  <!-- 7. provenance -->
+  <h2>Provenance</h2>
+  <table>
+    <tr><th>Artifact</th><th>Size</th><th class="mono">sha256</th></tr>
+    <tr><td class="mono">logs/s1.log</td><td>2.1 kB</td><td class="mono">a1b2…9f31</td></tr>
+    <tr><td class="mono">raw/s3/agent-approval-card.png</td><td>184 kB</td><td class="mono">4f9c…21ab</td></tr>
+    <tr><td class="mono">raw/s3/session.webm</td><td>1.7 MB</td><td class="mono">c01d…9fee</td></tr>
+  </table>
+  <p class="note">
+    Linked CI run <code>hamzajg/stream-weave-platform</code> @ <code>6c55d0d</code>
+    · conclusion success · verified against git HEAD at render time.
+  </p>
+
+  <!-- 8. redactions -->
+  <h2>Redaction report</h2>
+  <div class="card">
+    2 matches removed from <code>logs/s4.log</code> (Authorization header) ·
+    0 from screenshots · policy <code>openharness.evidence/redact@1</code>
+  </div>
+
+  <p class="footer">
+    Regenerate with
+    <code>python -m openharness run harness_evidence --action=render --bundle=evidence/workflow-definitions/20261116T101500Z-6c55d0d</code>
+    · verify with <code>--action=verify</code> · this page is generated, never edited by hand.
+  </p>
+</main>
+</body>
+</html>
