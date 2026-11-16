@@ -3,6 +3,16 @@ from typing import Callable, get_type_hints
 import inspect
 
 
+class SkillError(Exception):
+    """A skill refused to do its job; the message is shown to the user.
+
+    Skills that cannot produce a trustworthy artifact raise this instead of
+    returning an `ERROR: ...` string: a returned string looks like success to
+    every caller (CLI exit 0, HTTP 200), which is how a placeholder plan can
+    be mistaken for a real one.
+    """
+
+
 @dataclass
 class Skill:
     name: str

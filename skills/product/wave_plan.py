@@ -12,7 +12,7 @@ waves, each wave independently shippable (its own branch/PR). Deterministic.
 import re
 from pathlib import Path
 
-from openharness.skill import skill
+from openharness.skill import SkillError, skill
 
 _ITEM_RE = re.compile(r"^##\s+(B|US)(\d+)\s*[—-]\s*(.+)$", re.M)
 _SCEN_RE = re.compile(r"^-\s*Scenarios:\s*(.+)$", re.M)
@@ -124,7 +124,15 @@ def wave_plan(spec_dir: str = "") -> str:
 
     items = _parse_backlog(backlog.read_text())
     if not items:
-        return "ERROR: no backlog items parsed — expected `## US<n> — <user story>` blocks"
+        # Loud failure on purpose: returning an error string reads as success
+        # to the CLI and to `/ship-loop`, which is how a scaffold placeholder
+        # gets mistaken for an approved plan. Nothing is written on this path.
+        raise SkillError(
+            f"no backlog items parsed in {backlog} — expected "
+            "`## US<n> — As a <role>, I want <goal>, so that <value>` blocks with "
+            "`- Scenarios: @w<N>` lines. Fill BACKLOG.md before planning; "
+            "WAVES.md was not written."
+        )
 
     scenarios = _feature_scenarios(feature.read_text()) if feature.is_file() else {}
     waves, violations = _assign_waves(items)
