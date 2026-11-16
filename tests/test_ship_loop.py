@@ -343,3 +343,111 @@ def test_state_json_regenerated_on_next_mutation(tmp_path):
     data = json.loads((d / "LOOP.state.json").read_text())
     assert data["waves"]["1"]["status"] == "done"
     assert data["waves"]["1"]["pr"] == "#7"
+
+
+# ---------- independent review enforcement ----------
+
+def _unplanned(root: Path) -> Path:
+    d = _spec(root)
+    (d / "WAVES.md").unlink()
+    return d
+
+
+def _all_waves_done(root: Path) -> None:
+    _run(root, action="start", wave=1)
+    _run(root, action="complete", wave=1, note="2/2 tests, CI green")
+    _run(root, action="start", wave=2)
+    _run(root, action="complete", wave=2, note="2/2 tests, CI green")
+
+
+def test_review_advisory_is_default_and_does_not_require_audit(tmp_path):
+    _unplanned(tmp_path)
+    out = _run(tmp_path)
+    assert "plan waves" in out
+
+
+def test_review_required_blocks_planning_without_spec_audit(tmp_path):
+    _unplanned(tmp_path)
+    out = _run(tmp_path, review="required")
+    assert "audit the spec" in out
+    assert "SPEC-AUDIT.md" in out
+    assert "review_delivery" in out
+
+
+def test_review_required_rejects_template_only_audit(tmp_path):
+    d = _unplanned(tmp_path)
+    (d / "SPEC-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS | CONCERNS | BLOCK\n")
+    out = _run(tmp_path, review="required")
+    assert "has no filled verdict" in out
+
+
+def test_review_required_allows_pass(tmp_path):
+    d = _unplanned(tmp_path)
+    (d / "SPEC-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+    out = _run(tmp_path, review="required")
+    assert "plan waves" in out
+
+
+def test_review_required_allows_concerns(tmp_path):
+    d = _unplanned(tmp_path)
+    (d / "SPEC-AUDIT.md").write_text("# Audit\n\nAUDIT: CONCERNS\n")
+    out = _run(tmp_path, review="required")
+    assert "plan waves" in out
+
+
+def test_review_required_blocks_on_block_verdict(tmp_path):
+    d = _unplanned(tmp_path)
+    (d / "SPEC-AUDIT.md").write_text("# Audit\n\nAUDIT: BLOCK\n")
+    out = _run(tmp_path, review="required")
+    assert "AUDIT-BLOCK" in out
+    assert "SPEC-AUDIT.md" in out
+
+
+def test_review_required_requires_delivery_audit_before_finish(tmp_path):
+    d = _spec(tmp_path)
+    _all_waves_done(tmp_path)
+    (d / "VALIDATION.md").write_text("# Validation\n")
+    out = _run(tmp_path, review="required")
+    assert "audit the delivery" in out
+    assert "DELIVERY-AUDIT.md" in out
+
+
+def test_review_required_delivery_pass_marks_feature_done(tmp_path):
+    d = _spec(tmp_path)
+    _all_waves_done(tmp_path)
+    (d / "VALIDATION.md").write_text("# Validation\n")
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+    out = _run(tmp_path, review="required")
+    assert out.startswith("DONE")
+    assert "Status: done" in (d / "LOOP.md").read_text()
+
+
+def test_review_required_finish_action_enforces_delivery_audit(tmp_path):
+    d = _spec(tmp_path)
+    _all_waves_done(tmp_path)
+    (d / "VALIDATION.md").write_text("# Validation\n")
+
+    out = _run(tmp_path, action="finish", review="required")
+    assert "audit the delivery" in out
+    assert "Status: done" not in (d / "LOOP.md").read_text()
+
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: BLOCK\n")
+    out = _run(tmp_path, action="finish", review="required")
+    assert "AUDIT-BLOCK" in out
+
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: CONCERNS\n")
+    out = _run(tmp_path, action="finish", review="required")
+    assert "marked done" in out
+
+
+def test_summary_reports_review_status_when_required(tmp_path):
+    d = _spec(tmp_path)
+    (d / "SPEC-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+    out = _run(tmp_path, action="start", wave=1, review="required")
+    assert "review spec:pass delivery:missing" in out
+
+
+def test_review_rejects_unknown_mode(tmp_path):
+    _unplanned(tmp_path)
+    out = _run(tmp_path, review="strict")
+    assert out.startswith("ERROR") and "advisory|required" in out

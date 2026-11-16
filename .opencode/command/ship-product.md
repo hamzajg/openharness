@@ -154,6 +154,17 @@ Review `WAVES.md`. Each wave must ship alone: one branch, one PR, green
 tests. If a wave is too big or the dependencies are wrong, fix
 `BACKLOG.md`. Do not write code yet.
 
+Before planning waves, run the independent spec audit:
+
+```
+`python -m openharness run review_delivery --repo_path=sources/<repo> --spec_dir=sources/<repo>/specs/<feature> --phase=spec --write`
+```
+
+Hand the brief to **delivery-auditor**. It re-verifies every finding and
+checks that the spec's paths, endpoints, and scenarios are grounded in the
+repo. A `BLOCK` verdict stops the pipeline: fix the spec before writing
+code. `PASS` or accepted `CONCERNS` continue.
+
 ### Phase 6 — Implement (waves are iterations)
 
 Each wave is one iteration: a time-boxed increment with a demoable
@@ -192,6 +203,17 @@ absence. Each `Before: finish` gate in `GATES.md` must be `met` or
 `waived` before acceptance validation is complete. `ship_loop` status
 `done` means the feature was acceptance-validated; it does not mean its PRs
 were merged or the feature was deployed.
+
+Run the independent delivery audit before calling the feature done:
+
+```
+`python -m openharness run review_delivery --repo_path=sources/<repo> --spec_dir=sources/<repo>/specs/<feature> --phase=delivery --write`
+```
+
+Hand the brief to **delivery-auditor**. It opens the cited tests, checks that
+each acceptance criterion is proven by behavior (not just a matching name),
+verifies changed contracts against the spec, and looks for scope drift. A
+`BLOCK` verdict stops the pipeline; fix the delivery and re-audit.
 
 Then:
 

@@ -128,7 +128,19 @@ Otherwise stop and report that you need a target repo.
    fix `BACKLOG.md` or `EXAMPLES.feature` and re-run until clean. Each
    wave must ship alone: one branch, one PR, green tests, demoable.
 
-9. **Check the loop state.**
+9. **Audit the spec before waves.**
+
+   ```
+   python -m openharness run review_delivery --repo_path=<repo> \
+     --spec_dir=<repo>/specs/<feature> --phase=spec --write
+   ```
+
+   Hand the brief to **delivery-auditor**. It re-verifies the findings and
+   checks that every path, endpoint, and scenario is grounded in the repo.
+   Fix every confirmed blocker and re-run. A `BLOCK` verdict means the spec
+   is not ready for waves; do not plan around it.
+
+10. **Check the loop state.**
 
    ```
    python -m openharness run ship_loop --action=status --repo_path=<repo>
@@ -138,7 +150,7 @@ Otherwise stop and report that you need a target repo.
    correctly owned. Do not mark gates met. The orchestrator does that when
    the evidence exists.
 
-10. **Return** the report below.
+11. **Return** the report below.
 
 ## Output contract
 
@@ -148,6 +160,7 @@ CHOSEN: <name> — score <n>/125 (<value>,<feasibility>,<differentiation>)
 FILES:  SPEC.md · EXAMPLES.feature · BACKLOG.md · GATES.md · WAVES.md
 WAVES:  W1 <items> · W2 <items> ...
 GATES:  G1 <title> (<before>, <resolver>) · G2 ... | none
+AUDIT:  spec PASS | CONCERNS | BLOCK (accepted: ...)
 OUTCOME: <hypothesis, evidence status, signal, owner/date>
 REVIEW: <high-impact decisions to challenge> | none
 WARNINGS: none | <list>

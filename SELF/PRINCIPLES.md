@@ -121,3 +121,29 @@ bucket or into the serve block would both be bad layering. The budget's
 intent was always to discipline the small contract surface agents depend
 on; two honest buckets preserve that pressure without gaming the metric
 or contorting the architecture.
+
+### D013 — Spec and delivery get an independent audit before they count
+Rule: A feature may be audited at two checkpoints: `SPEC-AUDIT.md` after
+`SPEC.md`/`EXAMPLES.feature`/`BACKLOG.md` exist and before `wave_plan`/wave 1,
+and `DELIVERY-AUDIT.md` after `VALIDATION.md` and before `finish`. The
+deterministic skill `review_delivery` builds an evidence brief — artifact
+presence, AC → scenario → wave → backlog → LOOP traceability, existence of
+every claimed path/script/endpoint/ADR, placeholder evidence, scope drift,
+and unfinished markers — and the independent `delivery-auditor` subagent
+re-verifies each finding against the repository and fills exactly one
+`AUDIT: PASS|CONCERNS|BLOCK`. `BLOCK` on any confirmed blocker, hallucinated
+claim, or unproven acceptance criterion; `CONCERNS` only when every remaining
+item is non-blocking and explicitly accepted; `PASS` only when all lists are
+empty. `ship_loop` defaults to `--review=advisory`; `/ship-loop` passes
+`--review=required`, which refuses to plan without a filled spec audit and
+refuses to finish without a filled delivery audit. The audit never marks a
+gate, never merges, and never edits product code.
+Because: Gates (D010) check *whether* a precondition exists; they do not
+check whether the spec is grounded in the repository or whether the delivery
+matches the spec. The expensive failure is not a red test — it is a green
+loop built on an invented path, a scenario that does not exist, or an
+acceptance criterion with no real proof. A reviewer that trusts the artifacts
+cannot catch that; only one that opens the code and tests can. Keeping the
+deterministic brief separate from the judgment keeps the evidence auditable
+and the reviewer honest, and keeping enforcement opt-in preserves existing
+loops and the advisory principle of D011.

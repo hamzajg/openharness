@@ -11,6 +11,7 @@ Arguments (`$ARGUMENTS`). All are optional:
 | `--repo=sources/<repo>` | cwd inside `sources/` | Target repo. Must be in REPOS.md. |
 | `--feature=<name>` | first unfinished | Limit the loop to one `specs/<feature>/`. |
 | `--merge=review\|auto` | `review` | `review` keeps each PR open. `auto` merges green PRs only when required protections and checks are verified. |
+| `--review=required\|advisory` | `required` | Independent spec/delivery audit. `advisory` records nothing and enforces nothing. |
 | `--max=<N>` | `25` | Iteration limit before the loop stops. |
 
 ## Context
@@ -54,11 +55,14 @@ One iteration = one `--action=next` call + the named work + one state write
 
 ```
 ship_loop --action=next   → read directive
-  ├─ "no specs yet" / "complete the spec" / "plan waves"  → product-framer
+  ├─ "no specs yet" / "complete the spec"                  → product-framer
+  ├─ "audit the spec"                                      → delivery-auditor
+  ├─ "plan waves"                                          → product-framer
   ├─ GATE: ...                                             → resolve or block
   ├─ "implement wave N" / "resume wave N"                  → wave-implementer
   │      └─ then wave-reviewer (must pass) → record complete
   ├─ "validate <feature>"                                  → delivery-verifier
+  ├─ "audit the delivery"                                  → delivery-auditor
   │      └─ then record finish
   ├─ BLOCKED / STOP                                        → report, exit
   └─ DONE / FEATURE-DONE                                   → close out, exit
@@ -144,6 +148,34 @@ Decisions. If it changes a precondition, update `GATES.md`.
 Skip the review for small reversible choices. A review that fires too
 often stops being read.
 
+## Independent review (required)
+
+Gates check *if* a precondition exists. They do not prove that the spec is
+grounded in the repo or that the delivery matches the spec. Two audit
+artifacts do, and this loop runs with `--review=required`:
+
+- `specs/<feature>/SPEC-AUDIT.md` — required before `wave_plan` and wave 1.
+- `specs/<feature>/DELIVERY-AUDIT.md` — required after `VALIDATION.md`,
+  before `finish`.
+
+Build the deterministic brief, then hand it to **delivery-auditor**:
+
+```
+python -m openharness run review_delivery --repo_path=<repo> \
+  --spec_dir=<repo>/specs/<feature> --phase=spec|delivery --write
+```
+
+The auditor re-verifies every finding, opens the cited code and tests, and
+fills one verdict:
+
+- `PASS` — all lists empty and evidence was verified.
+- `CONCERNS` — every remaining item is non-blocking and explicitly accepted.
+- `BLOCK` — a confirmed blocker, a hallucinated claim, or an unproven
+  acceptance criterion. **Stop.** Fix it in a wave, re-run, re-audit.
+
+A `BLOCK` verdict stops the loop. Do not edit the verdict by hand; fix the
+spec or the delivery. The audit is not a `GATES.md` gate and never marks one.
+
 ## Wave steps
 
 1. Give **wave-implementer**: repo path, spec dir, wave number, the wave's
@@ -214,6 +246,9 @@ must:
 
 The framer writes only under `specs/`.
 
+8. Run the spec audit (`/review-delivery --phase=spec --write`) and fix every
+   confirmed blocker before wave 1. A `BLOCK` verdict stops the loop.
+
 Then call `ship_loop --action=next` again to enter wave 1.
 
 ## Validation steps
@@ -228,6 +263,8 @@ Give **delivery-verifier** the spec dir. It must:
 5. Update `README.md` and `AGENTS.md` for what shipped.
 6. Verify that each `Before: validate` and `Before: finish` gate is `met`
    or `waived`.
+7. Run the delivery audit (`/review-delivery --phase=delivery --write`) and
+   fix every confirmed blocker. A `BLOCK` verdict stops the loop.
 
 Report real gaps. Do not hide them. Only then call `--action=finish`.
 
@@ -258,6 +295,7 @@ Waves:    W1 done (#12) · W2 done (#14) · W3 pending
 Gates:    G1 met · G2 met · G3 pending (owner: security, resolver: human)
 PRs:      <open/merged per wave; stacked PRs include merge order>
 Evidence: <tests run, CI/review state>
+Audit:    spec PASS · delivery CONCERNS (accepted: ...) · artifacts: ...
 Deploy:   deployed | not deployed | unknown — <evidence>
 Outcome:  <observed signal or pending owner/date>
 Flow:     <elapsed/review times, if evidence is available>
