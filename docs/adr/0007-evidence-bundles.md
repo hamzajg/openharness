@@ -72,10 +72,10 @@ the harness's job starts at the manifest.
 
 Three layers, deliberately separable, shipped in that order.
 
-### 1. The contract — `evidence/<feature>/<run-id>/`
+### 1. The contract — `.openharness/evidence/<feature>/<run-id>/`
 
 ```
-evidence/<feature>/<run-id>/
+.openharness/evidence/<feature>/<run-id>/
 ├── evidence.json      # manifest, schema below (the authoritative record)
 ├── index.html         # generated walkthrough (never edited by hand)
 ├── SUMMARY.md         # 20-line summary for a PR comment or LOOP.md row
@@ -85,6 +85,31 @@ evidence/<feature>/<run-id>/
 
 `<run-id>` is `YYYYMMDDTHHMMSSZ-<sha7>` — sortable, and the sha makes a stale
 bundle obvious at a glance.
+
+#### Where bundles live — local scratch, never tracked
+
+`.openharness/evidence/` is a **local scratch directory**, the same tier as
+the existing `.openharness/chroma/`: created on demand, listed in
+`.gitignore`, and never committed. Evidence is proof of a run on this
+machine, not a product artifact; committing megabytes of PNG and WebM would
+bloat history and rot as files move.
+
+| consumer | what they get |
+|---|---|
+| the agent, next iteration | the whole bundle, by path |
+| the human reviewing the PR | `SUMMARY.md` pasted into the PR body or comment |
+| CI / a teammate who needs the full thing | `<run-id>.zip` uploaded as a CI artifact (P4), retained ~14 days |
+| an evidence service, later | the bundle, if someone opts in |
+
+Only `SUMMARY.md` is designed to travel into the repo (a handful of lines in
+`LOOP.md` or a PR body). `--public` exists for the rare case where a sanitized
+bundle really must be committed; it is not the default and the page marks
+itself as a published copy.
+
+The skill resolves the root as `<repo>/.openharness/evidence` by default,
+honours `--bundle=<path>` for anything else, and `verify` fails if handed a
+bundle inside a tracked directory (`git ls-files` on its path returns
+anything) — that is how "never tracked" is enforced rather than promised.
 
 Manifest v1 (JSON, all paths relative to the bundle):
 
@@ -260,9 +285,11 @@ free-text rules — this is additive, not a new tax on docs-only work.
 - `verify` is the part that keeps it honest: commit/sha binding, real exit
   codes, hashes, redaction. A bundle is only as good as those checks.
 - Costs: one module, one skill, one page renderer, plus a fixture for repos
-  that use Playwright. Bundles are large, so `evidence/` is gitignored by
-  default and uploaded as a CI artifact; committing a sanitized bundle is
-  opt-in (`--public`).
+  that use Playwright.
+- Nothing new is committed per run. Bundles are large, so they live in the
+  local scratch directory `.openharness/evidence/` (gitignored, never
+  tracked); a zip is uploaded as a CI artifact when a link is needed, and
+  committing a sanitized bundle is opt-in (`--public`).
 - The renderer is a single HTML template — deliberately boring, because it
   has to still open in three years with no build step.
 
@@ -278,9 +305,10 @@ free-text rules — this is additive, not a new tax on docs-only work.
    and the `attach --from=steps.json` fold-in, size budget for `--inline`.
 3. **P3 — loop wiring.** `evidence:` token in `ship_loop complete`, the
    stale/contradiction blockers in `review_delivery`, UI-wave requirement.
-4. **P4 — sharing.** CI job uploads `evidence/<feature>/<run-id>.zip`, PR
-   comment links to it, `SUMMARY.md` appended to the PR body.
+4. **P4 — sharing.** CI job zips `.openharness/evidence/<feature>/<run-id>` and
+   uploads it as an artifact; the PR comment links to it and `SUMMARY.md` is
+   appended to the PR body. Nothing is added to git.
 
-Open questions for review: whether bundles live under `evidence/` or
-`.harness/evidence/` (gitignore either way), and whether the Playwright
-fixture belongs in this repo or is generated per-project by the skill.
+Open question for review: whether the Playwright fixture belongs in this repo
+or is generated per-project by the skill. Bundle location is settled — local
+`.openharness/evidence/`, gitignored, never tracked.
