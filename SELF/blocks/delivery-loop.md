@@ -1,7 +1,7 @@
 ---
 name: delivery-loop
 type: block
-location: skills/product/ship_loop.py, skills/product/spec_scaffold.py, skills/product/ship_validate.py, .opencode/commands/ship-loop.md, .claude/commands/ship-loop.md, .opencode/agents/, .claude/agents/
+location: skills/product/ship_loop.py, skills/product/spec_scaffold.py, skills/product/ship_validate.py, skills/product/review_delivery.py, .opencode/commands/ship-loop.md, .opencode/commands/review-delivery.md, .claude/commands/ship-loop.md, .claude/commands/review-delivery.md, .opencode/agents/, .claude/agents/
 interfaces: [ship_loop.invoke, ship_loop --action=next|status|start|complete|gate|block|resume|reset|finish]
 ---
 # Block: delivery-loop
@@ -37,6 +37,10 @@ anything (D001, D009).
 - `specs/<feature>/VALIDATION.md` — written by `ship_validate`; required by
   `finish`. It holds acceptance evidence and an optional post-release outcome
   follow-up, which is not a finish gate.
+- `specs/<feature>/SPEC-AUDIT.md` — written by `review_delivery` +
+  `delivery-auditor`; the spec review artifact.
+- `specs/<feature>/DELIVERY-AUDIT.md` — same pair; the delivery review
+  artifact. Both are review records, not gates.
 - `specs/PRODUCT.md` — cross-feature map, refreshed by `product_map`.
 
 ## Gates
@@ -66,6 +70,37 @@ Status lives in `LOOP.md`: `pending` · `met` · `waived` · `failed`.
 - An invalid `Before` value blocks every phase until fixed.
 - Advisory gates (`Blocking: no`) are surfaced in `status` but never block.
 
+## Independent review
+Gates check *if* a precondition exists. They do not prove that the spec is
+grounded in the repo or that the delivery matches the spec. The loop has a
+separate review path:
+
+- `review_delivery` is deterministic: it checks traceability (AC → scenario →
+  wave → backlog → LOOP), claim existence (paths, scripts, endpoints, ADRs),
+  evidence integrity (wave/gate/validation), scope drift, and unfinished
+  markers. It emits findings and a verdict block; it never judges semantics.
+- `delivery-auditor` is the independent judgment half: it re-verifies every
+  finding, opens the cited tests, runs the real test command when possible,
+  and fills `AUDIT: PASS|CONCERNS|BLOCK`. It may write only the audit file.
+
+Two checkpoints:
+
+| Phase | Artifact | When |
+|---|---|---|
+| spec | `SPEC-AUDIT.md` | after `SPEC.md`/`EXAMPLES.feature`/`BACKLOG.md`, before `plan`/wave 1 |
+| delivery | `DELIVERY-AUDIT.md` | after `VALIDATION.md`, before `finish` |
+
+`ship_loop --review=advisory` (default) never enforces the audit; existing
+loops keep working. `--review=required` (used by `/ship-loop`) refuses to
+plan waves without a filled `SPEC-AUDIT.md` and refuses to finish without a
+filled `DELIVERY-AUDIT.md`. A `BLOCK` verdict stops the loop. `PASS` and
+accepted `CONCERNS` continue. The template line
+`AUDIT: PASS | CONCERNS | BLOCK` is not a filled verdict.
+
+The audit is advisory in principle (like D011): it never marks a gate, never
+merges, and never edits product code. Enforcement is a process choice the
+command makes, not a property of the reviewer.
+
 ## Actions
 | Action | Effect |
 |---|---|
@@ -80,6 +115,10 @@ Status lives in `LOOP.md`: `pending` · `met` · `waived` · `failed`.
 | `resume` | Clear `blocked`. |
 | `reset [--wave=N] [--force]` | Reset one wave, or the whole loop (needs `--force`). |
 | `finish` | Mark a validated feature done (requires `VALIDATION.md`, all waves done). |
+
+All actions accept `--review=advisory|required`. Enforcement happens on
+`next` (before `plan` and before `finish`) and on `finish`; other actions
+report the audit status in the summary.
 
 Phases map to ship-product: no specs → frame; missing artifacts → spec;
 no `WAVES.md` → plan; pending wave → wave N; all waves done → validate;
@@ -127,6 +166,11 @@ instead of the next action until the gate is met or waived.
 - Overdue gates keep blocking; advisory gates never do.
 - Events are append-only (last 200 kept).
 - Default merge policy is `review`: PRs stay open for a human.
+- `--review=required` adds exactly two artifact checks: `SPEC-AUDIT.md`
+  before `plan`, `DELIVERY-AUDIT.md` before `finish`. Advisory mode adds none.
+- A filled audit verdict is one value (`AUDIT: PASS`); the template line with
+  all three values is not a verdict. The auditor is read-only outside the
+  audit file and never marks a gate.
 
 ## How to Extend
 1. Keep phase logic in `skills/product/ship_loop.py`; do not duplicate it in
@@ -138,3 +182,6 @@ instead of the next action until the gate is met or waived.
    command tables, and this block.
 4. New subagent roles are `.opencode/agents/<name>.md` with
    `mode: subagent` plus a `.claude/agents/<name>.md` mirror.
+5. New audit checks go in `skills/product/review_delivery.py` with tests in
+   `tests/test_review_delivery.py`; keep the `delivery-auditor` contract and
+   the command tables in sync with any new finding code or phase.

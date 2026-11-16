@@ -1,7 +1,7 @@
 # Architecture — openharness
 
 Current-state map. Descriptive, not aspirational; normative decisions live
-in `SELF/PRINCIPLES.md` (D001–D011). See `docs/adr/` for the baseline record.
+in `SELF/PRINCIPLES.md` (D001–D013). See `docs/adr/` for the baseline record.
 
 ## Dual role
 
@@ -29,8 +29,9 @@ OpenHarness is simultaneously:
 | Metrics | `metrics.py` + `/api/metrics*` | per-session cost/latency rollups over the same JSONL |
 | RAG | `knowledge/rag.py` | ChromaDB + sentence-transformers, local |
 | Web UI | `web/` (Vite+TS) | observer dashboard — calls same verbs, no logic (D005) |
-| Skills | `skills/{harness,security,legacy_migration,product}/` | executable Python skills (`ship_loop`, `challenge_decision`, ...) |
+| Skills | `skills/{harness,security,legacy_migration,product}/` | executable Python skills (`ship_loop`, `review_delivery`, `challenge_decision`, ...) |
 | Delivery loop | `skills/product/ship_loop.py` + `.opencode/commands/ship-loop.md` + `.opencode/agents/*` | deterministic oracle, per-feature `specs/<feature>/LOOP.md` + `LOOP.state.json` state, `GATES.md` preconditions, subagent roles |
+| Independent audit | `skills/product/review_delivery.py` + `.opencode/commands/review-delivery.md` + `delivery-auditor` | deterministic evidence brief + independent verdict; `SPEC-AUDIT.md` before planning, `DELIVERY-AUDIT.md` before `finish` (D013) |
 | Self specs | `SELF/` | PRINCIPLES.md, decision log, domain blocks |
 
 ## Data flow
@@ -48,6 +49,13 @@ OpenHarness is simultaneously:
   → checks blocking gates for the current phase → returns one directive (or a
   `GATE:` directive) → the agent delegates it to a subagent role → outcome
   recorded back into `LOOP.md`/`LOOP.state.json`. No harness-side scheduling (D001, D009).
+- **Independent audit:** `/review-delivery` → `review_delivery` builds a
+  deterministic brief (artifact presence, AC → scenario → wave → backlog →
+  LOOP traceability, claimed path/script/endpoint/ADR existence, evidence
+  integrity, scope drift) → `delivery-auditor` re-verifies the cited code and
+  tests and fills `PASS`/`CONCERNS`/`BLOCK` → `SPEC-AUDIT.md` or
+  `DELIVERY-AUDIT.md`. `ship_loop --review=required` refuses to plan or finish
+  without a filled verdict (D013); the audit never marks a gate.
 - **Decision review:** `/challenge-decision` → `challenge_decision` builds a
   deterministic brief (record completeness, heuristic code signals, design
   moves, lens questions) → `decision-challenger` supplies alternatives,
@@ -67,4 +75,4 @@ execution), D003/D012 (LOC budgets: core ≤300, platform ≤1100), D005 (UI is 
 observation only), D007 (REPOS.md + sources/), D008 (no copying into target
 repos), D009 (agent-executed delivery loops, state in `specs/`), D010
 (declared gates guard phase transitions), D011 (optional advisory decision
-review).
+review), D013 (independent spec/delivery audit, enforced by `/ship-loop`).

@@ -36,6 +36,19 @@ All waves must be recorded done. If not, report that. Do not validate.
    "No evidence found" means check by hand. It does not prove absence.
    Run the cited test commands. Report real counts.
 
+   Then run the independent delivery audit and hand the brief to
+   **delivery-auditor**:
+
+   ```
+   python -m openharness run review_delivery --repo_path=<repo> \
+     --spec_dir=<spec_dir> --phase=delivery --write
+   ```
+
+   The auditor re-verifies every finding, opens the cited tests, and fills
+   `AUDIT: PASS|CONCERNS|BLOCK`. A `BLOCK` verdict means `FINISH: not safe`.
+   Fix the delivery or the spec and re-audit. `VALIDATION.md` alone is not
+   proof.
+
 3. **Check validate and finish gates.**
    - Read `GATES.md` and the `## Gates` table in `LOOP.md` and
      `LOOP.state.json`.
@@ -109,6 +122,7 @@ FINISH: safe | not safe — <reason>
 - each AC has passing test evidence, or a human-approved exception
 - the demo script was walked
 - each blocking validate/finish gate is `met` or `waived`
+- the delivery audit is `PASS`, or `CONCERNS` with every item accepted
 - the docs are true
 
 ## Guardrails
