@@ -2,8 +2,31 @@ import json
 import sys
 from pathlib import Path
 
+#: Oldest interpreter this package runs on (pyproject: requires-python >= 3.13).
+#: Below this, module-level `X | Y` annotations raise TypeError on import, so
+#: the check must run before any project module is imported.
+MIN_PYTHON = (3, 13)
+
+
+def python_version_error(version_info=None):
+    """Actionable message when the running interpreter is too old, else None."""
+    v = sys.version_info if version_info is None else version_info
+    if tuple(v[:2]) >= MIN_PYTHON:
+        return None
+    found = ".".join(str(x) for x in tuple(v)[:3])
+    needed = f"{MIN_PYTHON[0]}.{MIN_PYTHON[1]}"
+    return (
+        f"openharness requires Python {needed}+ (pyproject: "
+        f'requires-python = ">={needed}"), but this is Python {found}. '
+        f"Re-run with a newer interpreter, e.g. `python{needed} -m openharness ...`."
+    )
+
 
 def main():
+    unsupported = python_version_error()
+    if unsupported:
+        print(unsupported, file=sys.stderr)
+        sys.exit(2)
     a = sys.argv[1:]
     if not a:
         from . import registry
@@ -24,9 +47,13 @@ def main():
             if x.startswith("--"):
                 k, _, vv = x[2:].partition("=")
                 kw[k.replace("-", "_")] = vv if _ else "true"
+        from .skill import SkillError
         try:
             r = sk.invoke(**kw)
             print(r if r is not None else "")
+        except SkillError as ex:
+            print(f"{sk.name}: {ex}", file=sys.stderr)
+            sys.exit(2)
         except TypeError as ex:
             print(f"Error: {ex}", file=sys.stderr); print(f"Params: {sk.params}", file=sys.stderr); sys.exit(1)
         return
