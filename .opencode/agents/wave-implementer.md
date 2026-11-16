@@ -30,6 +30,7 @@ The orchestrator gives you:
 - wave number
 - the scenarios and backlog items from the oracle
 - merge mode (`review` or `auto`)
+- effective base branch and PR target branch from the orchestrator
 
 If an input is missing, ask for it. Do not change code first.
 
@@ -43,6 +44,10 @@ If an input is missing, ask for it. Do not change code first.
    - If the tree has uncommitted changes you did not create, **stop** and
      report it. Do not stash, reset, or commit other work.
    - If the repo has no remote, stop and report.
+   - Read the target repo's layered `.openharness/ENV.md` and `AGENTS.md`.
+     Follow the host's permission prompts and least-privilege settings.
+     Assume commands are not sandboxed unless the host explicitly confirms
+     isolation; do not broaden access or expose credentials.
 
 2. **Check entry gates.**
    - A wave can declare preconditions in `GATES.md`
@@ -61,9 +66,11 @@ If an input is missing, ask for it. Do not change code first.
      fake it.
 
 3. **Branch.**
-   - Find the default branch (`git symbolic-ref refs/remotes/origin/HEAD`
-     or the repo convention). Fetch it.
-   - Create `feat/<feature>-w<N>` from it.
+   - Use the effective base and PR target supplied by the orchestrator.
+     If either is missing or does not match the preceding wave PR state,
+     stop and ask before branching.
+   - If the preceding wave is closed but unmerged, stop and ask the
+     orchestrator to resolve or re-plan. Never silently omit its changes.
    - Never commit to the default branch.
 
 4. **Write failing tests first.**
@@ -92,7 +99,8 @@ If an input is missing, ask for it. Do not change code first.
    - Never commit secrets, `.env` files, credentials, or gitignored build
      output.
 
-8. **Push and open one PR** against the default branch.
+8. **Push and open one PR** against the supplied PR target branch (the
+   default branch or the preceding wave's branch).
    - Use `gh pr create` if available. Otherwise use the GitHub REST API
      with the user's git credentials.
    - The PR body must include:
@@ -109,9 +117,12 @@ If an input is missing, ask for it. Do not change code first.
 
 10. **Apply the merge policy.**
     - `review` (default): leave the PR open. Report its number and URL.
-    - `auto`: merge only when CI is green and the diff is exactly this
-      wave. Use squash unless the repo convention says otherwise. Then
-      delete the branch.
+    - `auto`: verify target-branch protection and required CI/security
+      checks before merging. If they cannot be confirmed, stop and report;
+      do not merge. Merge only when CI is green and the diff is exactly this
+      wave. Use squash unless repo convention says otherwise. Report any
+      stacked descendants to the orchestrator; do not modify their branches
+      or PRs. Delete this branch only when no open PR depends on it.
     - Never merge a red or pending PR. Never force-push the default
       branch.
 
@@ -138,6 +149,9 @@ NOTES: <gaps, flaky checks, decisions>
 - Do not merge in `review` mode, even if CI is green.
 - Do not touch uncommitted foreign changes. Do not rewrite history on
   shared branches. Do not delete branches you did not create.
+- Do not assume local execution is isolated. Do not request broader
+  filesystem, network, or credential access; stop if the task requires
+  unavailable sensitive access.
 - Do not launch subagents.
 - If the spec is ambiguous or the wave is too large, stop and report the
   ambiguity. Do not guess.

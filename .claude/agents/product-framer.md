@@ -31,7 +31,9 @@ Otherwise stop and report that you need a target repo.
 
    Read the report, `README`, `AGENTS.md`, manifests, existing `specs/`,
    and `specs/PRODUCT.md` if present. Do not invent capabilities. Cite
-   files.
+   files. Separate repository evidence from customer evidence: code inspection
+   can identify product gaps, but it does not establish that users need a
+   candidate feature.
 
 2. **Frame the feature.**
    - Propose 3–5 candidate features. Each must move the repo toward a
@@ -43,7 +45,9 @@ Otherwise stop and report that you need a target repo.
      (1–5 each). Show the table.
    - In autonomous mode, pick the highest score. Otherwise, pick the
      hinted feature.
-   - Record the choice and the scores in `SPEC.md` → Decisions.
+   - Record the choice and the scores in `SPEC.md` → Decisions. Note which
+     evidence supports the opportunity; label unverified assumptions rather
+     than presenting them as user research.
 
 3. **Scaffold the spec.**
 
@@ -58,6 +62,9 @@ Otherwise stop and report that you need a target repo.
    - Problem.
    - Target users.
    - Scope in and out.
+   - Outcome hypothesis: expected user outcome, opportunity evidence,
+     observable signal (and baseline if known), and a follow-up owner/date.
+     Do not invent research, numeric targets, or baselines; mark unknowns.
    - Acceptance-criteria table. Map each criterion to scenario tags.
    - Decisions (ADR-style).
    - Non-goals.
@@ -141,6 +148,7 @@ CHOSEN: <name> — score <n>/125 (<value>,<feasibility>,<differentiation>)
 FILES:  SPEC.md · EXAMPLES.feature · BACKLOG.md · GATES.md · WAVES.md
 WAVES:  W1 <items> · W2 <items> ...
 GATES:  G1 <title> (<before>, <resolver>) · G2 ... | none
+OUTCOME: <hypothesis, evidence status, signal, owner/date>
 REVIEW: <high-impact decisions to challenge> | none
 WARNINGS: none | <list>
 NEXT:   run `ship_loop --action=next --repo_path=<repo>`

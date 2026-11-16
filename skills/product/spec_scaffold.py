@@ -29,6 +29,13 @@ _SPEC_MD = """# Spec: {title}
 
 {users}
 
+## Outcome hypothesis
+
+- Expected user outcome: (what user behavior or problem should change?)
+- Opportunity evidence: (source; if unknown, state that this is an assumption)
+- Signal: (observable measure and baseline if known; do not invent targets)
+- Follow-up owner/date: (who will review the signal and when?)
+
 ## Scope (in)
 
 -

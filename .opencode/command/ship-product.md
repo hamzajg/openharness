@@ -1,7 +1,7 @@
 ---
-description: Take a managed repo from "code exists" to "product ships" — discover gaps, frame ONE innovative feature, spec it (spec-driven), write specifications-by-example, plan delivery waves, implement wave by wave
+description: Take a managed repo from "code exists" to an acceptance-validated feature — discover gaps, frame ONE feature, specify it, plan waves, implement and validate
 ---
-# /ship-product — Spec-driven product completion
+# /ship-product — Spec-driven product delivery
 
 > For autonomous delivery, use `/ship-loop`. The oracle (`ship_loop`)
 > walks these phases and delegates to subagents.
@@ -41,6 +41,9 @@ any existing `specs/` directories. Find:
 - What the product is today.
 - What is stubbed (placeholder markers).
 - Which routes or features exist but are thin.
+- What evidence exists about user needs (interviews, support themes,
+  analytics, or other direct feedback). Repository evidence is useful for
+  identifying gaps, but is not customer evidence.
 
 ### Phase 2 — Frame (feature planning)
 Propose 3–5 candidate features. Each must move the repo toward a
@@ -48,7 +51,9 @@ shippable product. Score each on three axes: user value, feasibility,
 differentiation.
 
 Show the shortlist to the user. Get approval for ONE feature before you
-write the spec.
+write the spec. For each candidate, state its expected user outcome and the
+evidence or unverified assumption behind it. Do not invent user research,
+baselines, or numeric targets.
 
 For a kata or legacy repo, an innovative feature usually adds the missing
 product loop: persistence, auth, notifications, export, or a real data
@@ -101,6 +106,9 @@ Fill `specs/<feature>/SPEC.md`:
 
 - Problem.
 - Users.
+- Outcome hypothesis: expected user outcome, opportunity evidence, an
+  observable signal (and baseline if known), and a follow-up owner/date.
+  Mark unknowns explicitly; do not make up evidence or targets.
 - Scope in and out.
 - Acceptance criteria table. Map each criterion to scenario tags.
 - Decisions section. Write ADR-style entries.
@@ -151,13 +159,19 @@ tests. If a wave is too big or the dependencies are wrong, fix
 Each wave is one iteration: a time-boxed increment with a demoable
 result. Do the waves in order:
 
-1. Branch `feat/<feature>-w<N>` from the default branch.
+1. Inspect the merge state of earlier wave PRs. If the preceding wave PR is
+   still open, branch from its head and target the new PR at that branch
+   (stack it). If it has merged, branch from the default branch. Record the
+   stacked PR and merge order; never base a dependent wave on a default
+   branch that lacks its predecessor.
 2. Write failing checks first for the wave's scenarios. The `.feature`
    scenarios are the acceptance spec.
 3. Implement the smallest correct change. Match repo conventions (KISS).
 4. Verify: build + tests green locally. Then CI green on the PR.
 5. Open one PR. Merge per the merge policy (default: leave open for
-   review). Delete the branch after merge. Demo the result.
+   review). For stacked PRs, retarget/rebase descendants onto the default
+   branch after their parent merges and rerun CI. Delete only the merged
+   wave's branch after descendants no longer depend on it. Demo the result.
 6. Record the wave: `ship_loop --action=complete`. `LOOP.md` holds the
    execution state. `WAVES.md` holds the plan.
 
@@ -175,14 +189,34 @@ evidence matrix, coverage stats, a demo script, and a gaps list.
 Walk the demo script by hand. Close real gaps: missing checks, unproven
 scenarios. "No evidence found" means verify by hand. It does not prove
 absence. Each `Before: finish` gate in `GATES.md` must be `met` or
-`waived` before you declare the feature shipped.
+`waived` before acceptance validation is complete. `ship_loop` status
+`done` means the feature was acceptance-validated; it does not mean its PRs
+were merged or the feature was deployed.
 
 Then:
 
 1. Update `README.md` and `AGENTS.md`.
 2. Refresh `specs/PRODUCT.md` with `product_map`.
 3. Make sure `specs/<feature>/` tells the true story.
-4. Report what shipped and what remains.
+4. Record an optional `Outcome follow-up` in `VALIDATION.md`: observed
+   signal/result, source, owner/date, and learning. If the feature is not
+   released or the signal is unavailable, state that and leave the follow-up
+   pending; it is not a finish gate.
+5. Report acceptance status separately from PR merge/deployment status. When
+   available, include actual elapsed time and review wait from recorded
+   timestamps. Do not invent metrics or use them to rank teams.
+
+## Agent execution and merge safeguards
+
+- Read the target repo's `AGENTS.md` and layered `.openharness/ENV.md`;
+  follow the active agent host's permission prompts and least-privilege
+  settings. The harness protocol does not create an isolated sandbox.
+- Do not broaden filesystem, network, or credential access to complete a
+  wave. Never copy secrets into prompts, tests, specs, or PRs. Stop and ask
+  for a human when required access is unavailable.
+- `--merge=auto` is allowed only when branch protection and required CI and
+  security checks are verified for the target branch. If their state cannot
+  be confirmed, use `review` and hand off to a human.
 
 ## Rules
 

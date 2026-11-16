@@ -93,6 +93,10 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - **D009:** delivery loops are agent-executed, not harness-scheduled. The
   oracle (`skills/product/ship_loop.py`) owns `specs/<feature>/LOOP.md`; the
   agent owns execution. Default merge policy is `review` (PRs stay open).
+  `done` means acceptance-validated, not necessarily merged or deployed.
+  Dependent waves stack on open predecessor PRs and must be retargeted and
+  retested after the parent merges. Specs record an outcome hypothesis;
+  post-release learning is optional and is not a finish gate.
 - **D010:** phase transitions are guarded by gates declared in
   `specs/<feature>/GATES.md` and tracked in `LOOP.md`. A blocking gate stops
   its phase; only a named human can waive one. Agent-owned gates are resolved
@@ -123,6 +127,9 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   and reason. Fix a wrong gate in `GATES.md`; do not route around it.
 - `/challenge-decision` is advisory: never make its verdict a gate or a merge
   blocker, and never let the reviewer edit product code.
+- The delivery-loop protocol does not sandbox agents. Follow host
+  permission prompts and target-repo least-privilege guidance; `--merge=auto`
+  requires verified branch protection and required CI/security checks.
 
 ## Agent rules
 
