@@ -23,7 +23,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from openharness.skill import skill
+from openharness.skill import SkillError, skill
 
 _WAVE_RE = re.compile(r"^##\s+Wave\s+(\d+)\b.*$", re.M)
 _SCENARIO_RE = re.compile(r"^\s*Scenario(?: Outline)?:\s*(.+?)\s*$")
@@ -670,6 +670,7 @@ def ship_loop(
     max_iterations: int = 25,
     review: str = "advisory",
     force: bool = False,
+    offline: bool = False,
 ) -> str:
     """Drive one delivery-loop iteration: report the next action and record wave/gate outcomes.
 
@@ -678,7 +679,8 @@ def ship_loop(
     `start` (mark a wave in progress), `complete` (mark it done with evidence),
     `gate` (record a precondition as met/waived/failed/pending), `block` (stop
     the loop with a reason), `resume` (clear blocked), `reset` (clear wave
-    state), `finish` (mark a validated feature done).
+    state), `finish` (mark a validated feature done), `reconcile` (alias
+    `check`; compare LOOP's claims with git and GitHub and raise on drift).
 
     Gates are preconditions declared in `specs/<feature>/GATES.md`; their
     status is recorded in `LOOP.md`. A blocking gate prevents the phase it is
@@ -690,7 +692,7 @@ def ship_loop(
     Params:
       repo_path: Repository root containing specs/.
       spec_dir: Feature dir; defaults to the first unfinished feature.
-      action: next|status|start|complete|gate|block|resume|reset|finish.
+      action: next|status|start|complete|gate|block|resume|reset|finish|reconcile.
       wave: Wave number for start/complete/reset.
       note: Evidence (complete), reason (block), or waiver/failure reason (gate).
       pr: PR reference recorded on complete.
@@ -706,6 +708,8 @@ def ship_loop(
         stops the loop. `advisory` keeps existing loops working and never
         enforces the audit.
       force: Allow out-of-order start/complete or a full reset.
+      offline: For `reconcile` only — check git facts and skip GitHub, so
+        PR/CI claims are reported as unverified instead of quietly assumed.
     """
     budget = max(1, int(max_iterations))
     if review not in ("advisory", "required"):
@@ -715,11 +719,11 @@ def ship_loop(
         return f"ERROR: {repo_path} is not a directory"
     if action not in (
         "next", "status", "start", "complete", "gate",
-        "block", "resume", "reset", "finish",
+        "block", "resume", "reset", "finish", "reconcile", "check",
     ):
         return (
             f"ERROR: unknown action {action!r} "
-            "(next|status|start|complete|gate|block|resume|reset|finish)"
+            "(next|status|start|complete|gate|block|resume|reset|finish|reconcile)"
         )
 
     dirs = _feature_dirs(root)
@@ -740,6 +744,66 @@ def ship_loop(
         )
         state = _load_state(d)
         waves = _parse_waves(d)
+
+        if action in ("reconcile", "check"):
+            # Read-only: the record is the claim, git and GitHub are the truth.
+            from openharness import verify
+
+            findings = verify.reconcile(
+                repo=root,
+                wave_state=state["waves"],
+                plan_waves=sorted(waves),
+                feature_status=state["status"],
+                offline=offline,
+            )
+            info = [f for f in findings if f.severity == "info"]
+            warnings = [f for f in findings if f.severity == "warning"]
+            drift = [f for f in findings if f.severity == "drift"]
+            unverified = [f for f in findings if f.severity == "unverified"]
+
+            report = [
+                f"# Reconcile — {d.name}",
+                "",
+                "Facts: git + GitHub. Claims: LOOP.md / LOOP.state.json. Nothing was written.",
+                "",
+            ]
+            if info:
+                report.extend(f.render() for f in info)
+            elif not drift and not unverified:
+                report.append("- no completed or in-progress wave to check")
+            if warnings:
+                report += ["", "True right now, not drift:"]
+                report.extend(f.render() for f in warnings)
+
+            if not drift and not unverified:
+                report += ["", "OK — LOOP state matches git and GitHub."]
+                return "\n".join(report)
+
+            report.append("")
+            if drift:
+                report.append(f"DRIFT ({len(drift)}) — the record contradicts reality:")
+                report.extend(f.render() for f in drift)
+                report.append("")
+            if unverified:
+                report.append(f"UNVERIFIED ({len(unverified)}) — reality could not be checked:")
+                report.extend(f.render() for f in unverified)
+                report.append("")
+            waves_in_drift = sorted(
+                int(f.subject.split()[1])
+                for f in drift
+                if f.subject.startswith("wave ") and f.subject.split()[1].isdigit()
+            )
+            if waves_in_drift:
+                resets = ", ".join(f"--action=reset --wave={n}" for n in waves_in_drift)
+                report.append(
+                    f"Fix the record (`{resets}`, then redo the wave) or the world "
+                    "(merge the PR, push the branch), then reconcile again."
+                )
+            else:
+                report.append(
+                    "Fix the record or the world, then reconcile again."
+                )
+            raise SkillError("\n".join(report))
 
         if action == "gate":
             gates = _parse_gates(d)
