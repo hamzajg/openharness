@@ -6,9 +6,12 @@ used only to *read* (`ls-files`, `rev-parse`) or to set up a fixture repo.
 
 import base64
 import json
+import os
+import shlex
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -570,3 +573,278 @@ def test_cli_verify_exits_0_when_clean(tmp_path):
 
     assert run.returncode == 0, run.stderr
     assert "OK —" in run.stdout
+
+
+# ------------------------------------------------------------------- capture
+
+def _capture_bundle(tmp_path: Path, feature: str = "capture") -> Path:
+    return evidence.new_bundle(
+        tmp_path,
+        feature,
+        head=HEAD,
+        run=f"20260101T000000Z-{feature}",
+    )
+
+
+def _python(code: str) -> str:
+    return shlex.join([sys.executable, "-c", code])
+
+
+def test_step_records_exit_code_log_and_duration(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+
+    step = evidence.record_step(bundle, title="Say hi", cmd=_python("print('hi')"))
+
+    assert step["id"] == "s1"
+    assert step["status"] == "pass"
+    assert step["exit_code"] == 0
+    assert step["duration_ms"] >= 0
+    assert step["log"] == "logs/s1.log"
+    log = (bundle / step["log"]).read_text()
+    assert "hi" in log
+    assert "exit 0" in log
+    assert evidence.load(bundle)["steps"][0]["title"] == "Say hi"
+
+
+def test_step_marks_a_nonzero_exit_as_fail(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+
+    step = evidence.record_step(
+        bundle, title="Fail", cmd=_python("raise SystemExit(3)")
+    )
+
+    assert step["status"] == "fail"
+    assert step["exit_code"] == 3
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+    assert "verdict-contradicts-steps" in _codes(report)
+
+
+def test_step_timeout_is_recorded_as_failure(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+
+    step = evidence.record_step(
+        bundle,
+        title="Slow",
+        cmd=_python("import time; time.sleep(2)"),
+        timeout=1,
+    )
+
+    assert step["status"] == "fail"
+    assert step["exit_code"] == 124
+    assert "timed out" in step["note"]
+
+
+def test_step_refuses_a_duplicate_id(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    evidence.record_step(bundle, title="One", cmd=_python("print(1)"), step_id="s1")
+
+    with pytest.raises(evidence.EvidenceError, match="already exists"):
+        evidence.record_step(
+            bundle, title="Two", cmd=_python("print(2)"), step_id="s1"
+        )
+
+
+def test_step_requires_a_command(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+
+    with pytest.raises(evidence.EvidenceError, match="cmd is required"):
+        evidence.record_step(bundle, title="Empty", cmd="  ")
+
+
+def test_step_redacts_secrets_in_the_log_and_command(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+
+    step = evidence.record_step(
+        bundle,
+        title="Leak",
+        cmd=_python("print('password=hunter2')"),
+    )
+
+    assert "hunter2" not in step["cmd"]
+    log = (bundle / step["log"]).read_text()
+    assert "hunter2" not in log
+    assert "[REDACTED:password]" in log
+    manifest = evidence.load(bundle)
+    assert any(r["pattern"] == "password" for r in manifest["redactions"])
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+    assert report.ok, report.render()
+
+
+def test_step_redacts_secrets_in_the_title(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+
+    step = evidence.record_step(
+        bundle,
+        title="login with password=hunter2",
+        cmd=_python("print('ok')"),
+    )
+
+    assert "hunter2" not in step["title"]
+    assert "[REDACTED:password]" in step["title"]
+    manifest = evidence.load(bundle)
+    assert any(r["path"].endswith(".title") for r in manifest["redactions"])
+
+
+def test_attach_hashes_and_copies_a_screenshot(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    shot = tmp_path / "shot.png"
+    shot.write_bytes(PNG)
+
+    art = evidence.record_attach(bundle, shot, caption="Approval card")
+
+    assert art["path"] == "raw/s1/shot.png"
+    assert art["mime"] == "image/png"
+    assert art["role"] == "screenshot"
+    assert art["bytes"] == len(PNG)
+    assert art["sha256"] == evidence.sha256(bundle / art["path"])
+    manifest = evidence.load(bundle)
+    assert manifest["steps"][0]["kind"] == "manual"
+    assert manifest["steps"][0]["status"] == "manual"
+    assert manifest["steps"][0]["artifacts"][0]["caption"] == "Approval card"
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+    assert report.ok, report.render()
+
+
+def test_attach_rejects_a_file_older_than_the_step(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    evidence.record_step(bundle, title="Now", cmd=_python("print('x')"))
+    shot = tmp_path / "old.png"
+    shot.write_bytes(PNG)
+    old = time.time() - 3600
+    os.utime(shot, (old, old))
+
+    with pytest.raises(evidence.EvidenceError, match="older than step"):
+        evidence.record_attach(bundle, shot, step_id="s1")
+
+
+def test_attach_allow_old_records_the_file(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    evidence.record_step(bundle, title="Now", cmd=_python("print('x')"))
+    shot = tmp_path / "old.png"
+    shot.write_bytes(PNG)
+    old = time.time() - 3600
+    os.utime(shot, (old, old))
+
+    art = evidence.record_attach(bundle, shot, step_id="s1", allow_old=True)
+
+    assert art["path"] == "raw/s1/old.png"
+    assert (bundle / art["path"]).is_file()
+
+
+def test_attach_redacts_text_artifacts(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    env = tmp_path / "env.txt"
+    env.write_text("API_KEY=sk-" + "a" * 32 + "\npassword=hunter2\n")
+
+    art = evidence.record_attach(bundle, env, caption="Environment")
+
+    body = (bundle / art["path"]).read_text()
+    assert "sk-" not in body
+    assert "hunter2" not in body
+    assert "[REDACTED:api-key]" in body
+    assert "[REDACTED:password]" in body
+    manifest = evidence.load(bundle)
+    patterns = {r["pattern"] for r in manifest["redactions"]}
+    assert {"api-key", "password"} <= patterns
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+    assert report.ok, report.render()
+
+
+def test_attach_redacts_json_secrets_and_keeps_valid_quotes(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    cfg = tmp_path / "config.json"
+    cfg.write_text(
+        '{"password": "hunter2", "Authorization": "Bearer abcdefghijklmnop"}\n'
+    )
+
+    art = evidence.record_attach(bundle, cfg, caption="Config")
+
+    body = (bundle / art["path"]).read_text()
+    assert "hunter2" not in body
+    assert "Bearer" not in body
+    assert '"[REDACTED:json-secret]"' in body
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+    assert report.ok, report.render()
+
+
+def test_attach_unknown_step_is_an_error(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    shot = tmp_path / "shot.png"
+    shot.write_bytes(PNG)
+
+    with pytest.raises(evidence.EvidenceError, match="unknown step"):
+        evidence.record_attach(bundle, shot, step_id="s9")
+
+
+def test_attach_missing_file_is_an_error(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+
+    with pytest.raises(evidence.EvidenceError, match="does not exist"):
+        evidence.record_attach(bundle, tmp_path / "nope.png")
+
+
+def test_attach_sniffs_mime_from_magic_bytes(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    shot = tmp_path / "shot.bin"
+    shot.write_bytes(PNG)
+
+    art = evidence.record_attach(bundle, shot)
+
+    assert art["mime"] == "image/png"
+    assert art["role"] == "screenshot"
+
+
+def test_attach_records_who_captured_it(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    shot = tmp_path / "shot.png"
+    shot.write_bytes(PNG)
+
+    art = evidence.record_attach(bundle, shot, by="Hamza")
+
+    assert art["captured_by"] == "Hamza"
+    manifest = evidence.load(bundle)
+    assert manifest["steps"][0]["captured_by"] == "Hamza"
+
+
+def test_v1_manifest_still_loads(tmp_path):
+    bundle, manifest = _make(tmp_path)
+    manifest["schema"] = "openharness.evidence/1"
+    _save(bundle, manifest)
+
+    assert evidence.load(bundle)["schema"] == "openharness.evidence/1"
+
+
+def test_cli_step_passthrough(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+
+    run = _cli(
+        "--action=step",
+        f"--repo={tmp_path}",
+        f"--bundle={bundle}",
+        "--title=Say hi",
+        "--",
+        sys.executable,
+        "-c",
+        "print('hi')",
+    )
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "Recorded step s1 (pass)" in run.stdout
+    assert "hi" in (bundle / "logs" / "s1.log").read_text()
+
+
+def test_cli_attach(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    shot = tmp_path / "shot.png"
+    shot.write_bytes(PNG)
+
+    run = _cli(
+        "--action=attach",
+        f"--repo={tmp_path}",
+        f"--bundle={bundle}",
+        f"--file={shot}",
+        "--caption=Approval card",
+    )
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "Attached raw/s1/shot.png" in run.stdout

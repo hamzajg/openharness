@@ -124,3 +124,46 @@ See `SELF/blocks/delivery-loop.md` for the state model, gate contract, and
 action contract, `SELF/blocks/delivery-audit.md` for the audit checkpoints and
 verdict rules, and `SELF/blocks/decision-review.md` for the review lenses and
 guardrails.
+
+## Evidence bundles
+
+A wave is not proven by a sentence. `harness_evidence` (ADR 0007) builds a
+local, offline-reviewable bundle per run:
+
+```
+.openharness/evidence/<feature>/<run-id>/
+├── evidence.json   manifest: commit, steps, artifacts, hashes, redactions
+├── index.html      generated walkthrough page
+├── SUMMARY.md      short, pasteable into a PR or LOOP row
+├── raw/            screenshots, recordings, traces
+└── logs/           one log per executed command
+```
+
+Bundles are local scratch (gitignored) and never committed. The harness does
+not drive browsers or devices: Playwright, `adb`, `xcrun`, or a human produce
+files, and `attach` records them with a hash.
+
+```bash
+# create a bundle for the current commit
+python -m openharness run harness_evidence --action=new \
+  --repo=. --feature=photo-notes --wave=2 --head=$(git rev-parse HEAD)
+
+# run a command; real exit code, duration and log are recorded
+python -m openharness run harness_evidence --action=step \
+  --repo=. --feature=photo-notes --title="API tests" -- pytest -q
+
+# attach a screenshot (copied under raw/<step>/, MIME + hash recorded)
+python -m openharness run harness_evidence --action=attach \
+  --repo=. --feature=photo-notes --file=/tmp/note-created.png \
+  --caption="A note is created"
+
+# generate the page, then verify hashes, commit and secrets
+python -m openharness run harness_evidence --action=render --repo=. --feature=photo-notes
+python -m openharness run harness_evidence --action=verify --repo=. --feature=photo-notes
+```
+
+`step` and `attach` redact auth headers, cookies, passwords, API keys, tokens,
+private keys, JWTs and JSON-shaped secrets before hashing; `verify` fails if a
+token still appears in a log, an artifact changed, or the manifest commit is
+not the checked-out one. The full design — capture policy, walkthrough page,
+loop wiring, sharing — is in `docs/plans/evidence-v2.md`.
