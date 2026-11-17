@@ -32,24 +32,40 @@ def harness_evidence(
     summary: str = "",
     not_verified: str = "",
     inline: bool = False,
+    cmd: str = "",
+    cwd: str = ".",
+    title: str = "",
+    step: str = "",
+    file: str = "",
+    caption: str = "",
+    role: str = "",
+    note: str = "",
+    timeout: int = 0,
+    expected_failure: bool = False,
+    allow_old: bool = False,
+    by: str = "",
 ) -> str:
-    """Create, render, verify or list local evidence bundles (ADR 0007 phase 1).
+    """Capture, render, verify or list local evidence bundles (ADR 0007).
 
     Bundles live in `<repo>/.openharness/evidence/<feature>/<run-id>/` — local
-    scratch, gitignored, never committed. `verify` re-hashes every artifact,
-    fails on a missing file, a token in a log, a manifest whose commit is not
-    the checked-out one, or a bundle git is tracking. Neither action touches the
+    scratch, gitignored, never committed. `step` runs a command and records its
+    real exit code, duration and log; `attach` adds an existing screenshot,
+    recording, trace or log to a step. `verify` re-hashes every artifact, fails
+    on a missing file, a token in a log, a manifest whose commit is not the
+    checked-out one, or a bundle git is tracking. Neither action touches the
     network, and neither writes to git.
 
     Actions:
       list    Every bundle, newest first, with verdict, counts and commit.
       new     Create an empty bundle + manifest (feature required).
+      step    Run a command; record exit code, duration and log.
+      attach  Add a file to a step (copies it under raw/<step>/).
       render  Write index.html + SUMMARY.md from evidence.json.
       verify  Check manifest, artifacts, hashes, commit, secrets, tracking.
               Raises (CLI exit 2) when anything is wrong.
 
     Params:
-      action: list|new|render|verify.
+      action: list|new|step|attach|render|verify.
       repo: Repository root (default cwd).
       bundle: Explicit bundle path; else the newest bundle for `feature`,
         else the newest bundle overall.
@@ -59,6 +75,18 @@ def harness_evidence(
       summary: One-paragraph "what this proves".
       not_verified: Semicolon- or newline-separated list of what was not checked.
       inline: Render with images base64-inlined into one shareable file.
+      cmd: Command for `step`; also accepted after `--` on the CLI.
+      cwd: Working directory for `step`, relative to the repo root.
+      title: Step title for `step`, or a manual-step title for `attach`.
+      step: Step id for `attach` (defaults to the newest step).
+      file: Artifact path for `attach`.
+      caption: Caption shown in the page for an attached artifact.
+      role: screenshot|video|trace|har|attachment (inferred when omitted).
+      note: Free-text note recorded on a `step`.
+      timeout: Seconds before a `step` is killed; 0 means no limit.
+      expected_failure: A non-zero exit is expected for this `step`.
+      allow_old: Attach a file older than the step (records why in the note).
+      by: Who captured a manual artifact.
     """
     repo_path = Path(repo)
     action = (action or "list").strip().lower()
@@ -108,6 +136,52 @@ def harness_evidence(
             "Next: record steps and artifacts, then `--action=render`."
         )
 
+    if action == "step":
+        target = _resolve(repo_path, bundle, feature)
+        if not cmd.strip():
+            raise SkillError("step requires --cmd or `-- <command>`")
+        try:
+            recorded = evidence.record_step(
+                target,
+                title=title,
+                cmd=cmd,
+                cwd=cwd,
+                timeout=timeout,
+                expected_failure=expected_failure,
+                step_id=step,
+                note=note,
+            )
+        except evidence.EvidenceError as ex:
+            raise SkillError(str(ex)) from ex
+        return (
+            f"Recorded step {recorded['id']} ({recorded['status']}) in {target}\n"
+            f"  log: {recorded['log']}\n"
+            "Next: attach screenshots or recordings, then `--action=render`."
+        )
+
+    if action == "attach":
+        target = _resolve(repo_path, bundle, feature)
+        if not file.strip():
+            raise SkillError("attach requires --file")
+        try:
+            art = evidence.record_attach(
+                target,
+                file,
+                step_id=step,
+                caption=caption,
+                role=role,
+                allow_old=allow_old,
+                by=by,
+            )
+        except evidence.EvidenceError as ex:
+            raise SkillError(str(ex)) from ex
+        return (
+            f"Attached {art['path']} ({art['mime']}, {art['bytes']} bytes) "
+            f"to {target.name}\n"
+            f"  sha256: {art['sha256']}\n"
+            "Next: `--action=render`."
+        )
+
     if action in ("render", "verify"):
         target = _resolve(repo_path, bundle, feature)
         if action == "render":
@@ -144,4 +218,6 @@ def harness_evidence(
             lines.extend(f.render() for f in report.warnings)
         return "\n".join(lines)
 
-    raise SkillError(f"unknown action {action!r} (list|new|render|verify)")
+    raise SkillError(
+        f"unknown action {action!r} (list|new|step|attach|render|verify)"
+    )

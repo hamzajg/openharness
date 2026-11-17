@@ -1,4 +1,5 @@
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -43,7 +44,14 @@ def main():
         if not sk:
             print(f"Unknown skill: {rest[0]}", file=sys.stderr); sys.exit(1)
         kw = {}
-        for x in rest[1:]:
+        argv = rest[1:]
+        if "--" in argv:
+            split = argv.index("--")
+            # A skill that accepts `cmd` (harness_evidence step) gets the tail
+            # as one shell command; other skills simply ignore the extra key.
+            kw["cmd"] = shlex.join(argv[split + 1:])
+            argv = argv[:split]
+        for x in argv:
             if x.startswith("--"):
                 k, _, vv = x[2:].partition("=")
                 kw[k.replace("-", "_")] = vv if _ else "true"
