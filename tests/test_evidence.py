@@ -288,6 +288,75 @@ def test_untracked_bundle_in_a_git_repo_passes(tmp_path):
     assert "tracked-bundle" not in _codes(report)
 
 
+def _git_init(repo: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.email=t@example.com",
+         "-c", "user.name=T", "commit", "-q", "--allow-empty", "-m", "init"],
+        check=True,
+    )
+
+
+def test_tracked_root_bundle_may_be_committed(tmp_path):
+    if not shutil.which("git"):
+        pytest.skip("git not installed")
+    _git_init(tmp_path)
+    bundle = evidence.new_bundle(
+        tmp_path, "cart", head=HEAD, run="20260101T000000Z-abc1234", tracked=True
+    )
+    assert bundle.parent == tmp_path / "evidence" / "cart"
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A", "evidence"], check=True)
+
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+
+    assert "tracked-bundle" not in _codes(report)
+    assert "untracked-bundle" not in _codes(report)
+
+
+def test_tracked_root_bundle_warns_until_git_tracks_it(tmp_path):
+    if not shutil.which("git"):
+        pytest.skip("git not installed")
+    _git_init(tmp_path)
+    bundle = evidence.new_bundle(
+        tmp_path, "cart", head=HEAD, run="20260101T000000Z-abc1234", tracked=True
+    )
+
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+
+    assert "untracked-bundle" in _codes(report)
+    assert report.ok  # a warning, not an error — the bundle just is not published yet
+
+
+def test_scratch_bundle_stays_an_error_when_tracked_even_next_to_evidence(tmp_path):
+    if not shutil.which("git"):
+        pytest.skip("git not installed")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    bundle, _ = _make(tmp_path)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "add", "-f", bundle.relative_to(tmp_path).as_posix()],
+        check=True,
+    )
+
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+
+    assert "tracked-bundle" in _codes(report)
+
+
+def test_list_bundles_covers_scratch_and_tracked_roots(tmp_path):
+    scratch, _ = _make(tmp_path)
+    tracked = evidence.new_bundle(
+        tmp_path, "cart", head=HEAD, run="20260202T000000Z-def5678", tracked=True
+    )
+
+    rows = evidence.list_bundles(tmp_path)
+
+    assert [r["bundle"] for r in rows] == [tracked, scratch]
+    assert rows[0]["tracked"] is True
+    assert rows[1]["tracked"] is False
+    assert [r["bundle"] for r in evidence.list_bundles(tmp_path, tracked=True)] == [tracked]
+    assert [r["bundle"] for r in evidence.list_bundles(tmp_path, tracked=False)] == [scratch]
+
+
 def test_no_git_repository_is_a_warning_not_an_error(tmp_path):
     bundle, _ = _make(tmp_path)
 
@@ -504,6 +573,20 @@ def test_skill_new_then_render(tmp_path):
     bundle = evidence.list_bundles(tmp_path, feature="cart")[0]["bundle"]
     assert (bundle / "index.html").is_file()
     assert "Verification: OK" in out
+
+
+def test_skill_new_with_tracked_uses_the_committable_root(tmp_path):
+    out = harness_evidence.invoke(
+        action="new", repo=str(tmp_path), feature="cart", head=HEAD, tracked=True
+    )
+
+    assert (tmp_path / "evidence" / "cart").is_dir()
+    assert "tracked root" in out
+    rows = evidence.list_bundles(tmp_path, feature="cart")
+    assert rows[0]["tracked"] is True
+
+    listing = harness_evidence.invoke(action="list", repo=str(tmp_path))
+    assert "tracked" in listing and "local" in listing
 
 
 def test_skill_render_reports_an_unbound_bundle(tmp_path):
@@ -848,3 +931,205 @@ def test_cli_attach(tmp_path):
 
     assert run.returncode == 0, run.stdout + run.stderr
     assert "Attached raw/s1/shot.png" in run.stdout
+
+
+# ------------------------------------------------------------------- attach --from
+
+def test_attach_from_folds_fragment(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    shot = tmp_path / "shot.png"
+    shot.write_bytes(PNG)
+
+    # Create a fragment manually (simulating what a fixture would emit)
+    fragment = {
+        "id": "s2",
+        "title": "Browser navigation",
+        "kind": "browser",
+        "status": "pass",
+        "started_at": "2026-11-17T18:00:00Z",
+        "duration_ms": 1234,
+        "log": "logs/s2.log",
+        "artifacts": [
+            {
+                "path": "raw/s2/01-page.png",
+                "mime": "image/png",
+                "sha256": evidence.sha256(shot),
+                "bytes": len(PNG),
+                "role": "screenshot",
+                "caption": "Page loaded",
+            }
+        ],
+    }
+
+    # Write the fragment to a temp file and attach it
+    from_file = tmp_path / "fragment.json"
+    from_file.write_text(json.dumps(fragment, indent=2))
+
+    run = _cli(
+        "--action=attach",
+        f"--repo={tmp_path}",
+        f"--bundle={bundle}",
+        f"--fragment={from_file}",
+    )
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert "Folded step s2 (pass)" in run.stdout
+    assert "artifacts: 1" in run.stdout
+
+    manifest = evidence.load(bundle)
+    steps = manifest["steps"]
+    assert len(steps) == 2
+    assert steps[1]["id"] == "s2"
+    assert steps[1]["kind"] == "browser"
+    assert steps[1]["status"] == "pass"
+    assert steps[1]["artifacts"][0]["caption"] == "Page loaded"
+
+
+def test_attach_from_missing_required_field(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    from_file = tmp_path / "fragment.json"
+    from_file.write_text('{"id": "s2", "title": "Missing fields"}')
+
+    run = _cli(
+        "--action=attach",
+        f"--repo={tmp_path}",
+        f"--bundle={bundle}",
+        f"--fragment={from_file}",
+    )
+
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert "missing required field" in run.stderr
+
+
+def test_attach_from_duplicate_id(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    evidence.record_step(bundle, title="First", cmd="echo x")
+
+    fragment = {
+        "id": "s1",  # duplicate
+        "title": "Duplicate",
+        "kind": "browser",
+        "status": "pass",
+        "started_at": "2026-11-17T18:00:00Z",
+        "duration_ms": 1234,
+        "log": "logs/s1.log",
+        "artifacts": [],
+    }
+
+    from_file = tmp_path / "fragment.json"
+    from_file.write_text(json.dumps(fragment, indent=2))
+
+    run = _cli(
+        "--action=attach",
+        f"--repo={tmp_path}",
+        f"--bundle={bundle}",
+        f"--fragment={from_file}",
+    )
+
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert "already exists" in run.stderr
+
+
+def test_attach_from_invalid_json(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    from_file = tmp_path / "fragment.json"
+    from_file.write_text("not json {")
+
+    run = _cli(
+        "--action=attach",
+        f"--repo={tmp_path}",
+        f"--bundle={bundle}",
+        f"--fragment={from_file}",
+    )
+
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert "invalid JSON fragment" in run.stderr
+
+
+def test_attach_from_invalid_kind(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    fragment = {
+        "id": "s2",
+        "title": "Browser navigation",
+        "kind": "unknown",  # invalid
+        "status": "pass",
+        "started_at": "2026-11-17T18:00:00Z",
+        "duration_ms": 1234,
+        "log": "logs/s2.log",
+        "artifacts": [],
+    }
+
+    from_file = tmp_path / "fragment.json"
+    from_file.write_text(json.dumps(fragment, indent=2))
+
+    run = _cli(
+        "--action=attach",
+        f"--repo={tmp_path}",
+        f"--bundle={bundle}",
+        f"--fragment={from_file}",
+    )
+
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert "fragment kind must be one of" in run.stderr
+
+
+def test_attach_from_invalid_status(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    fragment = {
+        "id": "s2",
+        "title": "Browser navigation",
+        "kind": "browser",
+        "status": "unknown",  # invalid
+        "started_at": "2026-11-17T18:00:00Z",
+        "duration_ms": 1234,
+        "log": "logs/s2.log",
+        "artifacts": [],
+    }
+
+    from_file = tmp_path / "fragment.json"
+    from_file.write_text(json.dumps(fragment, indent=2))
+
+    run = _cli(
+        "--action=attach",
+        f"--repo={tmp_path}",
+        f"--bundle={bundle}",
+        f"--fragment={from_file}",
+    )
+
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert "fragment status must be one of" in run.stderr
+
+
+def test_attach_from_invalid_artifact(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    fragment = {
+        "id": "s2",
+        "title": "Browser navigation",
+        "kind": "browser",
+        "status": "pass",
+        "started_at": "2026-11-17T18:00:00Z",
+        "duration_ms": 1234,
+        "log": "logs/s2.log",
+        "artifacts": [
+            {
+                "path": "raw/s2/01-page.png",
+                "mime": "image/png",
+                "sha256": "0000000000000000000000000000000000000000000000000000000000000000",  # fake
+                "bytes": 100,
+                # missing role
+            }
+        ],
+    }
+
+    from_file = tmp_path / "fragment.json"
+    from_file.write_text(json.dumps(fragment, indent=2))
+
+    run = _cli(
+        "--action=attach",
+        f"--repo={tmp_path}",
+        f"--bundle={bundle}",
+        f"--fragment={from_file}",
+    )
+
+    assert run.returncode == 2, run.stdout + run.stderr
+    assert "artifact missing required field" in run.stderr
