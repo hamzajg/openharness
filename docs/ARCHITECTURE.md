@@ -32,7 +32,7 @@ OpenHarness is simultaneously:
 | Skills | `skills/{harness,security,legacy_migration,product}/` | executable Python skills (`ship_loop`, `review_delivery`, `challenge_decision`, ...) |
 | Delivery loop | `skills/product/ship_loop.py` + `.opencode/commands/ship-loop.md` + `.opencode/agents/*` | deterministic oracle, per-feature `specs/<feature>/LOOP.md` + `LOOP.state.json` state, `GATES.md` preconditions, subagent roles |
 | Independent audit | `skills/product/review_delivery.py` + `.opencode/commands/review-delivery.md` + `delivery-auditor` | deterministic evidence brief + independent verdict; `SPEC-AUDIT.md` before planning, `DELIVERY-AUDIT.md` before `finish` (D013) |
-| Evidence bundles | `evidence.py` + `skills/harness/evidence.py` | per-run manifest, hashes and generated walkthrough page in `.openharness/evidence/` (local scratch, never committed); `verify` binds the bundle to a commit, rejects tracked bundles and secrets (ADR 0007) |
+| Evidence bundles | `evidence.py` + `skills/harness/evidence.py` | per-run manifest, hashes and generated walkthrough page in `.openharness/evidence/` (local scratch) or `evidence/` with `--tracked` (committable); `verify` binds the bundle to a commit, rejects tracked scratch bundles and secrets (ADR 0007) |
 | Self specs | `SELF/` | PRINCIPLES.md, decision log, domain blocks |
 
 ## Data flow
