@@ -1,6 +1,7 @@
 # ADR 0007 — Evidence bundles and the walkthrough page
 
-Status: accepted · 2026-11-16 · phase 1 implemented 2026-11-17 · relates to D009
+Status: accepted · 2026-11-16 · phase 1 implemented 2026-11-17 ·
+phase 2a implemented 2026-11-17 · relates to D009
 (delivery loop), D013 (delivery audit)
 
 ## Context
@@ -305,8 +306,15 @@ free-text rules — this is additive, not a new tax on docs-only work.
    that proves nothing says so. No network, no git writes.
    (Deliberately deferred to P2: `attach`/`step` and the redaction pass;
    `render --inline` already inlines images under a size budget.)
-2. **P2 — capture.** `step` and `attach`, redaction pass, Playwright fixture
-   and the `attach --from=steps.json` fold-in, size budget for `--inline`.
+2. **P2 — capture.** ✅ P2a (2026-11-17): `step` runs a command and records
+   the real exit code, wall time, cwd and a redacted log; `attach` copies a
+   file under `raw/<step>/`, sniffs MIME from magic bytes and the suffix,
+   refuses a file older than the step (`--allow-old` overrides), and creates a
+   `manual` step when the bundle is empty; a redaction pass scrubs
+   auth/cookie/password/API-key/token/private-key/JWT/JSON-secret shapes
+   before hashing and records counts in `redactions`. Manifest schema is
+   `openharness.evidence/2`, with `/1` still accepted. Deferred to P2b:
+   Playwright fixture and the `attach --from=steps.json` fold-in.
 3. **P3 — loop wiring.** `evidence:` token in `ship_loop complete`, the
    stale/contradiction blockers in `review_delivery`, UI-wave requirement.
 4. **P4 — sharing.** CI job zips `.openharness/evidence/<feature>/<run-id>` and

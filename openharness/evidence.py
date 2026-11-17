@@ -24,14 +24,20 @@ import base64
 import hashlib
 import html
 import json
+import mimetypes
+import platform
 import re
+import shutil
 import subprocess as sp
+import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-SCHEMA = "openharness.evidence/1"
+SCHEMA = "openharness.evidence/2"
+#: v1 bundles stay readable; v2 adds capture/coverage metadata.
+SCHEMAS = ("openharness.evidence/1", SCHEMA)
 ROOT = Path(".openharness") / "evidence"
 
 KINDS = ("command", "browser", "api", "manual")
@@ -43,6 +49,7 @@ INLINE_BUDGET = 6 * 1024 * 1024
 
 _TEXT_SUFFIXES = {
     ".log", ".txt", ".json", ".md", ".csv", ".yaml", ".yml", ".toml", ".xml",
+    ".har", ".feature",
 }
 
 
@@ -140,9 +147,13 @@ def new_bundle(
         "verdict": "pass",
         "summary": summary,
         "not_verified": [str(x) for x in not_verified],
+        "capture": {},
         "steps": [],
         "redactions": [],
-        "environment": {},
+        "environment": {
+            "os": platform.system().lower(),
+            "python": platform.python_version(),
+        },
     }
     _write_manifest(bundle, manifest)
     return bundle
@@ -173,8 +184,8 @@ def _schema_problems(m: Any) -> list[str]:
     if not isinstance(m, dict):
         return ["manifest must be an object"]
     out: list[str] = []
-    if m.get("schema") != SCHEMA:
-        out.append(f"schema must be {SCHEMA!r}, got {m.get('schema')!r}")
+    if m.get("schema") not in SCHEMAS:
+        out.append(f"schema must be one of {SCHEMAS}, got {m.get('schema')!r}")
     for key in ("feature", "run_id", "created_at"):
         if not isinstance(m.get(key), str) or not m.get(key).strip():
             out.append(f"{key} must be a non-empty string")
@@ -184,6 +195,8 @@ def _schema_problems(m: Any) -> list[str]:
         out.append("not_verified must be a list (possibly empty)")
     if not isinstance(m.get("repo"), dict):
         out.append("repo must be an object")
+    if "capture" in m and not isinstance(m["capture"], dict):
+        out.append("capture must be an object")
     if not isinstance(m.get("steps"), list):
         out.append("steps must be a list")
         return out
@@ -210,6 +223,19 @@ def _schema_problems(m: Any) -> list[str]:
             out.append(f"{where}.exit_code must be an integer for a command step")
         if step.get("log") is not None and not isinstance(step.get("log"), str):
             out.append(f"{where}.log must be a path string")
+        for key in ("started_at", "note", "captured_by"):
+            if key in step and not isinstance(step[key], str):
+                out.append(f"{where}.{key} must be a string")
+        covers = step.get("covers", [])
+        if not isinstance(covers, list) or not all(isinstance(x, str) for x in covers):
+            out.append(f"{where}.covers must be a list of strings")
+        checks = step.get("checks", [])
+        if not isinstance(checks, list):
+            out.append(f"{where}.checks must be a list")
+        else:
+            for k, check in enumerate(checks):
+                if not isinstance(check, dict) or not isinstance(check.get("name"), str):
+                    out.append(f"{where}.checks[{k}] must be an object with a name")
         arts = step.get("artifacts", [])
         if not isinstance(arts, list):
             out.append(f"{where}.artifacts must be a list")
@@ -224,6 +250,9 @@ def _schema_problems(m: Any) -> list[str]:
                     out.append(f"{aw}.{key} must be a non-empty string")
             if not isinstance(art.get("bytes"), int):
                 out.append(f"{aw}.bytes must be an integer")
+            for key in ("role", "caption", "poster", "captured_by"):
+                if key in art and not isinstance(art[key], str):
+                    out.append(f"{aw}.{key} must be a string")
     return out
 
 
@@ -251,16 +280,153 @@ _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}")),
     (
         "bearer-token",
-        re.compile(r"(?i)\bauthorization\s*:\s*bearer\s+(?!\[REDACTED\])[A-Za-z0-9._~+/=-]{16,}"),
+        re.compile(r"(?i)\bauthorization\s*:\s*bearer\s+(?!\[REDACTED)[A-Za-z0-9._~+/=-]{16,}"),
+    ),
+    (
+        "basic-auth",
+        re.compile(r"(?i)\bauthorization\s*:\s*basic\s+(?!\[REDACTED)[A-Za-z0-9+/=]{8,}"),
+    ),
+    (
+        "json-secret",
+        re.compile(
+            r"(?i)[\"']?(?:password|passwd|pwd|api[_-]?key|apikey|"
+            r"client[_-]?secret|secret[_-]?key|access[_-]?token|"
+            r"refresh[_-]?token|authorization|cookie|set-cookie)"
+            r"[\"']?\s*:\s*(?![\"']?\[REDACTED)[\"'][^\"']+[\"']"
+        ),
+    ),
+    (
+        "password",
+        re.compile(
+            r"(?i)\b(?:password|passwd|pwd)[\"']?\s*[=:]\s*"
+            r"(?![\"']?\[REDACTED)[\"']?[^\s\"'&;]+"
+        ),
+    ),
+    (
+        "api-key",
+        re.compile(
+            r"(?i)\b(?:api[_-]?key|apikey|client[_-]?secret|secret[_-]?key)"
+            r"[\"']?\s*[=:]\s*(?![\"']?\[REDACTED)[\"']?[^\s\"'&;]+"
+        ),
     ),
     ("private-key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
 )
 
 _ALLOWED_REDACTED = ("[REDACTED]", "<redacted>", "REDACTED")
 
+#: (name, pattern, replacement) applied in order before an artifact is hashed.
+#: Each replacement keeps the field name and drops only the value, so a log
+#: still shows *that* a header was present.
+_REDACT_RULES: tuple[tuple[str, re.Pattern[str], str], ...] = (
+    (
+        "json-secret",
+        re.compile(
+            r"(?i)([\"']?(?:password|passwd|pwd|api[_-]?key|apikey|"
+            r"client[_-]?secret|secret[_-]?key|access[_-]?token|"
+            r"refresh[_-]?token|authorization|cookie|set-cookie)"
+            r"[\"']?\s*:\s*)(?![\"']?\[REDACTED)([\"'])([^\"']*)(\2)"
+        ),
+        r"\1\2[REDACTED:json-secret]\4",
+    ),
+    (
+        "authorization",
+        re.compile(
+            r"(?im)^(\s*authorization\s*:\s*(?:bearer|basic)\s+)"
+            r"(?!\[REDACTED)[^\s]+"
+        ),
+        r"\1[REDACTED:authorization]",
+    ),
+    (
+        "cookie",
+        re.compile(r"(?im)^(\s*(?:set-)?cookie\s*:\s*)(?!\[REDACTED)[^\n]+"),
+        r"\1[REDACTED:cookie]",
+    ),
+    (
+        "password",
+        re.compile(
+            r"(?i)\b(password|passwd|pwd)(\s*[=:]\s*)"
+            r"(?![\"']?\[REDACTED)[\"']?[^\s\"'&;]+[\"']?"
+        ),
+        r"\1\2[REDACTED:password]",
+    ),
+    (
+        "api-key",
+        re.compile(
+            r"(?i)\b(api[_-]?key|apikey|client[_-]?secret|secret[_-]?key|"
+            r"access[_-]?token|refresh[_-]?token)(\s*[=:]\s*)"
+            r"(?![\"']?\[REDACTED)[\"']?[^\s\"'&;]+[\"']?"
+        ),
+        r"\1\2[REDACTED:api-key]",
+    ),
+    (
+        "github-token",
+        re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}"),
+        "[REDACTED:github-token]",
+    ),
+    (
+        "github-pat",
+        re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"),
+        "[REDACTED:github-pat]",
+    ),
+    ("openai-key", re.compile(r"\bsk-[A-Za-z0-9]{20,}"), "[REDACTED:openai-key]"),
+    ("aws-access-key", re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED:aws-access-key]"),
+    (
+        "slack-token",
+        re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"),
+        "[REDACTED:slack-token]",
+    ),
+    (
+        "jwt",
+        re.compile(
+            r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"
+        ),
+        "[REDACTED:jwt]",
+    ),
+    (
+        "private-key",
+        re.compile(
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?"
+            r"-----END [A-Z ]*PRIVATE KEY-----"
+        ),
+        "[REDACTED:private-key]",
+    ),
+)
+
 
 def _is_text(path: Path, mime: str = "") -> bool:
     return mime.startswith("text/") or path.suffix.lower() in _TEXT_SUFFIXES
+
+
+def redact_value(text: str) -> tuple[str, list[dict[str, Any]]]:
+    """Scrub secret-shaped values from a string; returns the text and counts."""
+    entries: list[dict[str, Any]] = []
+    for name, pattern, replacement in _REDACT_RULES:
+        text, count = pattern.subn(replacement, text)
+        if count:
+            entries.append({"pattern": name, "count": count})
+    return text, entries
+
+
+def redact_text(path: Path | str, rel: str = "") -> list[dict[str, Any]]:
+    """Scrub a text file in place; returns one entry per pattern that matched.
+
+    Binary files are left untouched. Callers that attach media record the
+    "not scanned" fact themselves rather than implying the file is clean.
+    """
+    path = Path(path)
+    try:
+        text = path.read_text()
+    except (OSError, UnicodeDecodeError):
+        return []
+    clean, entries = redact_value(text)
+    if entries:
+        try:
+            path.write_text(clean)
+        except OSError as ex:
+            raise EvidenceError(f"could not redact {path}: {ex}") from ex
+        for entry in entries:
+            entry["path"] = rel or path.name
+    return entries
 
 
 def _secret_hits(path: Path) -> list[tuple[str, int]]:
@@ -301,6 +467,292 @@ def _tracked_files(repo: Path, bundle: Path) -> list[str]:
     if run.returncode != 0:
         return []
     return [line for line in run.stdout.splitlines() if line.strip()]
+
+
+# ------------------------------------------------------------------- capture
+
+def _as_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return str(value)
+
+
+def _parse_ts(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _next_step_id(manifest: dict) -> str:
+    numbers = [
+        int(match.group(1))
+        for step in manifest.get("steps", [])
+        if (match := re.fullmatch(r"s(\d+)", str(step.get("id", ""))))
+    ]
+    return f"s{max(numbers, default=0) + 1}"
+
+
+def _mime_for(path: Path) -> str:
+    """Sniff known magic bytes first; fall back to the filename suffix."""
+    try:
+        head = path.read_bytes()[:16]
+    except OSError:
+        head = b""
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    if head.startswith(b"\x1aE\xdf\xa3"):
+        return "video/webm"
+    if len(head) >= 12 and head[4:8] == b"ftyp":
+        return "video/mp4"
+    if head.startswith(b"%PDF"):
+        return "application/pdf"
+    if head.startswith(b"PK\x03\x04"):
+        return "application/zip"
+    guessed, _ = mimetypes.guess_type(path.name)
+    return guessed or "application/octet-stream"
+
+
+def _role_for(mime: str, path: Path) -> str:
+    if mime.startswith("image/"):
+        return "screenshot"
+    if mime.startswith("video/"):
+        return "video"
+    if path.suffix.lower() in (".zip", ".trace"):
+        return "trace"
+    if path.suffix.lower() == ".har":
+        return "har"
+    return "attachment"
+
+
+def _copy_into_raw(bundle: Path, step_id: str, src: Path) -> str:
+    """Copy an artifact under `raw/<step>/`, or reuse a path already there."""
+    try:
+        rel = src.relative_to(bundle)
+        if rel.parts and rel.parts[0] == "raw":
+            return rel.as_posix()
+    except ValueError:
+        pass
+    target_dir = bundle / "raw" / step_id
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / src.name
+    stem, suffix = target.stem, target.suffix
+    n = 2
+    while target.exists():
+        target = target_dir / f"{stem}-{n}{suffix}"
+        n += 1
+    shutil.copy2(src, target)
+    return target.relative_to(bundle).as_posix()
+
+
+def record_step(
+    bundle: Path | str,
+    *,
+    title: str = "",
+    cmd: str,
+    cwd: str = ".",
+    timeout: int = 0,
+    expected_failure: bool = False,
+    step_id: str = "",
+    note: str = "",
+) -> dict[str, Any]:
+    """Run a command and record its real exit code, duration and log.
+
+    The command is run with a shell so ordinary pipelines work. Its output and
+    the command line are redacted before they are hashed, so a token printed by
+    the command does not become evidence that `verify` has to reject.
+    """
+    bundle = Path(bundle)
+    manifest = load(bundle)
+    if not cmd.strip():
+        raise EvidenceError("cmd is required")
+    if timeout < 0:
+        raise EvidenceError("timeout must be zero (no limit) or positive")
+    sid = (step_id or _next_step_id(manifest)).strip()
+    if not sid:
+        raise EvidenceError("step id must not be empty")
+    if any(s.get("id") == sid for s in manifest["steps"]):
+        raise EvidenceError(f"step {sid!r} already exists")
+
+    repo = _guess_repo(bundle) or Path.cwd()
+    workdir = Path(cwd).expanduser()
+    if not workdir.is_absolute():
+        workdir = repo / workdir
+    workdir = workdir.resolve()
+    if not workdir.is_dir():
+        raise EvidenceError(f"cwd is not a directory: {workdir}")
+    try:
+        cwd_rel = workdir.relative_to(repo).as_posix()
+    except ValueError:
+        cwd_rel = str(workdir)
+
+    safe_title, title_redactions = redact_value(title)
+    safe_cmd, cmd_redactions = redact_value(cmd)
+    safe_note, note_redactions = redact_value(note)
+
+    started = datetime.now(timezone.utc)
+    t0 = time.monotonic()
+    timed_out = False
+    try:
+        run = sp.run(
+            cmd,
+            shell=True,
+            cwd=str(workdir),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout or None,
+        )
+        code = run.returncode
+        stdout, stderr = run.stdout, run.stderr
+    except sp.TimeoutExpired as ex:
+        timed_out = True
+        code = 124
+        stdout = _as_text(ex.stdout)
+        stderr = _as_text(ex.stderr) + f"\n[timed out after {timeout}s]"
+    duration_ms = int((time.monotonic() - t0) * 1000)
+
+    log_rel = f"logs/{sid}.log"
+    log_path = bundle / log_rel
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(
+        f"$ {safe_cmd}\n"
+        f"cwd: {cwd_rel}\n"
+        f"started: {started.strftime('%Y-%m-%dT%H:%M:%SZ')}\n"
+        f"--- stdout ---\n{stdout}"
+        + ("" if stdout.endswith("\n") else "\n")
+        + f"--- stderr ---\n{stderr}"
+        + ("" if stderr.endswith("\n") else "\n")
+        + f"--- exit {code} in {duration_ms}ms ---\n"
+    )
+    redactions = redact_text(log_path, log_rel)
+
+    step: dict[str, Any] = {
+        "id": sid,
+        "title": safe_title.strip() or safe_cmd.strip(),
+        "kind": "command",
+        "status": "pass" if code == 0 else "fail",
+        "started_at": started.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "duration_ms": duration_ms,
+        "cmd": safe_cmd,
+        "cwd": cwd_rel,
+        "exit_code": code,
+        "log": log_rel,
+        "artifacts": [],
+    }
+    if safe_note.strip():
+        step["note"] = safe_note.strip()
+    if expected_failure:
+        step["expected_failure"] = True
+    if timed_out:
+        step["note"] = (
+            (step.get("note", "") + "; ") if step.get("note") else ""
+        ) + f"timed out after {timeout}s"
+
+    manifest["steps"].append(step)
+    for entry in title_redactions:
+        manifest["redactions"].append({**entry, "path": f"steps[{sid}].title"})
+    for entry in cmd_redactions:
+        manifest["redactions"].append({**entry, "path": f"steps[{sid}].cmd"})
+    for entry in note_redactions:
+        manifest["redactions"].append({**entry, "path": f"steps[{sid}].note"})
+    manifest["redactions"].extend(redactions)
+    _write_manifest(bundle, manifest)
+    return step
+
+
+def record_attach(
+    bundle: Path | str,
+    file: Path | str,
+    *,
+    step_id: str = "",
+    caption: str = "",
+    role: str = "",
+    allow_old: bool = False,
+    by: str = "",
+) -> dict[str, Any]:
+    """Attach an existing file to a step, copying it under `raw/<step>/`.
+
+    A file older than the step's start is refused unless `allow_old` is set:
+    an old screenshot must not be passed off as this run. When the bundle has
+    no steps yet, a `manual` step is created and dated from the artifact, which
+    is how a human-owned gate records a walkthrough.
+    """
+    bundle = Path(bundle)
+    manifest = load(bundle)
+    src = Path(file).expanduser()
+    if not src.is_absolute():
+        src = Path.cwd() / src
+    src = src.resolve()
+    if not src.is_file():
+        raise EvidenceError(f"file does not exist: {src}")
+
+    safe_caption, caption_redactions = redact_value(caption)
+
+    steps = manifest["steps"]
+    step: dict[str, Any] | None = None
+    if step_id:
+        step = next((s for s in steps if s.get("id") == step_id), None)
+        if step is None:
+            raise EvidenceError(f"unknown step {step_id!r}; run --action=step first")
+    elif steps:
+        step = steps[-1]
+    else:
+        mtime = datetime.fromtimestamp(src.stat().st_mtime, timezone.utc)
+        step = {
+            "id": _next_step_id(manifest),
+            "title": safe_caption.strip() or src.name,
+            "kind": "manual",
+            "status": "manual",
+            "started_at": mtime.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "artifacts": [],
+        }
+        if by.strip():
+            step["captured_by"] = by.strip()
+        steps.append(step)
+
+    sid = step["id"]
+    started = _parse_ts(step.get("started_at"))
+    mtime = datetime.fromtimestamp(src.stat().st_mtime, timezone.utc)
+    if started and mtime < started - timedelta(seconds=5) and not allow_old:
+        raise EvidenceError(
+            f"{src} is older than step {sid} "
+            f"({mtime.isoformat()} < {started.isoformat()}); "
+            "capture it during the step or pass --allow-old"
+        )
+
+    rel = _copy_into_raw(bundle, sid, src)
+    path = bundle / rel
+    mime = _mime_for(path)
+    redactions = redact_text(path, rel) if _is_text(path, mime) else []
+    art: dict[str, Any] = {
+        "path": rel,
+        "mime": mime,
+        "sha256": sha256(path),
+        "bytes": path.stat().st_size,
+        "role": role.strip() or _role_for(mime, path),
+    }
+    if safe_caption.strip():
+        art["caption"] = safe_caption.strip()
+    if by.strip():
+        art["captured_by"] = by.strip()
+    step.setdefault("artifacts", []).append(art)
+    art_ref = f"steps[{sid}].artifacts[{len(step['artifacts']) - 1}].caption"
+    for entry in caption_redactions:
+        manifest["redactions"].append({**entry, "path": art_ref})
+    manifest["redactions"].extend(redactions)
+    _write_manifest(bundle, manifest)
+    return art
 
 
 def verify(
