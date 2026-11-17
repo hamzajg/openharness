@@ -1,6 +1,7 @@
 # ADR 0007 — Evidence bundles and the walkthrough page
 
-Status: proposed · 2026-11-16 · relates to D009 (delivery loop), D013 (delivery audit)
+Status: accepted · 2026-11-16 · phase 1 implemented 2026-11-17 · relates to D009
+(delivery loop), D013 (delivery audit)
 
 ## Context
 
@@ -295,12 +296,15 @@ free-text rules — this is additive, not a new tax on docs-only work.
 
 ## Phases
 
-1. **P1 — contract + renderer + verify.** `openharness/evidence.py`,
-   `harness_evidence` skill (`render`, `verify`, `list`), manifest schema,
-   the page. Tests: manifest round-trip, missing artifact is an error, hash
-   mismatch, commit mismatch, secret in a log, stale video refused, empty
-   bundle renders an honest "nothing captured" page. No network, no git
-   writes.
+1. **P1 — contract + renderer + verify.** ✅ `openharness/evidence.py`,
+   `harness_evidence` skill (`new`, `render`, `verify`, `list`), manifest
+   schema, the page (`tests/test_evidence.py`, 41 tests). Checks now enforced:
+   schema, artifact hash/size, missing artifact or log, commit binding to HEAD,
+   verdict-vs-step contradictions, command exit codes, token shapes in logs and
+   text artifacts, tracked bundles, and an `empty-bundle` warning so a bundle
+   that proves nothing says so. No network, no git writes.
+   (Deliberately deferred to P2: `attach`/`step` and the redaction pass;
+   `render --inline` already inlines images under a size budget.)
 2. **P2 — capture.** `step` and `attach`, redaction pass, Playwright fixture
    and the `attach --from=steps.json` fold-in, size budget for `--inline`.
 3. **P3 — loop wiring.** `evidence:` token in `ship_loop complete`, the
