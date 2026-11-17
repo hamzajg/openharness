@@ -146,6 +146,18 @@ def _rel(root: Path, path: Path) -> str:
         return str(path)
 
 
+def _display_path(path: Path) -> str:
+    """Render a path for human-facing output, collapsing the user's home
+    directory to `~` so absolute host paths never leak into committed
+    audit files (security: see ADR 0004)."""
+    try:
+        home = Path.home()
+        rel = path.resolve().relative_to(home)
+        return f"~/{rel}"
+    except (ValueError, OSError):
+        return str(path)
+
+
 @dataclass
 class Finding:
     severity: str  # blocker | concern | unverified
@@ -970,7 +982,7 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
     out = [
         title,
         "",
-        f"- Repo: `{root}`",
+        f"- Repo: `{_display_path(root)}`",
         f"- Spec: `{_rel(root, spec_dir)}`",
         f"- Generated: {_now()}",
         f"- Phase: **{phase}**",
