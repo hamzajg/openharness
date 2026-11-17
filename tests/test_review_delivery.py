@@ -828,3 +828,29 @@ def test_default_spec_dir_picks_first_feature(tmp_path):
     _spec_only(tmp_path)
     out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
     assert "# Delivery audit — cart (spec)" in out
+
+
+# ---------- security: no absolute host paths in audit output ----------
+
+def test_audit_rewrites_home_path_to_tilde(tmp_path):
+    """The Repo: line must never emit an absolute /home/<user>/... path into
+    a committed audit file (security: ADR 0004)."""
+    import os
+    import shutil
+
+    home = Path(os.path.expanduser("~"))
+    # Copy the temp spec tree under the real home dir so the display-path
+    # logic actually collapses it (tmp_path is usually under /tmp, so a
+    # symlink would resolve through to the tmp path and not collapse).
+    repo = home / f".openharness-audit-test-{os.getpid()}"
+    try:
+        if repo.exists():
+            shutil.rmtree(repo)
+        shutil.copytree(tmp_path, repo)
+        _spec_only(repo)
+        out = _audit(repo, phase="spec", changed="src/cart/store.py")
+        assert f"- Repo: `~/.openharness-audit-test-{os.getpid()}`" in out
+        assert "/home/" not in out
+    finally:
+        if repo.exists():
+            shutil.rmtree(repo)
