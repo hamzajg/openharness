@@ -114,8 +114,10 @@ them.
    generated contract (OpenAPI/Swagger for REST, AsyncAPI for events,
    schema-registry/IDL for gRPC/protobuf or other protocols). Also
    acceptable: an HTML doc pairing each curl example with its real
-   response — include a "quick test" section with copyable curl
-   commands so a human can replay the wave's scenarios by hand. Event-driven waves attach schema docs plus sample messages
+   response. For screenshot-driven walkthroughs (e.g. Swagger try-it-out),
+   attach each capture with `--snippet` holding its curl command — the
+   renderer shows every request as a rich code card in a Requests
+   section, which is the quick-test surface. Event-driven waves attach schema docs plus sample messages
    for each topic/queue the wave introduces. Never log real secrets —
    redact tokens in output.
 3. Before `complete`: `--action=render` then `--action=verify` (hashes,
