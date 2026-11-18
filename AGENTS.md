@@ -131,6 +131,11 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   `ship_loop` is their only writer (JSON is the machine projection,
   markdown the human render — both regenerated together).
   The loop is driven by the agent, not by a daemon or cron (D001/D009).
+- `ship_loop --action=complete`/`finish` refuse to record without a
+  rendered `harness_evidence` bundle under `.openharness/evidence/`
+  (gitignored local scratch). UI-touching waves must attach screenshots
+  per the capture policy in `docs/plans/evidence-v2.md`; the harness
+  never drives browsers itself.
 - Never mark a gate `met` without evidence or `waived` without a human's name
   and reason. Fix a wrong gate in `GATES.md`; do not route around it.
 - `/challenge-decision` verdicts stay advisory: never make a verdict a gate

@@ -51,6 +51,9 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
     # Gate tests declare their own GATES.md; reset the scaffold's default
     # design-challenge gate so each test starts from a clean slate.
     (d / "GATES.md").write_text("# Gates: Cart\n\nNo gates defined yet.\n")
+    b = root / ".openharness" / "evidence" / name / "run-1"
+    b.mkdir(parents=True, exist_ok=True)
+    (b / "index.html").write_text("<html/>")
     return d
 
 
