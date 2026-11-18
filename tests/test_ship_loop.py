@@ -59,7 +59,16 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
         evidence=f"file:{d.relative_to(root)}/DECISION-REVIEW.md",
     )
     (d / "SPEC-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+    _bundle(root, name)
     return d
+
+
+def _bundle(root: Path, feature: str) -> Path:
+    """A rendered evidence bundle — required before wave complete/finish."""
+    b = root / ".openharness" / "evidence" / feature / "run-1"
+    b.mkdir(parents=True, exist_ok=True)
+    (b / "index.html").write_text("<html>walkthrough</html>")
+    return b
 
 
 def _run(root: Path, **kw) -> str:
@@ -284,6 +293,39 @@ def test_full_reset_requires_force(tmp_path):
     assert "Reset cart-checkout" in out
     text = (tmp_path / "specs" / "cart-checkout" / "LOOP.md").read_text()
     assert "Iterations: 0" in text and "| 1 | pending |" in text
+
+
+# ---------- evidence bundles (ADR 0007) ----------
+
+def test_complete_requires_rendered_evidence_bundle(tmp_path):
+    _spec(tmp_path)
+    import shutil
+    shutil.rmtree(tmp_path / ".openharness" / "evidence" / "cart-checkout")
+    _run(tmp_path, action="start", wave=1)
+    out = _run(tmp_path, action="complete", wave=1, note="ok")
+    assert out.startswith("ERROR") and "harness_evidence" in out
+    # An unrendered bundle (no index.html) does not count either.
+    b = tmp_path / ".openharness" / "evidence" / "cart-checkout" / "run-1"
+    b.mkdir(parents=True)
+    (b / "evidence.json").write_text("{}")
+    out = _run(tmp_path, action="complete", wave=1, note="ok")
+    assert out.startswith("ERROR") and "harness_evidence" in out
+    (b / "index.html").write_text("<html/>")
+    assert "Recorded wave 1 done" in _run(tmp_path, action="complete", wave=1, note="ok")
+
+
+def test_finish_requires_rendered_evidence_bundle(tmp_path):
+    d = _spec(tmp_path)
+    _run(tmp_path, action="start", wave=1)
+    _run(tmp_path, action="complete", wave=1, note="ok")
+    _run(tmp_path, action="start", wave=2)
+    _run(tmp_path, action="complete", wave=2, note="ok")
+    (d / "VALIDATION.md").write_text("# Validation\n")
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+    import shutil
+    shutil.rmtree(tmp_path / ".openharness" / "evidence" / "cart-checkout")
+    out = _run(tmp_path, action="finish")
+    assert out.startswith("ERROR") and "harness_evidence" in out
 
 
 # ---------- multi-feature / errors ----------

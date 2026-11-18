@@ -91,6 +91,26 @@ disk.
 Evidence is mandatory. `--note` must name the tests that ran and their
 result. A "done" without evidence is a false record.
 
+## Evidence bundles (required)
+
+Every wave ships with a local evidence bundle — the oracle refuses
+`--action=complete` and `--action=finish` without a rendered one
+(`.openharness/evidence/<feature>/<run-id>/`, gitignored, never
+committed). The harness does not drive browsers: Playwright, a human,
+or you produce screenshots/recordings; the bundle hashes and catalogs
+them.
+
+1. At wave start: `python -m openharness run harness_evidence --action=new
+   --repo=<repo> --feature=<feature> --wave=N`.
+2. During the wave: `--action=step` for real commands (build, tests —
+   exit code, duration and log are recorded). UI-touching waves attach
+   at least one screenshot per acceptance scenario touched; flows over
+   ~3 steps or any failed UI step get a short recording.
+3. Before `complete`: `--action=render` then `--action=verify` (hashes,
+   commit, secrets). Fix what verify reports; never commit the bundle.
+4. `SUMMARY.md` can be pasted into the PR body or the LOOP evidence
+   column.
+
 ## Gates
 
 A gate is a precondition for a phase. Declare gates in

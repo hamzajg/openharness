@@ -546,6 +546,31 @@ def _audit_block_brief(root: Path, spec_dir: Path, phase: str) -> str:
     ])
 
 
+
+def _evidence_error(root: Path, feature: str) -> str:
+    """ADR 0007 / evidence-v2: a wave is not done without a rendered bundle."""
+    ev_root = root / ".openharness" / "evidence" / feature
+    rendered = (
+        [b for b in ev_root.iterdir() if b.is_dir() and (b / "index.html").exists()]
+        if ev_root.is_dir()
+        else []
+    )
+    if rendered:
+        return ""
+    return (
+        f"ERROR: no rendered evidence bundle for {feature!r} under "
+        f"{ev_root} — a wave is not proven by a sentence.\n"
+        "Capture one per wave (local-only, gitignored):\n"
+        f"  python -m openharness run harness_evidence --action=new --repo={root} "
+        f"--feature={feature} --wave=<N>\n"
+        "  ... --action=step for build/tests; --action=attach for screenshots "
+        "(UI waves: one per scenario touched) ...\n"
+        f"  ... --action=render --repo={root} --feature={feature}\n"
+        f"  ... --action=verify --repo={root} --feature={feature}\n"
+        "The harness does not drive browsers — produce screenshots with "
+        "Playwright/manual capture and attach them."
+    )
+
 def _decide(
     root: Path, spec_dir: Path, state: dict, waves: dict,
     review: str = "required",
@@ -901,6 +926,9 @@ def ship_loop(
                 return f"ERROR: wave {wave} is not in WAVES.md"
             if not note.strip():
                 return "ERROR: --note is required — record the evidence (tests, CI, demo)"
+            ev_err = _evidence_error(root, d.name)
+            if ev_err and not force:
+                return ev_err
             row = _wave(state, wave)
             if row["status"] != "in-progress" and not force:
                 return f"ERROR: wave {wave} is {row['status']}, not in-progress (or --force)"
@@ -951,6 +979,9 @@ def ship_loop(
                 )
             if not (d / "VALIDATION.md").is_file():
                 return "ERROR: VALIDATION.md is missing — run ship_validate first"
+            ev_err = _evidence_error(root, d.name)
+            if ev_err and not force:
+                return ev_err
             blocked = _blocking_gates(d, state, "finish", root)
             if blocked:
                 return _gate_directive(root, d, "finish", blocked)

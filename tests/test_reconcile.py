@@ -56,6 +56,9 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
     # Reconcile tests check git/GitHub drift, not policy gates — reset the
     # scaffold's default design-challenge gate.
     (d / "GATES.md").write_text("# Gates: Cart\n\nNo gates defined yet.\n")
+    b = root / ".openharness" / "evidence" / name / "run-1"
+    b.mkdir(parents=True, exist_ok=True)
+    (b / "index.html").write_text("<html/>")
     return d
 
 
