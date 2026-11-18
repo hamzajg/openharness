@@ -90,10 +90,10 @@ Two checkpoints:
 | spec | `SPEC-AUDIT.md` | after `SPEC.md`/`EXAMPLES.feature`/`BACKLOG.md`, before `plan`/wave 1 |
 | delivery | `DELIVERY-AUDIT.md` | after `VALIDATION.md`, before `finish` |
 
-`ship_loop --review=advisory` (default) never enforces the audit; existing
-loops keep working. `--review=required` (used by `/ship-loop`) refuses to
-plan waves without a filled `SPEC-AUDIT.md` and refuses to finish without a
-filled `DELIVERY-AUDIT.md`. A `BLOCK` verdict stops the loop. `PASS` and
+`ship_loop` defaults to `--review=required`: it refuses to plan waves and
+to start wave 1 without a filled `SPEC-AUDIT.md`, and refuses to finish
+without a filled `DELIVERY-AUDIT.md`. `--review=advisory` never enforces
+the audit. A `BLOCK` verdict stops the loop. `PASS` and
 accepted `CONCERNS` continue. The template line
 `AUDIT: PASS | CONCERNS | BLOCK` is not a filled verdict.
 
@@ -117,8 +117,8 @@ command makes, not a property of the reviewer.
 | `finish` | Mark a validated feature done (requires `VALIDATION.md`, all waves done). |
 
 All actions accept `--review=advisory|required`. Enforcement happens on
-`next` (before `plan` and before `finish`) and on `finish`; other actions
-report the audit status in the summary.
+`next` (before `plan`, before wave 1, and before `finish`) and on `finish`;
+other actions report the audit status in the summary.
 
 Phases map to ship-product: no specs → frame; missing artifacts → spec;
 no `WAVES.md` → plan; pending wave → wave N; all waves done → validate;
@@ -166,8 +166,9 @@ instead of the next action until the gate is met or waived.
 - Overdue gates keep blocking; advisory gates never do.
 - Events are append-only (last 200 kept).
 - Default merge policy is `review`: PRs stay open for a human.
-- `--review=required` adds exactly two artifact checks: `SPEC-AUDIT.md`
-  before `plan`, `DELIVERY-AUDIT.md` before `finish`. Advisory mode adds none.
+- `--review=required` adds exactly three artifact checks: `SPEC-AUDIT.md`
+  before `plan` and again before wave 1 starts, `DELIVERY-AUDIT.md` before
+  `finish`. Advisory mode adds none.
 - A filled audit verdict is one value (`AUDIT: PASS`); the template line with
   all three values is not a verdict. The auditor is read-only outside the
   audit file and never marks a gate.

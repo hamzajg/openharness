@@ -113,14 +113,21 @@ Fill `specs/<feature>/SPEC.md`:
 - Acceptance criteria table. Map each criterion to scenario tags.
 - Decisions section. Write ADR-style entries.
 
-**Optional — challenge high-impact decisions.** When a decision is a
-one-way door (data ownership, schema, public contract, service split,
-security control) or the domain is contested, run `/challenge-decision`
-before you plan waves.
+**Challenge design decisions — required by default.** `spec_scaffold`
+writes gate `G1 — Design decisions challenged` (`Before: plan`,
+`Check: file:specs/<feature>/DECISION-REVIEW.md`) into every feature's
+`GATES.md`. Before `wave_plan`, run `/challenge-decision` on
+`SPEC.md` → Decisions, let `decision-challenger` fill
+`DECISION-REVIEW.md`, and record the gate `met`. Cover every one-way-door
+choice: data ownership, schema, persistence model (entity vs event
+sourcing vs in-memory), consistency, service/module boundaries,
+stateless vs stateful design, public contracts, security controls.
 
-The review is advisory (D011). It gives alternatives, a tradeoff matrix,
-and a verdict. It does not block the pipeline. Record the outcome in the
-Decisions section. If it changes a precondition, update `GATES.md`.
+The verdict is advisory (D011): `ACCEPT`/`REVISE`/`REVISIT`/`SPLIT` informs
+the spec and backlog but never blocks the pipeline. A `REVISE` becomes a
+backlog item or a wave. Record the outcome in the Decisions section. If it
+changes a precondition, update `GATES.md`. A human may waive G1 for
+trivial features — record the waiver, never assume it.
 
 ### Phase 4 — Examples (specifications by example)
 

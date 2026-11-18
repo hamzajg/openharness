@@ -133,8 +133,11 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   The loop is driven by the agent, not by a daemon or cron (D001/D009).
 - Never mark a gate `met` without evidence or `waived` without a human's name
   and reason. Fix a wrong gate in `GATES.md`; do not route around it.
-- `/challenge-decision` is advisory: never make its verdict a gate or a merge
-  blocker, and never let the reviewer edit product code.
+- `/challenge-decision` verdicts stay advisory: never make a verdict a gate
+  or merge blocker. The review *artifact* is different — `spec_scaffold`
+  emits a blocking `Before: plan` gate requiring `DECISION-REVIEW.md`, so
+  the review must happen even though its verdict does not block. Never let
+  the reviewer edit product code.
 - `/review-delivery` is independent: the auditor must not audit its own
   implementation, must not edit `LOOP.md`/`LOOP.state.json`/`GATES.md` or
   product code, and must not mark `PASS` from the deterministic brief alone.
