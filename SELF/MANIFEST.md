@@ -61,4 +61,4 @@ See `SELF/blocks/<name>.md` for full block specs:
 | [serve](SELF/blocks/serve.md) | FastAPI observer API + SSE + SPA web UI |
 | [delivery-loop](SELF/blocks/delivery-loop.md) | `/ship-loop` oracle + subagents; `LOOP.md` state; `GATES.md` preconditions; D001/D009/D010 |
 | [delivery-audit](SELF/blocks/delivery-audit.md) | `/review-delivery` + `delivery-auditor`; deterministic evidence brief + independent verdict; spec and delivery checkpoints; D013 |
-| [decision-review](SELF/blocks/decision-review.md) | `/challenge-decision` + `decision-challenger`; deterministic brief + design lenses; advisory only; D011 |
+| [decision-review](SELF/blocks/decision-review.md) | `/challenge-decision` + `decision-challenger`; deterministic brief + design lenses; verdict advisory (D011), artifact gate-required via scaffold G1 |

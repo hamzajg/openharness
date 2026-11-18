@@ -66,13 +66,21 @@ Otherwise stop and report that you need a target repo.
      observable signal (and baseline if known), and a follow-up owner/date.
      Do not invent research, numeric targets, or baselines; mark unknowns.
    - Acceptance-criteria table. Map each criterion to scenario tags.
-   - Decisions (ADR-style).
+   - Decisions (ADR-style) — record EVERY one-way-door or high-impact
+     choice (persistence model, consistency guarantees, module/service
+     boundaries, stateless vs stateful design, public contracts, security
+     controls, framework vs custom mechanism) in the shape the challenger
+     scores: context & forces, at least two credible options including the
+     simplest and the most reversible, decision & why, consequences (+/-),
+     reversibility and revisit trigger. Think hard about architecture
+     here — modular, testable, valuable; not default CRUD. These feed the
+     mandatory G1 challenge gate.
    - Non-goals.
    - Keep the spec short. A reviewer must be able to hold it in mind.
-   - For a one-way-door decision (data ownership, schema, public contract,
-     service split, security control), prefix it with `REVIEW:` and tell
-     the orchestrator that `/challenge-decision` is recommended. Do not
-     run the review yourself. Never let it block the plan.
+   - For each high-impact decision, prefix it with `REVIEW:` and list it in
+     the report's REVIEW line so the orchestrator runs
+     `/challenge-decision` before wave planning (gate G1). Do not run the
+     review yourself.
 
 5. **Write `EXAMPLES.feature`.**
    - Observable Gherkin only.
@@ -106,6 +114,10 @@ Otherwise stop and report that you need a target repo.
 
    - Keep 2–6 gates. Each gate must be falsifiable: a decision id, a
      path, or a command output. "Quality is good" is not a gate.
+   - KEEP the scaffold's `G1 — Design decisions challenged` gate
+     (`Before: plan`, `Check: file:specs/<feature>/DECISION-REVIEW.md`).
+     It is what forces the architecture review before waves start. Do not
+     delete or weaken it; a human may waive it, you may not.
    - `Resolver: human` for decisions or access a person must grant:
      domain rules, pricing, legal, credentials, external sign-off.
    - `Resolver: agent` for artifacts and checks you can produce.

@@ -4,9 +4,11 @@ allowed-tools: [Bash, Read, Grep, Glob, Edit, Write, Task]
 ---
 # /challenge-decision — Review a decision before it becomes expensive
 
-Optional, advisory design review. Use it when a decision is complex, hard to
-reverse, or spans a domain boundary; skip it for trivial choices. It never
-blocks a gate, a wave, or a merge.
+Advisory design review — the verdict never blocks a gate, a wave, or a
+merge. Inside `/ship-loop` the review *artifact* is mandatory, though:
+every feature's `GATES.md` carries a blocking `Before: plan` gate that
+requires `DECISION-REVIEW.md` before wave planning, and any new
+one-way-door decision a wave introduces must be challenged before coding.
 
 Arguments (`$ARGUMENTS`), all optional but one source is required:
 
@@ -21,6 +23,8 @@ Arguments (`$ARGUMENTS`), all optional but one source is required:
 
 ## When to use it
 
+- Inside `/ship-loop`: once per feature (gate `G1`) before wave planning,
+  and again whenever a wave introduces a new one-way-door decision.
 - A decision is a **one-way door** (schema, public contract, data ownership,
   service split, security control).
 - The domain is complex enough that business rules and language are contested.
@@ -91,8 +95,12 @@ LOOP IMPACT: none (advisory) | <if the decision changes, which spec/gate to upda
 
 ## Relationship to the delivery loop
 
-- **Not a gate.** `/challenge-decision` is optional and advisory (D011). The
-  loop never waits on it and never treats its verdict as a blocker.
+- **Artifact required, verdict advisory.** `spec_scaffold` writes gate
+  `G1` (`Before: plan`, `Check: file:specs/<feature>/DECISION-REVIEW.md`)
+  into every feature — the loop refuses wave planning and wave 1 until the
+  review file exists. The verdict itself (`ACCEPT` / `REVISE` / `REVISIT` /
+  `SPLIT`) stays advisory (D011): it informs the spec and backlog but never
+  blocks a merge.
 - **Before planning waves** is the best moment for high-impact decisions: the
   cost of changing direction is still low.
 - **If the review says REVISIT or SPLIT**, record the decision change in

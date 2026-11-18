@@ -64,7 +64,7 @@ feature:
 | `/ship-product` | Phased, human-in-the-loop: discover → frame → spec/outcome hypothesis → examples → waves → implement → validate. One feature at a time. |
 | `/ship-loop` | Autonomous loop over the same pipeline: the oracle picks the next action, subagents execute it, every wave is one PR. Stacks on open predecessor PRs; `done` means acceptance-validated, not necessarily merged or deployed. Runs with `--review=required`: a spec audit gates planning and a delivery audit gates `finish`. |
 | `/review-delivery` | Independent audit of one feature's spec or delivery: a deterministic brief checks claims against the repo, then `delivery-auditor` re-verifies the code and tests and returns `PASS`/`CONCERNS`/`BLOCK`. |
-| `/challenge-decision` | Optional, advisory design review: steelman a decision, generate alternatives, weigh tradeoffs, apply DDD/architecture/testability/craftsmanship lenses. Never blocks. |
+| `/challenge-decision` | Advisory design review: steelman a decision, generate alternatives, weigh tradeoffs, apply DDD/architecture/testability/craftsmanship lenses. The verdict never blocks — but inside `/ship-loop` the review artifact is a required gate (`G1`) before wave planning. |
 
 ```
 /ship-loop --repo=sources/portal-api --merge=review --max=25
@@ -104,7 +104,8 @@ deterministic brief (`challenge_decision`: record completeness, heuristic code
 signals, design moves, lens questions) and delegates the judgment to the
 `decision-challenger` subagent: steelman, alternatives, tradeoff matrix,
 scores with evidence, verdict `ACCEPT`/`REVISE`/`REVISIT`/`SPLIT`. It is
-advisory (D011) — it never blocks a gate, wave, or merge.
+advisory (D011) — the verdict never blocks a gate, wave, or merge, though
+the review artifact itself is gate-required before wave planning.
 
 **Independent audit.** Gates check whether a precondition exists; they do not
 prove the spec is grounded in the repo or that the delivery matches the spec.

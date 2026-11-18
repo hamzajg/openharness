@@ -48,6 +48,12 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
     (d / "BACKLOG.md").write_text(BACKLOG)
     (d / "EXAMPLES.feature").write_text(FEATURE)
     wave_plan.invoke(spec_dir=str(d))
+    # Gate tests declare their own GATES.md; reset the scaffold's default
+    # design-challenge gate so each test starts from a clean slate.
+    (d / "GATES.md").write_text("# Gates: Cart\n\nNo gates defined yet.\n")
+    b = root / ".openharness" / "evidence" / name / "run-1"
+    b.mkdir(parents=True, exist_ok=True)
+    (b / "index.html").write_text("<html/>")
     return d
 
 
@@ -63,6 +69,9 @@ def _gate(gid: str, title: str, before: str, **fields) -> str:
 
 
 def _run(root: Path, **kw) -> str:
+    # These tests exercise gate mechanics, not the review policy — run
+    # advisory so audit artifacts are not required.
+    kw.setdefault("review", "advisory")
     return ship_loop.invoke(repo_path=str(root), **kw)
 
 
@@ -75,11 +84,14 @@ def _finish_waves(root: Path, d: Path) -> None:
 
 # ---------- authoring / compatibility ----------
 
-def test_scaffold_creates_empty_gates_file(tmp_path):
+def test_scaffold_creates_design_challenge_gate(tmp_path):
     spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
     gates = tmp_path / "specs" / "cart-checkout" / "GATES.md"
     assert gates.is_file()
-    assert "No gates defined yet." in gates.read_text()
+    text = gates.read_text()
+    assert "G1 — Design decisions challenged" in text
+    assert "Before: plan" in text and "Blocking: yes" in text
+    assert "DECISION-REVIEW.md" in text
 
 
 def test_no_gates_file_is_backwards_compatible(tmp_path):

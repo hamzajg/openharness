@@ -95,6 +95,9 @@ def _spec_only(root: Path, name: str = "cart") -> Path:
 def _delivery(root: Path, name: str = "cart") -> Path:
     """A complete, clean delivery: waves done, validation written, tests named."""
     d = _spec_only(root, name)
+    b = root / ".openharness" / "evidence" / name / "run-1"
+    b.mkdir(parents=True, exist_ok=True)
+    (b / "index.html").write_text("<html/>")
     wave_plan.invoke(spec_dir=str(d))
     _run(root, action="start", wave=1)
     _run(root, action="complete", wave=1, note="tests 2/2, CI green", pr="#12")

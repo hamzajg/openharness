@@ -131,10 +131,18 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   `ship_loop` is their only writer (JSON is the machine projection,
   markdown the human render — both regenerated together).
   The loop is driven by the agent, not by a daemon or cron (D001/D009).
+- `ship_loop --action=complete`/`finish` refuse to record without a
+  rendered `harness_evidence` bundle under `.openharness/evidence/`
+  (gitignored local scratch). UI-touching waves must attach screenshots
+  per the capture policy in `docs/plans/evidence-v2.md`; the harness
+  never drives browsers itself.
 - Never mark a gate `met` without evidence or `waived` without a human's name
   and reason. Fix a wrong gate in `GATES.md`; do not route around it.
-- `/challenge-decision` is advisory: never make its verdict a gate or a merge
-  blocker, and never let the reviewer edit product code.
+- `/challenge-decision` verdicts stay advisory: never make a verdict a gate
+  or merge blocker. The review *artifact* is different — `spec_scaffold`
+  emits a blocking `Before: plan` gate requiring `DECISION-REVIEW.md`, so
+  the review must happen even though its verdict does not block. Never let
+  the reviewer edit product code.
 - `/review-delivery` is independent: the auditor must not audit its own
   implementation, must not edit `LOOP.md`/`LOOP.state.json`/`GATES.md` or
   product code, and must not mark `PASS` from the deterministic brief alone.

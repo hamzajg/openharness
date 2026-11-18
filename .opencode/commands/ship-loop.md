@@ -58,6 +58,7 @@ One iteration = one `--action=next` call + the named work + one state write
 ship_loop --action=next   → read directive
   ├─ "no specs yet" / "complete the spec"                  → product-framer
   ├─ "audit the spec"                                      → delivery-auditor
+  ├─ GATE: design decisions challenged                     → /challenge-decision
   ├─ "plan waves"                                          → product-framer
   ├─ GATE: ...                                             → resolve or block
   ├─ "implement wave N" / "resume wave N"                  → wave-implementer
@@ -89,6 +90,26 @@ disk.
 
 Evidence is mandatory. `--note` must name the tests that ran and their
 result. A "done" without evidence is a false record.
+
+## Evidence bundles (required)
+
+Every wave ships with a local evidence bundle — the oracle refuses
+`--action=complete` and `--action=finish` without a rendered one
+(`.openharness/evidence/<feature>/<run-id>/`, gitignored, never
+committed). The harness does not drive browsers: Playwright, a human,
+or you produce screenshots/recordings; the bundle hashes and catalogs
+them.
+
+1. At wave start: `python -m openharness run harness_evidence --action=new
+   --repo=<repo> --feature=<feature> --wave=N`.
+2. During the wave: `--action=step` for real commands (build, tests —
+   exit code, duration and log are recorded). UI-touching waves attach
+   at least one screenshot per acceptance scenario touched; flows over
+   ~3 steps or any failed UI step get a short recording.
+3. Before `complete`: `--action=render` then `--action=verify` (hashes,
+   commit, secrets). Fix what verify reports; never commit the bundle.
+4. `SUMMARY.md` can be pasted into the PR body or the LOOP evidence
+   column.
 
 ## Gates
 
@@ -127,27 +148,41 @@ When the oracle prints `GATE:`:
 If a gate is wrong, fix `GATES.md`. Do not mark it `met` silently. If a
 check fails, record `--status=failed` with the failure.
 
-## Challenge a design decision (optional)
+## Challenge design decisions (required by default)
 
-Gates check *if* a precondition exists. They do not check *how* a decision
-was made. For a high-impact decision (data ownership, schema, public
-contract, service split, security control) or a contested domain, run
-`/challenge-decision` before the wave that uses it:
+`spec_scaffold` writes a blocking gate — `G1 — Design decisions
+challenged` (`Before: plan`, `Check:
+file:specs/<feature>/DECISION-REVIEW.md`) — into every feature's
+`GATES.md`. The loop refuses wave planning and wave 1 until that artifact
+exists. The gate checks *that the review happened*; the verdict itself
+stays advisory (D011) and never blocks a merge.
 
-```
-python -m openharness run challenge_decision --repo_path=<repo> \
-  --spec_dir=<repo>/specs/<feature> --paths="<paths>" --write
-```
+When the oracle prints `GATE:` for it (or before `wave_plan`):
 
-Give the review to **decision-challenger**. It returns
-`ACCEPT`/`REVISE`/`REVISIT`/`SPLIT` plus the smallest next step. The review
-is advisory (D011). It is not a gate. It does not stop the loop. A `REVISE`
-becomes a backlog item or a new wave. Do not edit the decision silently
-during review. If the review changes the decision, update `SPEC.md` →
-Decisions. If it changes a precondition, update `GATES.md`.
+1. Make sure `SPEC.md` → `## Decisions` records each one-way-door choice
+   in the required shape: context & forces, at least two credible options
+   (including the simplest and the most reversible), decision & why,
+   consequences (+/-), reversibility and revisit trigger.
+2. Build the brief and persist it:
+   ```
+   python -m openharness run challenge_decision --repo_path=<repo> \
+     --spec_dir=<repo>/specs/<feature> --paths="<paths>" --write
+   ```
+3. Give the brief to **decision-challenger**. It steelmans the decision,
+   generates alternatives, applies the DDD / architecture / testability /
+   craftsmanship lenses, scores with evidence, and fills the verdict block
+   in `DECISION-REVIEW.md`.
+4. Verify the review — do not rubber-stamp it — then record the gate:
+   `--action=gate --gate=G1 --status=met --evidence="file:specs/<feature>/DECISION-REVIEW.md — verdict ACCEPT"`.
+5. A `REVISE` / `REVISIT` / `SPLIT` verdict is design feedback, not a
+   blocker. Fold the smallest next step into `SPEC.md` → Decisions, a
+   backlog item, or a wave. Update `GATES.md` if a precondition changes.
 
-Skip the review for small reversible choices. A review that fires too
-often stops being read.
+A human may waive G1 for genuinely trivial features — record the waiver,
+never assume it. Skip *extra* reviews for small reversible choices inside
+a wave; the gate covers the decisions every wave inherits. A wave that
+introduces a NEW one-way-door decision must challenge it before coding
+(see the wave protocol).
 
 ## Independent review (required)
 
@@ -249,6 +284,11 @@ The framer writes only under `specs/`.
 
 8. Run the spec audit (`/review-delivery --phase=spec --write`) and fix every
    confirmed blocker before wave 1. A `BLOCK` verdict stops the loop.
+
+9. Resolve the design-challenge gate (`G1` in `GATES.md`): run
+   `/challenge-decision` on `SPEC.md` → Decisions, let
+   **decision-challenger** fill `DECISION-REVIEW.md`, then record the gate
+   `met`. See "Challenge design decisions".
 
 Then call `ship_loop --action=next` again to enter wave 1.
 
