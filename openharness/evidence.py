@@ -1133,20 +1133,27 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
         for art in images:
             src = _src(art, bundle, inline)
             caption = art.get("caption") or art["path"]
-            snippet_html = ""
-            if art.get("snippet"):
-                snippet_html = (
-                    f'<pre class="snippet"><code>{e(str(art["snippet"]))}</code></pre>'
-                )
             parts.append(
                 "<figure>"
                 f'<a href="{e(_rel_src(art))}"><img src="{e(src)}" alt="{e(str(caption))}" loading="lazy"></a>'
-                + snippet_html +
                 f"<figcaption><b>{e(str(caption))}</b><br>"
                 f'<span class="mono">sha256 {e(art["sha256"][:12])}…</span></figcaption>'
                 "</figure>"
             )
         parts.append("</div>")
+
+    # -- request snippets (curl/API calls attached to artifacts)
+    snippeted = [a for a in arts if a.get("snippet")]
+    if snippeted:
+        parts.append("<h2>Requests</h2>")
+        for art in snippeted:
+            caption = art.get("caption") or art["path"]
+            parts.append(
+                '<div class="card snippet-card">'
+                f'<p class="note"><b>{e(str(caption))}</b></p>'
+                f'<pre class="snippet"><code>{e(str(art["snippet"]))}</code></pre>'
+                "</div>"
+            )
 
     # -- recording
     if videos:
@@ -1311,10 +1318,12 @@ padding:12px 14px;border:1px solid var(--line);background:var(--panel);border-ra
 figure{margin:0;border:1px solid var(--line);border-radius:9px;overflow:hidden;
 background:var(--panel)}figure img{width:100%;display:block}
 figcaption{padding:8px 10px;font-size:12px;color:var(--muted)}
-figure .snippet{margin:0;padding:10px 12px;background:#0b0d11;color:#d7dde6;
-font-family:var(--mono);font-size:11.5px;line-height:1.5;overflow-x:auto;
-white-space:pre-wrap;word-break:break-all;border-top:1px solid var(--line)}
-@media (prefers-color-scheme:light){figure .snippet{background:#f0f2f5;color:#1b1f24}}
+.snippet-card{padding:0;overflow:hidden}
+.snippet-card .note{margin:0;padding:8px 12px 0}
+pre.snippet{margin:0;padding:12px;background:#0b0d11;color:#d7dde6;
+font-family:var(--mono);font-size:12px;line-height:1.55;overflow-x:auto;
+white-space:pre-wrap;word-break:break-all}
+@media (prefers-color-scheme:light){pre.snippet{background:#f0f2f5;color:#1b1f24}}
 figcaption b{color:var(--text);font-weight:600}
 video{width:100%;border-radius:9px;border:1px solid var(--line);background:#000}
 pre{margin:0 0 12px;padding:12px;background:#0b0d11;color:#d7dde6;border-radius:9px;
