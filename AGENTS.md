@@ -37,6 +37,10 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   - `repos.py` — REPOS.md parsing, `sources/` clone/pull management.
   - `registry.py`, `skill.py`, `frontmatter.py`, `env.py` — skill catalog,
     YAML-frontmatter spec parsing (~15 LOC, no PyYAML), ENV.md handling.
+  - `evidence.py` — evidence bundles: per-run manifest, hashes, generated
+    walkthrough page, and the commit/secret checks behind `ship_loop`
+    (ADR 0007).
+  - `verify.py` — loop ground truth from git/GitHub for `--action=reconcile`.
   - `serve.py` + `serve_api.py` — observer HTTP API + SSE streams
     (agent sessions via `/api/stream/{sid}`; ship-loop state via
     `/api/loops` + `/api/loops/stream`, read from
@@ -63,7 +67,7 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   `delivery-verifier`), the independent audit (`delivery-auditor`), and the
   review (`decision-challenger`).
 - `SELF/` — the harness's own specs/principles (`PRINCIPLES.md`, decision
-  log D001–D013, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
+  log D001–D014, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
 - `REPOS.md` — YAML-frontmatter registry of managed repos (source of truth).
 - `tests/` — unittest-style pytest files per module.
 
@@ -123,7 +127,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   registry.
 - `oh serve` observes session JSONL files the agent CLIs already write —
   don't add instrumentation hooks into agents.
-- Decision log D001–D013 in `SELF/PRINCIPLES.md` is normative — read it
+- Decision log D001–D014 in `SELF/PRINCIPLES.md` is normative — read it
   before structural changes.
 - The web UI must call the same verbs as the CLI (D005) — no business
   logic in TSX.
@@ -158,7 +162,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - Verify before claiming: run `pytest` (with `--no-deps` install path) and
   report the real result.
 - Keep changes minimal and consistent with surrounding code. Respect the
-  D001–D013 decision log.
+  D001–D014 decision log.
 - For product work, prefer `/ship-loop` (autonomous) or `/ship-product`
   (phased); both keep specs and loop state in the target repo under
   `specs/` and ship one wave per PR.

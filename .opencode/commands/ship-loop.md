@@ -93,10 +93,11 @@ result. A "done" without evidence is a false record.
 
 ## Evidence bundles (required)
 
-Every wave ships with a local evidence bundle — the oracle refuses
-`--action=complete` and `--action=finish` without a rendered one
-(`.openharness/evidence/<feature>/<run-id>/`, gitignored, never
-committed). The harness does not drive browsers: Playwright, a human,
+Every wave ships with an evidence bundle — the oracle refuses
+`--action=complete` (for that wave) and `--action=finish` until a bundle
+loads, passes `verify` and records the checked-out commit. Bundles live in
+`.openharness/evidence/<feature>/<run-id>/` (gitignored scratch) or in the
+committable `evidence/` root when `new` is given `--tracked`. The harness does not drive browsers: Playwright, a human,
 or you produce screenshots/recordings; the bundle hashes and catalogs
 them.
 

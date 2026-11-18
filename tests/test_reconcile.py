@@ -5,12 +5,14 @@ the suite never touches a network or a real repository; the point is the
 comparison logic, not the transport.
 """
 
+import re
 import textwrap
 import types
 from pathlib import Path
 
 import pytest
 
+from openharness import evidence
 from openharness import verify
 from openharness.skill import SkillError
 from skills.product.ship_loop import ship_loop
@@ -56,10 +58,22 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
     # Reconcile tests check git/GitHub drift, not policy gates — reset the
     # scaffold's default design-challenge gate.
     (d / "GATES.md").write_text("# Gates: Cart\n\nNo gates defined yet.\n")
-    b = root / ".openharness" / "evidence" / name / "run-1"
-    b.mkdir(parents=True, exist_ok=True)
-    (b / "index.html").write_text("<html/>")
+    _bundles(root, name)
     return d
+
+
+def _bundles(root: Path, name: str) -> None:
+    """A rendered, verifiable evidence bundle per planned wave (ADR 0007)."""
+    waves_md = root / "specs" / name / "WAVES.md"
+    text = waves_md.read_text() if waves_md.is_file() else ""
+    waves = sorted(
+        {int(n) for n in re.findall(r"^##\s+Wave\s+(\d+)", text, re.M)}
+    ) or [1]
+    for wave in waves:
+        b = evidence.new_bundle(
+            root, name, wave=wave, head="abc1234", run=f"run-w{wave}"
+        )
+        (b / "index.html").write_text("<html/>")
 
 
 def _run(root: Path, **kw):

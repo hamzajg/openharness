@@ -105,6 +105,8 @@ def harness_evidence(
       allow_old: Attach a file older than the step (records why in the note).
       by: Who captured a manual artifact.
       fragment: Path to a JSON fragment (steps.json) to fold into the manifest.
+        An artifact `role` omitted by the fragment is inferred from its MIME
+        type and file name, exactly as `attach --file` does.
       tracked: On `new`, place the bundle under `evidence/` (committable)
         instead of the gitignored scratch root.
     """
@@ -241,9 +243,14 @@ def harness_evidence(
                 if step_data["id"] in existing:
                     raise SkillError(f"step {step_data['id']!r} already exists")
                 for art in step_data.get("artifacts") or []:
-                    for key in ("path", "mime", "sha256", "bytes", "role"):
+                    for key in ("path", "mime", "sha256", "bytes"):
                         if key not in art:
                             raise SkillError(f"artifact missing required field: {key}")
+                    # `role` is a label, not a proof: infer it from MIME/suffix
+                    # when the producer omitted it, exactly like `attach --file`.
+                    # An explicit role always wins.
+                    if not str(art.get("role") or "").strip():
+                        art["role"] = evidence._role_for(art["mime"], Path(art["path"]))
                 existing.add(step_data["id"])
                 folded.append(step_data)
 

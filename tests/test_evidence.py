@@ -985,6 +985,49 @@ def test_attach_from_folds_fragment(tmp_path):
     assert steps[1]["artifacts"][0]["caption"] == "Page loaded"
 
 
+def test_attach_from_infers_artifact_role(tmp_path):
+    """`role` is a label: infer it from MIME/suffix, keep an explicit one."""
+    bundle = _capture_bundle(tmp_path)
+    fragment = {
+        "id": "s3",
+        "title": "comprehensive test",
+        "kind": "browser",
+        "status": "pass",
+        "started_at": "2026-11-17T21:04:00Z",
+        "duration_ms": 3456,
+        "log": "",
+        "artifacts": [
+            # no role: a structured capture is a trace
+            {"path": "raw/s3/trace.json", "mime": "application/json",
+             "sha256": "c" * 64, "bytes": 300},
+            # no role: MIME decides
+            {"path": "raw/s3/video.webm", "mime": "video/webm",
+             "sha256": "d" * 64, "bytes": 100},
+            # no role: the suffix is more specific than the MIME
+            {"path": "raw/s3/network.har", "mime": "application/json",
+             "sha256": "e" * 64, "bytes": 200},
+            # explicit role always wins
+            {"path": "raw/s3/notes.json", "mime": "application/json",
+             "sha256": "f" * 64, "bytes": 50, "role": "attachment"},
+        ],
+    }
+
+    from_file = tmp_path / "steps.json"
+    from_file.write_text(json.dumps(fragment, indent=2))
+
+    run = _cli(
+        "--action=attach",
+        f"--repo={tmp_path}",
+        f"--bundle={bundle}",
+        f"--fragment={from_file}",
+    )
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    manifest = evidence.load(bundle)
+    roles = [a["role"] for a in manifest["steps"][1]["artifacts"]]
+    assert roles == ["trace", "video", "har", "attachment"]
+
+
 def test_attach_from_missing_required_field(tmp_path):
     bundle = _capture_bundle(tmp_path)
     from_file = tmp_path / "fragment.json"
@@ -1101,6 +1144,7 @@ def test_attach_from_invalid_status(tmp_path):
 
 
 def test_attach_from_invalid_artifact(tmp_path):
+    """A proving field is still mandatory; only `role` is inferred."""
     bundle = _capture_bundle(tmp_path)
     fragment = {
         "id": "s2",
@@ -1114,9 +1158,8 @@ def test_attach_from_invalid_artifact(tmp_path):
             {
                 "path": "raw/s2/01-page.png",
                 "mime": "image/png",
-                "sha256": "0000000000000000000000000000000000000000000000000000000000000000",  # fake
                 "bytes": 100,
-                # missing role
+                # missing sha256
             }
         ],
     }

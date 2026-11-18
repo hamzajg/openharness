@@ -295,7 +295,10 @@ tax on docs-only work.
 
 - `attach --from=steps.json` folds a fragment into the manifest. Fragment
   schema is a subset of a step, so a fixture can emit it without importing
-  harness code.
+  harness code. `role` is a label, not a proof, so an omitted `role` is
+  inferred from the MIME type and file name (`_role_for`); an explicit one
+  always wins. Fold-in is shipped; the Playwright fixture itself is not in
+  this repo yet (see ADR 0007's fixture-home question).
 - Playwright fixture: `afterEach` attaches screenshot on failure, video/trace
   on failure, and a screenshot per named step when `EVIDENCE=1`.
 - Tests: fragment fold-in, duplicate artifacts, poster selection, trace MIME.

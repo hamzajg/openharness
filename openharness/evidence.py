@@ -541,14 +541,15 @@ def _mime_for(path: Path) -> str:
 
 
 def _role_for(mime: str, path: Path) -> str:
+    """Infer a role from MIME and suffix; an explicit `role` always wins."""
     if mime.startswith("image/"):
         return "screenshot"
     if mime.startswith("video/"):
         return "video"
-    if path.suffix.lower() in (".zip", ".trace"):
-        return "trace"
     if path.suffix.lower() == ".har":
         return "har"
+    if path.suffix.lower() in (".zip", ".trace") or mime == "application/json":
+        return "trace"
     return "attachment"
 
 

@@ -151,19 +151,18 @@ loops that opt out explicitly and the advisory principle of D011.
 
 ### D014 — Audit output must not leak absolute host paths
 
-`review_delivery` (D013) writes a `Repo: <path>` header into every
+Rule: `review_delivery` (D013) writes a `Repo: <path>` header into every
 `SPEC-AUDIT.md` / `DELIVERY-AUDIT.md` it generates. Those files are
 committed into the *target* repo and shipped in PRs, so the header must
 never contain an absolute path under the operator's home directory
 (`/home/<user>/...`, `C:\Users\<user>\...`). Emit it as `~`-prefixed
 instead: collapse `Path.home()` to `~` and fall back to the raw path only
-when the repo is not under the home dir.
+when the repo is not under the home dir. More generally, any skill that emits
+a path into a file that will be committed into a target repo must run it
+through `_display_path` (or equivalent) first.
 
 Because: The harness's whole value is that it writes into other people's
 repositories. An audit tool that leaks the operator's home path is a
 privacy regression in the one place its output is most visible — the
 committed spec dir. `~` is the standard, portable shorthand and preserves
 readability.
-
-Rule: any skill that emits a path into a file that will be committed into a
-target repo must run it through `_display_path` (or equivalent) first.

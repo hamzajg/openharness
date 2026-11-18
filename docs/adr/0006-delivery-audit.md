@@ -1,6 +1,7 @@
 # ADR 0006 — Independent spec and delivery audit
 
-Status: accepted · 2026-11-16 · decision D013
+Status: accepted · 2026-11-16 · decision D013 · amended 2026-11-18 (the
+review default is `required`, as D013 says)
 
 ## Context
 
@@ -51,10 +52,11 @@ Add an **independent audit** with two checkpoints:
    The deterministic brief is kept; the auditor appends the verdict.
 
 Enforcement is a loop setting, not a property of the reviewer:
-`ship_loop --review=advisory` (default) never enforces the audit;
-`--review=required` (used by `/ship-loop`) refuses to plan without a filled
-spec audit and refuses to finish without a filled delivery audit. A `BLOCK`
-verdict stops the loop. The template line
+`ship_loop --review=required` is the default (D013, used by `/ship-loop`) —
+it refuses to plan without a filled spec audit, refuses to start wave 1 until
+that audit passes, and refuses to finish without a filled delivery audit.
+`--review=advisory` remains as an explicit opt-out and never enforces the
+audit. A `BLOCK` verdict stops the loop. The template line
 `AUDIT: PASS | CONCERNS | BLOCK` is not a filled verdict.
 
 The audit is advisory in principle (like D011): it never marks a gate, never
@@ -67,8 +69,9 @@ merges, and never edits product code. The auditor writes only the audit file.
 - The deterministic half keeps the review grounded and repeatable; the
   independent half keeps it honest, because it must read code and tests
   rather than restate the loop's claims.
-- Backwards compatible: advisory is the default, so existing loops and tests
-  are unaffected. `/ship-loop` opts into enforcement.
+- Backwards compatible: `--review=advisory` is still there as an explicit
+  opt-out for a loop that wants no audit; without it the audit applies, which
+  is what D013 requires.
 - Cost: one skill, one command, one subagent role, and one or two review
   documents per feature. The risk is ceremony; the command therefore says
   when the audit is required and what each verdict means.
