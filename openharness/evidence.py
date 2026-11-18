@@ -268,7 +268,7 @@ def _schema_problems(m: Any) -> list[str]:
                     out.append(f"{aw}.{key} must be a non-empty string")
             if not isinstance(art.get("bytes"), int):
                 out.append(f"{aw}.bytes must be an integer")
-            for key in ("role", "caption", "poster", "captured_by"):
+            for key in ("role", "caption", "poster", "captured_by", "snippet"):
                 if key in art and not isinstance(art[key], str):
                     out.append(f"{aw}.{key} must be a string")
     return out
@@ -699,6 +699,7 @@ def record_attach(
     role: str = "",
     allow_old: bool = False,
     by: str = "",
+    snippet: str = "",
 ) -> dict[str, Any]:
     """Attach an existing file to a step, copying it under `raw/<step>/`.
 
@@ -717,6 +718,7 @@ def record_attach(
         raise EvidenceError(f"file does not exist: {src}")
 
     safe_caption, caption_redactions = redact_value(caption)
+    safe_snippet, snippet_redactions = redact_value(snippet)
 
     steps = manifest["steps"]
     step: dict[str, Any] | None = None
@@ -763,12 +765,17 @@ def record_attach(
     }
     if safe_caption.strip():
         art["caption"] = safe_caption.strip()
+    if safe_snippet.strip():
+        art["snippet"] = safe_snippet.strip()
     if by.strip():
         art["captured_by"] = by.strip()
     step.setdefault("artifacts", []).append(art)
     art_ref = f"steps[{sid}].artifacts[{len(step['artifacts']) - 1}].caption"
     for entry in caption_redactions:
         manifest["redactions"].append({**entry, "path": art_ref})
+    snippet_ref = art_ref[:-len(".caption")] + ".snippet" if art_ref.endswith(".caption") else art_ref
+    for entry in snippet_redactions:
+        manifest["redactions"].append({**entry, "path": snippet_ref})
     manifest["redactions"].extend(redactions)
     _write_manifest(bundle, manifest)
     return art
@@ -1135,6 +1142,19 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
             )
         parts.append("</div>")
 
+    # -- request snippets (curl/API calls attached to artifacts)
+    snippeted = [a for a in arts if a.get("snippet")]
+    if snippeted:
+        parts.append("<h2>Requests</h2>")
+        for art in snippeted:
+            caption = art.get("caption") or art["path"]
+            parts.append(
+                '<div class="card snippet-card">'
+                f'<p class="note"><b>{e(str(caption))}</b></p>'
+                f'<pre class="snippet"><code>{e(str(art["snippet"]))}</code></pre>'
+                "</div>"
+            )
+
     # -- recording
     if videos:
         parts.append("<h2>Recording</h2>")
@@ -1145,6 +1165,22 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
                 f'<video controls preload="metadata" src="{e(src)}"></video>'
                 f'<p class="note">{e(art.get("caption") or art["path"])} · '
                 f'{e(_size(art.get("bytes")))} · sha256 {e(art["sha256"][:12])}…</p></div>'
+            )
+
+    # -- documents (self-contained HTML artifacts render inline)
+    docs = [a for a in arts if a.get("mime") == "text/html"]
+    if docs:
+        parts.append("<h2>Documents</h2>")
+        for art in docs:
+            caption = art.get("caption") or art["path"]
+            parts.append(
+                '<div class="card">'
+                f'<p class="note"><b>{e(str(caption))}</b> · '
+                f'{e(_size(art.get("bytes")))} · sha256 {e(art["sha256"][:12])}… · '
+                f'<a href="{e(_rel_src(art))}">open file</a></p>'
+                f'<iframe src="{e(_rel_src(art))}" style="width:100%;height:720px;'
+                'border:1px solid var(--line);border-radius:8px;background:#fff"></iframe>'
+                "</div>"
             )
 
     # -- logs
@@ -1282,6 +1318,12 @@ padding:12px 14px;border:1px solid var(--line);background:var(--panel);border-ra
 figure{margin:0;border:1px solid var(--line);border-radius:9px;overflow:hidden;
 background:var(--panel)}figure img{width:100%;display:block}
 figcaption{padding:8px 10px;font-size:12px;color:var(--muted)}
+.snippet-card{padding:0;overflow:hidden}
+.snippet-card .note{margin:0;padding:8px 12px 0}
+pre.snippet{margin:0;padding:12px;background:#0b0d11;color:#d7dde6;
+font-family:var(--mono);font-size:12px;line-height:1.55;overflow-x:auto;
+white-space:pre-wrap;word-break:break-all}
+@media (prefers-color-scheme:light){pre.snippet{background:#f0f2f5;color:#1b1f24}}
 figcaption b{color:var(--text);font-weight:600}
 video{width:100%;border-radius:9px;border:1px solid var(--line);background:#000}
 pre{margin:0 0 12px;padding:12px;background:#0b0d11;color:#d7dde6;border-radius:9px;
