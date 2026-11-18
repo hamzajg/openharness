@@ -414,10 +414,14 @@ def _phase_guidance(root: Path) -> str:
         "   highest score and record the choice in SPEC.md → Decisions.",
         "3. Scaffold: `python -m openharness run spec_scaffold --repo_path="
         f"{root} --feature=\"<name>\"`",
-        "4. Fill SPEC.md, EXAMPLES.feature (@w<N> tags) and BACKLOG.md",
-        "   (user stories, one `## US<n> — ...` block each).",
-        "5. `python -m openharness run wave_plan --spec_dir="
-        f"{root}/specs/<feature>`",
+        "4. Fill SPEC.md (incl. `## Decisions` — every one-way-door choice,",
+        "   options + simplest/reversible alternative, consequences),",
+        "   EXAMPLES.feature (@w<N> tags) and BACKLOG.md (user stories, one",
+        "   `## US<n> — ...` block each). Keep the scaffold's G1 gate.",
+        "5. Challenge the decisions: `challenge_decision --spec_dir=<dir> --write`,",
+        "   decision-challenger fills DECISION-REVIEW.md, record gate G1 met.",
+        "6. `python -m openharness run wave_plan --spec_dir="
+        f"{root}/specs/<feature>` (after G1 is met and SPEC-AUDIT passes).",
         "",
         "Then call `ship_loop --action=next` again to start wave 1.",
     ])
@@ -445,7 +449,11 @@ def _wave_brief(root: Path, spec_dir: Path, state: dict, n: int, waves: dict) ->
         f"1. Branch `feat/{spec_dir.name}-w{n}` from the default branch.",
         "2. Write the failing checks first — the scenarios above are the",
         "   acceptance spec; tests cite their names.",
-        "3. Implement minimally, matching repo conventions (KISS).",
+        "3. Implement minimally, matching repo conventions (KISS). If the",
+        "   wave introduces a new one-way-door decision (schema, public",
+        "   contract, service/module boundary, persistence model), record it",
+        "   in SPEC.md → Decisions and run /challenge-decision BEFORE coding;",
+        "   a REVISE verdict shapes this wave's scope.",
         "4. Verify locally: build + tests green.",
         "5. One commit series, one PR; wait for CI.",
         "6. Record the outcome:",
@@ -540,7 +548,7 @@ def _audit_block_brief(root: Path, spec_dir: Path, phase: str) -> str:
 
 def _decide(
     root: Path, spec_dir: Path, state: dict, waves: dict,
-    review: str = "advisory",
+    review: str = "required",
 ) -> str:
     missing = [
         name for name in ("SPEC.md", "EXAMPLES.feature", "BACKLOG.md")
@@ -597,6 +605,16 @@ def _decide(
         blocked = _blocking_gates(spec_dir, state, phase, root)
         if blocked:
             return _gate_directive(root, spec_dir, phase, blocked)
+        if review == "required" and not any(
+            _wave(state, w)["status"] == "done" for w in waves
+        ):
+            # The spec audit is a precondition for wave 1, not only for
+            # planning: a plan written without it must not reach code.
+            audit = _audit_status(spec_dir, "SPEC-AUDIT.md")
+            if audit in ("missing", "unverified"):
+                return _audit_brief(root, spec_dir, "spec", audit)
+            if audit == "block":
+                return _audit_block_brief(root, spec_dir, "spec")
         return _wave_brief(root, spec_dir, state, pending[0], waves)
 
     if not (spec_dir / "VALIDATION.md").is_file():
@@ -619,7 +637,7 @@ def _decide(
 
 def _summary(
     root: Path, spec_dir: Path, state: dict, waves: dict, budget: int,
-    review: str = "advisory",
+    review: str = "required",
 ) -> str:
     done = sum(1 for w in waves if _wave(state, w)["status"] == "done")
     progress = sum(1 for w in waves if _wave(state, w)["status"] == "in-progress")
@@ -668,7 +686,7 @@ def ship_loop(
     evidence: str = "",
     waived_by: str = "",
     max_iterations: int = 25,
-    review: str = "advisory",
+    review: str = "required",
     force: bool = False,
     offline: bool = False,
 ) -> str:
@@ -702,10 +720,11 @@ def ship_loop(
       evidence: Proof recorded when a gate is marked met.
       waived_by: Human who approved a waiver (required with `--status=waived`).
       max_iterations: Hard stop after this many `next` calls (default 25).
-      review: `advisory` (default) or `required`. When required, the loop
-        refuses to plan waves until `SPEC-AUDIT.md` has a filled verdict, and
-        refuses to finish until `DELIVERY-AUDIT.md` has one. A `BLOCK` verdict
-        stops the loop. `advisory` keeps existing loops working and never
+      review: `required` (default) or `advisory`. When required, the loop
+        refuses to plan waves until `SPEC-AUDIT.md` has a filled verdict,
+        refuses to start wave 1 until the spec audit passes, and refuses to
+        finish until `DELIVERY-AUDIT.md` has one. A `BLOCK` verdict stops
+        the loop. `advisory` keeps existing loops working and never
         enforces the audit.
       force: Allow out-of-order start/complete or a full reset.
       offline: For `reconcile` only — check git facts and skip GitHub, so
@@ -989,7 +1008,7 @@ def ship_loop(
 
 
 def _next_feature(
-    root: Path, current: Path, review: str = "advisory",
+    root: Path, current: Path, review: str = "required",
 ) -> str:
     remaining = [d for d in _feature_dirs(root)
                  if d != current and _load_state(d)["status"] != "done"]

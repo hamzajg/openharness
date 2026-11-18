@@ -65,9 +65,10 @@ A filled verdict is a single value (`AUDIT: PASS`). The template line
 `AUDIT: PASS | CONCERNS | BLOCK` is not a verdict.
 
 ## Enforcement
-`ship_loop` defaults to `--review=advisory`, which never enforces the audit.
-`--review=required` (used by `/ship-loop`) refuses to plan without a filled
-`SPEC-AUDIT.md` and refuses to finish without a filled `DELIVERY-AUDIT.md`.
+`ship_loop` defaults to `--review=required`: it refuses to plan without a
+filled `SPEC-AUDIT.md`, refuses to start wave 1 until the spec audit
+passes, and refuses to finish without a filled `DELIVERY-AUDIT.md`.
+`--review=advisory` is the explicit opt-out and never enforces the audit.
 A `BLOCK` verdict stops the loop; `PASS` and accepted `CONCERNS` continue.
 
 ## Invariants

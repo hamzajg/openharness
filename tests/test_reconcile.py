@@ -53,10 +53,14 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
     (d / "BACKLOG.md").write_text(BACKLOG)
     (d / "EXAMPLES.feature").write_text(FEATURE)
     wave_plan.invoke(spec_dir=str(d))
+    # Reconcile tests check git/GitHub drift, not policy gates — reset the
+    # scaffold's default design-challenge gate.
+    (d / "GATES.md").write_text("# Gates: Cart\n\nNo gates defined yet.\n")
     return d
 
 
 def _run(root: Path, **kw):
+    kw.setdefault("review", "advisory")
     return ship_loop.invoke(repo_path=str(root), **kw)
 
 

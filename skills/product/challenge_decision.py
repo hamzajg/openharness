@@ -758,7 +758,9 @@ def challenge_decision(
     brief: record completeness, heuristic code signals, design moves, and
     lens questions for architecture, DDD, testability, and craftsmanship.
     The agent fills the scorecard and verdict; this skill never judges design.
-    Optional and advisory — it never blocks the delivery loop.
+    Advisory — the verdict never blocks the delivery loop, but
+    `spec_scaffold`'s G1 gate requires the review artifact
+    (`DECISION-REVIEW.md`) before wave planning.
 
     Params:
       repo_path: Repository root (default ".").

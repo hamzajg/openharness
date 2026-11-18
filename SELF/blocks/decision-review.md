@@ -8,8 +8,11 @@ interfaces: [challenge_decision.invoke]
 
 ## Purpose
 Reviews one design/architecture decision to **discover the better design**
-before it becomes expensive. It is optional and advisory: the delivery loop
-never waits on it, and its verdict is never a gate (D011).
+before it becomes expensive. Its verdict is advisory and never a gate
+(D011). The review *artifact* is different: `spec_scaffold` emits a
+blocking `Before: plan` gate (`G1 — Design decisions challenged`,
+`Check: file:specs/<feature>/DECISION-REVIEW.md`) so the review must exist
+before wave planning; the verdict still does not block.
 
 Two halves:
 
@@ -91,5 +94,6 @@ remains the source of truth.
    falsifiable ("good looks like", not "is elegant").
 3. The agent contract lives in the command and subagent; mirror every change
    to `.claude/`.
-4. Keep the review advisory. If it ever needs to block, that is a gate
-   (`GATES.md`), not this block.
+4. Keep the verdict advisory — the scaffold gate requires the artifact to
+   exist, it does not judge the verdict. If a verdict ever needs to block,
+   that is a gate (`GATES.md`), not this block.
