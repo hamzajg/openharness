@@ -262,6 +262,24 @@ def test_ship_validate_writes_traceability(tmp_path):
     assert "test_demo.py" in out  # evidence found
 
 
+def test_ship_validate_finds_tsx_test_evidence(tmp_path):
+    from skills.product.ship_validate import ship_validate
+    repo = tmp_path / "repo"
+    d = repo / "specs" / "demo"
+    d.mkdir(parents=True)
+    (d / "SPEC.md").write_text(
+        "# Spec: Demo\n\n## Acceptance criteria\n\n| # | Criterion | Scenario(s) |\n|---|-----------|-------------|\n| 1 | It works | @w1 |\n"
+    )
+    (d / "EXAMPLES.feature").write_text(
+        "Feature: Demo\n\n  @w1 @happy-path\n  Scenario: Render shell\n    Given x\n    When y\n    Then z\n"
+    )
+    (d / "WAVES.md").write_text("# Waves\n\n## Wave 1 — iteration 1\n\n| Item |\n")
+    _write(repo, "src/__tests__/shell.test.tsx",
+           "describe('Render shell', () => { it('works', () => {}) })\n")
+    out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    assert "shell.test.tsx" in out
+
+
 def test_ship_validate_preserves_outcome_followup_on_rerun(tmp_path):
     from skills.product.ship_validate import ship_validate
     repo = tmp_path / "repo"

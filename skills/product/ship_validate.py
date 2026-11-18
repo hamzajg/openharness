@@ -44,7 +44,8 @@ def _test_files(root: Path):
             p = Path(dirpath) / name
             low = name.lower()
             if any(m in low for m in ("test", "spec")) and p.suffix.lower() in (
-                ".py", ".js", ".ts", ".java", ".groovy", ".cs", ".kt", ".go", ".rb",
+                ".py", ".js", ".jsx", ".ts", ".tsx", ".mts", ".cts",
+                ".java", ".groovy", ".cs", ".kt", ".go", ".rb",
             ):
                 yield p
 
