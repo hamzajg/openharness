@@ -1,6 +1,8 @@
+import re
 import textwrap
 from pathlib import Path
 
+from openharness import evidence
 from skills.product.review_delivery import review_delivery
 from skills.product.ship_loop import ship_loop
 from skills.product.ship_validate import ship_validate
@@ -95,10 +97,8 @@ def _spec_only(root: Path, name: str = "cart") -> Path:
 def _delivery(root: Path, name: str = "cart") -> Path:
     """A complete, clean delivery: waves done, validation written, tests named."""
     d = _spec_only(root, name)
-    b = root / ".openharness" / "evidence" / name / "run-1"
-    b.mkdir(parents=True, exist_ok=True)
-    (b / "index.html").write_text("<html/>")
     wave_plan.invoke(spec_dir=str(d))
+    _bundles(root, name)
     _run(root, action="start", wave=1)
     _run(root, action="complete", wave=1, note="tests 2/2, CI green", pr="#12")
     _run(root, action="start", wave=2)
@@ -111,6 +111,20 @@ def _delivery(root: Path, name: str = "cart") -> Path:
         """))
     ship_validate.invoke(spec_dir=str(d), repo_path=str(root))
     return d
+
+
+def _bundles(root: Path, name: str) -> None:
+    """A rendered, verifiable evidence bundle per planned wave (ADR 0007)."""
+    waves_md = root / "specs" / name / "WAVES.md"
+    text = waves_md.read_text() if waves_md.is_file() else ""
+    waves = sorted(
+        {int(n) for n in re.findall(r"^##\s+Wave\s+(\d+)", text, re.M)}
+    ) or [1]
+    for wave in waves:
+        b = evidence.new_bundle(
+            root, name, wave=wave, head="abc1234", run=f"run-w{wave}"
+        )
+        (b / "index.html").write_text("<html/>")
 
 
 def _run(root: Path, **kw) -> str:

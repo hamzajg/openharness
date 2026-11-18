@@ -129,23 +129,25 @@ guardrails.
 ## Evidence bundles
 
 A wave is not proven by a sentence. `harness_evidence` (ADR 0007) builds a
-local, offline-reviewable bundle per run:
+local, offline-reviewable bundle per run. By default bundles are local scratch
+(gitignored); pass `--tracked` on `new` when a run's proof should be committed
+and pushed — those live under `evidence/` instead:
 
 ```
-.openharness/evidence/<feature>/<run-id>/
+.openharness/evidence/<feature>/<run-id>/   # default: scratch, never committed
+evidence/<feature>/<run-id>/                # --tracked: committable, pushed on purpose
 ├── evidence.json   manifest: commit, steps, artifacts, hashes, redactions
 ├── index.html      generated walkthrough page
 ├── SUMMARY.md      short, pasteable into a PR or LOOP row
 ├── raw/            screenshots, recordings, traces
 └── logs/           one log per executed command
-```
-
-Bundles are local scratch (gitignored) and never committed. The harness does
+``` The harness does
 not drive browsers or devices: Playwright, `adb`, `xcrun`, or a human produce
 files, and `attach` records them with a hash.
 
 ```bash
-# create a bundle for the current commit
+# create a bundle for the current commit (scratch by default;
+# add --tracked=true to place it under evidence/ for committing)
 python -m openharness run harness_evidence --action=new \
   --repo=. --feature=photo-notes --wave=2 --head=$(git rev-parse HEAD)
 

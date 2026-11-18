@@ -1,6 +1,10 @@
+import re
+import shutil
+import subprocess
 import textwrap
 from pathlib import Path
 
+from openharness import evidence
 from skills.product.ship_loop import ship_loop
 from skills.product.spec_scaffold import spec_scaffold
 from skills.product.wave_plan import wave_plan
@@ -63,12 +67,18 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
     return d
 
 
-def _bundle(root: Path, feature: str) -> Path:
-    """A rendered evidence bundle — required before wave complete/finish."""
-    b = root / ".openharness" / "evidence" / feature / "run-1"
-    b.mkdir(parents=True, exist_ok=True)
-    (b / "index.html").write_text("<html>walkthrough</html>")
-    return b
+def _bundle(root: Path, feature: str) -> None:
+    """A rendered, verifiable evidence bundle per planned wave (ADR 0007)."""
+    waves_md = root / "specs" / feature / "WAVES.md"
+    text = waves_md.read_text() if waves_md.is_file() else ""
+    waves = sorted(
+        {int(n) for n in re.findall(r"^##\s+Wave\s+(\d+)", text, re.M)}
+    ) or [1]
+    for wave in waves:
+        b = evidence.new_bundle(
+            root, feature, wave=wave, head="abc1234", run=f"run-w{wave}"
+        )
+        (b / "index.html").write_text("<html>walkthrough</html>")
 
 
 def _run(root: Path, **kw) -> str:
@@ -297,19 +307,76 @@ def test_full_reset_requires_force(tmp_path):
 
 # ---------- evidence bundles (ADR 0007) ----------
 
-def test_complete_requires_rendered_evidence_bundle(tmp_path):
+def test_complete_requires_verified_evidence_bundle(tmp_path):
     _spec(tmp_path)
-    import shutil
-    shutil.rmtree(tmp_path / ".openharness" / "evidence" / "cart-checkout")
+    evidence_dir = tmp_path / ".openharness" / "evidence" / "cart-checkout"
+    shutil.rmtree(evidence_dir)
     _run(tmp_path, action="start", wave=1)
     out = _run(tmp_path, action="complete", wave=1, note="ok")
     assert out.startswith("ERROR") and "harness_evidence" in out
-    # An unrendered bundle (no index.html) does not count either.
-    b = tmp_path / ".openharness" / "evidence" / "cart-checkout" / "run-1"
+
+    # A page without a manifest is not a bundle.
+    b = evidence_dir / "run-1"
     b.mkdir(parents=True)
+    (b / "index.html").write_text("<html/>")
+    out = _run(tmp_path, action="complete", wave=1, note="ok")
+    assert out.startswith("ERROR") and "harness_evidence" in out
+
+    # A manifest that does not verify is not a bundle either.
     (b / "evidence.json").write_text("{}")
     out = _run(tmp_path, action="complete", wave=1, note="ok")
     assert out.startswith("ERROR") and "harness_evidence" in out
+
+    shutil.rmtree(evidence_dir)
+    _bundle(tmp_path, "cart-checkout")
+    assert "Recorded wave 1 done" in _run(tmp_path, action="complete", wave=1, note="ok")
+
+
+def test_complete_rejects_a_bundle_from_another_wave(tmp_path):
+    """Wave 1 must not be proven by wave 2's bundle (ADR 0007)."""
+    _spec(tmp_path)
+    evidence_dir = tmp_path / ".openharness" / "evidence" / "cart-checkout"
+    for run in evidence_dir.iterdir():
+        if run.name != "run-w2":
+            shutil.rmtree(run)
+    _run(tmp_path, action="start", wave=1)
+    out = _run(tmp_path, action="complete", wave=1, note="ok")
+    assert out.startswith("ERROR")
+    assert "records wave 2, not wave 1" in out
+
+
+def test_complete_accepts_a_bundle_under_the_tracked_root(tmp_path):
+    _spec(tmp_path)
+    shutil.rmtree(tmp_path / ".openharness" / "evidence" / "cart-checkout")
+    b = evidence.new_bundle(
+        tmp_path, "cart-checkout", wave=1, head="abc1234", run="run-w1", tracked=True
+    )
+    (b / "index.html").write_text("<html/>")
+    _run(tmp_path, action="start", wave=1)
+    assert "Recorded wave 1 done" in _run(tmp_path, action="complete", wave=1, note="ok")
+
+
+def test_complete_rejects_a_bundle_bound_to_another_commit(tmp_path):
+    """A bundle from another commit is stale, even when the wave matches."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "-c", "user.email=a@b", "-c", "user.name=a",
+         "commit", "-q", "--allow-empty", "-m", "init"],
+        check=True,
+    )
+    _spec(tmp_path)  # bundles are bound to a placeholder sha, not HEAD
+    _run(tmp_path, action="start", wave=1)
+    out = _run(tmp_path, action="complete", wave=1, note="ok")
+    assert out.startswith("ERROR")
+    assert "checked commit is" in out
+
+    head = subprocess.run(
+        ["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    b = evidence.new_bundle(
+        tmp_path, "cart-checkout", wave=1, head=head, run="run-w1-head"
+    )
     (b / "index.html").write_text("<html/>")
     assert "Recorded wave 1 done" in _run(tmp_path, action="complete", wave=1, note="ok")
 

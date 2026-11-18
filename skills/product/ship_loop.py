@@ -23,6 +23,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from openharness import evidence as evidence_bundles
 from openharness.skill import SkillError, skill
 
 _WAVE_RE = re.compile(r"^##\s+Wave\s+(\d+)\b.*$", re.M)
@@ -547,29 +548,79 @@ def _audit_block_brief(root: Path, spec_dir: Path, phase: str) -> str:
 
 
 
-def _evidence_error(root: Path, feature: str) -> str:
-    """ADR 0007 / evidence-v2: a wave is not done without a rendered bundle."""
-    ev_root = root / ".openharness" / "evidence" / feature
-    rendered = (
-        [b for b in ev_root.iterdir() if b.is_dir() and (b / "index.html").exists()]
-        if ev_root.is_dir()
-        else []
-    )
-    if rendered:
-        return ""
-    return (
-        f"ERROR: no rendered evidence bundle for {feature!r} under "
-        f"{ev_root} — a wave is not proven by a sentence.\n"
-        "Capture one per wave (local-only, gitignored):\n"
+def _evidence_error(root: Path, feature: str, wave: int | None = None) -> str:
+    """ADR 0007: a wave is done only when a bundle for it verifies at HEAD.
+
+    A directory holding an `index.html` proves nothing: the bundle must load,
+    record the wave being closed (`wave=None` accepts any wave for a feature
+    close-out), pass `evidence.verify` — hashes, artifacts, secrets, verdict —
+    and be bound to the checked-out commit. Both roots count: the gitignored
+    scratch dir and the committable `evidence/` (ADR 0007 amendment).
+    """
+    roots = [
+        evidence_bundles.bundle_root(root),
+        evidence_bundles.bundle_root(root, tracked=True),
+    ]
+    rejected: list[str] = []
+    for base in roots:
+        feature_dir = base / feature
+        if not feature_dir.is_dir():
+            continue
+        runs = sorted(
+            (b for b in feature_dir.iterdir() if b.is_dir()),
+            key=lambda b: b.name,
+            reverse=True,  # newest run first: the run just captured matches
+        )
+        for bundle in runs:
+            if not (bundle / "evidence.json").is_file():
+                continue
+            if not (bundle / "index.html").is_file():
+                rejected.append(f"{bundle.name}: not rendered (no index.html)")
+                continue
+            try:
+                manifest = evidence_bundles.load(bundle)
+            except evidence_bundles.EvidenceError as ex:
+                rejected.append(f"{bundle.name}: invalid manifest ({ex})")
+                continue
+            recorded_wave = manifest.get("wave")
+            if wave is not None and recorded_wave != wave:
+                rejected.append(
+                    f"{bundle.name}: records wave {recorded_wave}, not wave {wave}"
+                )
+                continue
+            report = evidence_bundles.verify(bundle, repo=root)
+            if not report.ok:
+                why = "; ".join(f.message for f in report.errors[:2])
+                rejected.append(f"{bundle.name}: verify failed ({why})")
+                continue
+            return ""
+
+    what = f"wave {wave}" if wave is not None else "this feature"
+    lines = [
+        f"ERROR: no verified evidence bundle for {what} of {feature!r} — "
+        "a wave is not proven by a sentence.",
+        f"Looked in {roots[0]} and {roots[1]}.",
+    ]
+    if rejected:
+        lines.append("Rejected:")
+        lines += [f"  - {r}" for r in rejected[:5]]
+        if len(rejected) > 5:
+            lines.append(f"  - … {len(rejected) - 5} more")
+    lines += [
+        "Capture a bundle for this wave, then render and verify it:",
         f"  python -m openharness run harness_evidence --action=new --repo={root} "
-        f"--feature={feature} --wave=<N>\n"
+        f"--feature={feature} --wave={wave if wave is not None else '<N>'}",
         "  ... --action=step for build/tests; --action=attach for screenshots "
         "(UI waves: one per scenario touched) ...\n"
         f"  ... --action=render --repo={root} --feature={feature}\n"
-        f"  ... --action=verify --repo={root} --feature={feature}\n"
+        f"  ... --action=verify --repo={root} --feature={feature}",
+        "The bundle must cover this wave, verify clean and record the commit now "
+        "checked out. `--tracked` on `new` stores it under `evidence/` instead "
+        "of the scratch root.",
         "The harness does not drive browsers — produce screenshots with "
-        "Playwright/manual capture and attach them."
-    )
+        "Playwright/manual capture and attach them.",
+    ]
+    return "\n".join(lines)
 
 def _decide(
     root: Path, spec_dir: Path, state: dict, waves: dict,
@@ -926,7 +977,7 @@ def ship_loop(
                 return f"ERROR: wave {wave} is not in WAVES.md"
             if not note.strip():
                 return "ERROR: --note is required — record the evidence (tests, CI, demo)"
-            ev_err = _evidence_error(root, d.name)
+            ev_err = _evidence_error(root, d.name, wave)
             if ev_err and not force:
                 return ev_err
             row = _wave(state, wave)

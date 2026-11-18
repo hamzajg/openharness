@@ -161,6 +161,11 @@ instead of the next action until the gate is met or waived.
 - `complete` requires a note; the protocol requires that it record test,
   CI, and review evidence, but the oracle only checks that the note is
   nonempty. `block` requires a decision to hand back.
+- `complete --wave=N` and `finish` require a bundle that covers that wave,
+  loads, passes `evidence.verify` (hashes, artifacts, secrets, verdict) and
+  records the checked-out commit. A rendered page alone is not evidence, and
+  another wave's bundle cannot stand in. Both roots count: the gitignored
+  `.openharness/evidence/` and the committable `evidence/` (`--tracked`).
 - A blocking gate stops its phase; the agent resolves `agent` gates inline and
   blocks for `human` gates — it never self-approves a human gate or a waiver.
 - Overdue gates keep blocking; advisory gates never do.

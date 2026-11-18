@@ -1,8 +1,8 @@
 # ADR 0007 — Evidence bundles and the walkthrough page
 
 Status: accepted · 2026-11-16 · phase 1 implemented 2026-11-17 ·
-phase 2a implemented 2026-11-17 · relates to D009
-(delivery loop), D013 (delivery audit)
+phase 2a implemented 2026-11-17 · amended 2026-11-17 (tracked root) ·
+relates to D009 (delivery loop), D013 (delivery audit)
 
 ## Context
 
@@ -74,10 +74,11 @@ the harness's job starts at the manifest.
 
 Three layers, deliberately separable, shipped in that order.
 
-### 1. The contract — `.openharness/evidence/<feature>/<run-id>/`
+### 1. The contract — two roots, scratch by default
 
 ```
-.openharness/evidence/<feature>/<run-id>/
+.openharness/evidence/<feature>/<run-id>/   # default: local scratch
+evidence/<feature>/<run-id>/                # --tracked: meant to be committed
 ├── evidence.json      # manifest, schema below (the authoritative record)
 ├── index.html         # generated walkthrough (never edited by hand)
 ├── SUMMARY.md         # 20-line summary for a PR comment or LOOP.md row
@@ -88,7 +89,7 @@ Three layers, deliberately separable, shipped in that order.
 `<run-id>` is `YYYYMMDDTHHMMSSZ-<sha7>` — sortable, and the sha makes a stale
 bundle obvious at a glance.
 
-#### Where bundles live — local scratch, never tracked
+#### Where bundles live — scratch by default, tracked on request
 
 `.openharness/evidence/` is a **local scratch directory**, the same tier as
 the existing `.openharness/chroma/`: created on demand, listed in
@@ -96,22 +97,32 @@ the existing `.openharness/chroma/`: created on demand, listed in
 machine, not a product artifact; committing megabytes of PNG and WebM would
 bloat history and rot as files move.
 
+The exception is explicit: `--action=new --tracked` places the bundle under
+`<repo>/evidence/<feature>/<run-id>/`, a normal tracked folder, for the case
+where a run's proof should travel with the repo (a public demo, a compliance
+record, a walkthrough a reviewer must see in the PR itself). Nothing is ever
+committed automatically — the harness writes files only; `git add`/commit/push
+stay a human or agent decision. `verify` enforces the split both ways: a
+scratch bundle that git tracks is an error, and a bundle under `evidence/`
+that git does not yet track draws an `untracked-bundle` warning.
+
 | consumer | what they get |
 |---|---|
 | the agent, next iteration | the whole bundle, by path |
 | the human reviewing the PR | `SUMMARY.md` pasted into the PR body or comment |
 | CI / a teammate who needs the full thing | `<run-id>.zip` uploaded as a CI artifact (P4), retained ~14 days |
+| a repo that must carry its proof | the bundle under `evidence/`, committed via `--tracked` |
 | an evidence service, later | the bundle, if someone opts in |
 
-Only `SUMMARY.md` is designed to travel into the repo (a handful of lines in
-`LOOP.md` or a PR body). `--public` exists for the rare case where a sanitized
-bundle really must be committed; it is not the default and the page marks
-itself as a published copy.
+Only `SUMMARY.md` is designed to travel into the repo as prose (a handful of
+lines in `LOOP.md` or a PR body). A full committed bundle is opt-in via
+`--tracked` and never automatic.
 
-The skill resolves the root as `<repo>/.openharness/evidence` by default,
-honours `--bundle=<path>` for anything else, and `verify` fails if handed a
-bundle inside a tracked directory (`git ls-files` on its path returns
-anything) — that is how "never tracked" is enforced rather than promised.
+The skill resolves both roots — `<repo>/.openharness/evidence` and
+`<repo>/evidence` — honours `--bundle=<path>` for anything else, and `verify`
+fails if a scratch bundle sits in a tracked directory (`git ls-files` on its
+path returns anything) — that is how "scratch stays local" is enforced rather
+than promised.
 
 Manifest v1 (JSON, all paths relative to the bundle):
 
@@ -288,10 +299,11 @@ free-text rules — this is additive, not a new tax on docs-only work.
   codes, hashes, redaction. A bundle is only as good as those checks.
 - Costs: one module, one skill, one page renderer, plus a fixture for repos
   that use Playwright.
-- Nothing new is committed per run. Bundles are large, so they live in the
-  local scratch directory `.openharness/evidence/` (gitignored, never
-  tracked); a zip is uploaded as a CI artifact when a link is needed, and
-  committing a sanitized bundle is opt-in (`--public`).
+- Nothing new is committed per run by default. Bundles live in the local
+  scratch directory `.openharness/evidence/` (gitignored); a zip is uploaded
+  as a CI artifact when a link is needed. When a run's proof must travel with
+  the repo, `--action=new --tracked` writes it under `evidence/` — a normal
+  tracked folder the human or agent commits and pushes explicitly.
 - The renderer is a single HTML template — deliberately boring, because it
   has to still open in three years with no build step.
 
@@ -322,5 +334,6 @@ free-text rules — this is additive, not a new tax on docs-only work.
    appended to the PR body. Nothing is added to git.
 
 Open question for review: whether the Playwright fixture belongs in this repo
-or is generated per-project by the skill. Bundle location is settled — local
-`.openharness/evidence/`, gitignored, never tracked.
+or is generated per-project by the skill. Bundle location: local scratch
+`.openharness/evidence/` by default; `evidence/` (tracked, committed on
+request via `--tracked`) when a run's proof must travel with the repo.
