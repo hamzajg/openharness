@@ -105,7 +105,18 @@ them.
 2. During the wave: `--action=step` for real commands (build, tests —
    exit code, duration and log are recorded). UI-touching waves attach
    at least one screenshot per acceptance scenario touched; flows over
-   ~3 steps or any failed UI step get a short recording.
+   ~3 steps or any failed UI step get a short recording. Backend-only
+   waves (services/APIs, no UI) record live request/response evidence
+   instead: run the real endpoints as a `step` — a curl walkthrough
+   covering the wave's scenarios (happy path, validation errors,
+   authz denials) reads like endpoint documentation; attach the script
+   so the exchange is reproducible. When the service exposes API docs,
+   attach the generated contract and a screenshot of the docs UI as
+   artifacts — OpenAPI/Swagger for REST, AsyncAPI for events,
+   schema-registry/IDL docs for gRPC/protobuf or other protocols.
+   Event-driven waves attach schema docs plus sample messages for each
+   topic/queue the wave introduces. Never log real secrets — redact
+   tokens in output.
 3. Before `complete`: `--action=render` then `--action=verify` (hashes,
    commit, secrets). Fix what verify reports; never commit the bundle.
 4. `SUMMARY.md` can be pasted into the PR body or the LOOP evidence
