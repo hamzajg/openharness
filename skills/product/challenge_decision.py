@@ -82,12 +82,16 @@ _TYPE_WORDS = {
              "transaction", "transactional", "eventual", "aggregate", "database",
              "table", "index", "idempotent", "idempotency"],
     "api": ["endpoint", "contract", "version", "versioning", "rest", "graphql",
-            "payload", "backward", "breaking"],
+            "grpc", "protobuf", "openapi", "asyncapi", "websocket", "payload",
+            "backward", "breaking", "deprecat"],
     "persistence": ["orm", "repository", "unit of work", "jpa", "entity",
                     "active record", "query", "dao"],
     "integration": ["webhook", "queue", "event bus", "third-party", "external",
                     "acl", "anti-corruption", "retry", "retries", "timeout",
                     "timeouts", "idempotent", "idempotency"],
+    "events": ["kafka", "rabbitmq", "sqs", "sns", "pub/sub", "pubsub",
+               "producer", "consumer", "topic", "message broker",
+               "event-driven", "event stream", "asyncapi"],
     "security": ["auth", "authentication", "authorization", "secret", "token",
                  "threat", "privilege", "encrypt", "encryption", "audit"],
     "domain": ["ubiquitous", "bounded context", "aggregate", "invariant",
@@ -95,7 +99,7 @@ _TYPE_WORDS = {
     "ux": ["user", "screen", "flow", "accessibility", "journey", "form"],
     "process": ["process", "team", "workflow", "ci", "review", "ownership"],
 }
-_HIGH_IMPACT = {"architecture", "data", "persistence", "integration", "security"}
+_HIGH_IMPACT = {"architecture", "data", "persistence", "integration", "security", "events"}
 
 
 def _now() -> str:
@@ -528,7 +532,18 @@ _DESIGN_MOVES = {
     "api": [
         "Is this a public contract or an implementation detail? Who depends on it?",
         "How will it version, and what is the backward-compatibility promise?",
-        "Are errors part of the contract, or an afterthought?",
+        "Are errors part of the contract — consistent shape, codes, retry semantics — or an afterthought?",
+        "Is the contract documented where consumers can find it (OpenAPI, AsyncAPI, schema registry, docs site), and is the doc generated from code or hand-maintained?",
+        "Which fields and operations are stable vs experimental, and what is the deprecation path?",
+        "Is authn/authz explicit per operation with least privilege, and is that visible in the docs?",
+        "Are writes idempotent where clients can retry (idempotency keys, natural keys, upserts)?",
+    ],
+    "events": [
+        "Is the event schema versioned and owned by the producer; how do consumers tolerate unknown or missing fields?",
+        "What are the delivery guarantees (at-least/at-most/exactly-once) and the dedup strategy for consumers?",
+        "What happens on poison messages — DLQ, retry/backoff policy, ordering requirements?",
+        "Is the contract discoverable (schema registry, AsyncAPI, catalog) so consumers don't guess payloads?",
+        "Are events facts about the past with minimal payloads, or disguised commands coupling producer and consumer?",
     ],
     "integration": [
         "Is an anti-corruption layer needed, or will the external model leak inward?",

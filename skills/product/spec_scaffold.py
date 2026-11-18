@@ -57,8 +57,10 @@ _SPEC_MD = """# Spec: {title}
 
 <!-- One block per decision. Every one-way-door or high-impact choice
      (persistence model, consistency guarantees, module/service boundaries,
-     stateless vs stateful design, public contracts, security controls,
-     framework vs custom mechanism) MUST record:
+     stateless vs stateful design, public contracts — REST/OpenAPI,
+     events/AsyncAPI or schema registry, gRPC/protobuf IDL — and their
+     documentation, security controls, framework vs custom mechanism)
+     MUST record:
        - Context & forces: what drives the choice, what breaks without it
        - Options considered: at least two credible options, INCLUDING the
          simplest one and the most reversible one
