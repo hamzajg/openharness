@@ -1147,6 +1147,22 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
                 f'{e(_size(art.get("bytes")))} · sha256 {e(art["sha256"][:12])}…</p></div>'
             )
 
+    # -- documents (self-contained HTML artifacts render inline)
+    docs = [a for a in arts if a.get("mime") == "text/html"]
+    if docs:
+        parts.append("<h2>Documents</h2>")
+        for art in docs:
+            caption = art.get("caption") or art["path"]
+            parts.append(
+                '<div class="card">'
+                f'<p class="note"><b>{e(str(caption))}</b> · '
+                f'{e(_size(art.get("bytes")))} · sha256 {e(art["sha256"][:12])}… · '
+                f'<a href="{e(_rel_src(art))}">open file</a></p>'
+                f'<iframe src="{e(_rel_src(art))}" style="width:100%;height:720px;'
+                'border:1px solid var(--line);border-radius:8px;background:#fff"></iframe>'
+                "</div>"
+            )
+
     # -- logs
     logs = [s for s in steps if s.get("log")]
     if logs:
