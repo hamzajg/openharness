@@ -134,9 +134,10 @@ re-verifies each finding against the repository and fills exactly one
 `AUDIT: PASS|CONCERNS|BLOCK`. `BLOCK` on any confirmed blocker, hallucinated
 claim, or unproven acceptance criterion; `CONCERNS` only when every remaining
 item is non-blocking and explicitly accepted; `PASS` only when all lists are
-empty. `ship_loop` defaults to `--review=advisory`; `/ship-loop` passes
-`--review=required`, which refuses to plan without a filled spec audit and
-refuses to finish without a filled delivery audit. The audit never marks a
+empty. `ship_loop` defaults to `--review=required`, which refuses to plan
+without a filled spec audit, refuses to start wave 1 until the spec audit
+passes, and refuses to finish without a filled delivery audit;
+`--review=advisory` remains as an explicit opt-out. The audit never marks a
 gate, never merges, and never edits product code.
 Because: Gates (D010) check *whether* a precondition exists; they do not
 check whether the spec is grounded in the repository or whether the delivery
@@ -146,7 +147,7 @@ acceptance criterion with no real proof. A reviewer that trusts the artifacts
 cannot catch that; only one that opens the code and tests can. Keeping the
 deterministic brief separate from the judgment keeps the evidence auditable
 and the reviewer honest, and keeping enforcement opt-in preserves existing
-loops and the advisory principle of D011.
+loops that opt out explicitly and the advisory principle of D011.
 
 ### D014 — Audit output must not leak absolute host paths
 

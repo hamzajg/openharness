@@ -34,6 +34,8 @@ If the PR or branch is missing, inspect `specs/<feature>/LOOP.md` and
      - status is `met`, `waived`, or advisory (`Blocking: no`)
      - a `met` gate cites real evidence: a file that exists, or command
        output. A placeholder such as "done" is not evidence.
+     - for the design-challenge gate, `DECISION-REVIEW.md` must contain a
+       filled `VERDICT:` line — an unfilled template brief is not a review.
      - a `waived` gate names who waived it and why. An agent cannot
        self-waive.
      - the diff does not satisfy a human-owned gate quietly (for example:

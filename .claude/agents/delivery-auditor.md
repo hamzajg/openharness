@@ -67,6 +67,9 @@ If the spec dir or phase is missing, ask. Do not guess.
    - Scope, acceptance criteria, and scenarios agree: no orphan scenario, no
      untraceable criterion, no scenario that names a different outcome.
    - No unresolved `TBD`/`TODO`/`FIXME` in the contract.
+   - When `GATES.md` cites `DECISION-REVIEW.md`, the file exists AND its
+     verdict block is filled (`VERDICT: ACCEPT|REVISE|REVISIT|SPLIT`), not
+     the unfilled template.
    - A criterion that names a scenario which does not exist is a hallucinated
      specification, not a typo to ignore.
 

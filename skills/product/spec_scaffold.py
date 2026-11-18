@@ -55,6 +55,19 @@ _SPEC_MD = """# Spec: {title}
 
 ## Decisions
 
+<!-- One block per decision. Every one-way-door or high-impact choice
+     (persistence model, consistency guarantees, module/service boundaries,
+     stateless vs stateful design, public contracts, security controls,
+     framework vs custom mechanism) MUST record:
+       - Context & forces: what drives the choice, what breaks without it
+       - Options considered: at least two credible options, INCLUDING the
+         simplest one and the most reversible one
+       - Decision & why: the choice and the decisive tradeoff
+       - Consequences: positive AND negative
+       - Reversibility: one-way or two-way door; revisit trigger if known
+     These feed `challenge_decision` — the review brief scores exactly
+     this shape. -->
+
 - (record ADR-style choices here as they are made)
 """
 
@@ -126,7 +139,18 @@ _GATES_MD = """# Gates: {title}
   - Why: AC-2 and AC-3 use domain terms that must be defined once.
 -->
 
-No gates defined yet.
+## G1 — Design decisions challenged
+- Before: plan
+- Type: artifact
+- Owner: agent
+- Resolver: agent
+- Blocking: yes
+- Check: file:specs/{slug}/DECISION-REVIEW.md
+- Why: Every wave inherits the feature's architecture choices (persistence
+  model, consistency, module boundaries, stateless vs stateful). The
+  challenger review — alternatives, tradeoffs, testability — must exist
+  before wave planning locks the design in. A human may waive this gate
+  for genuinely trivial features.
 """
 
 
@@ -178,7 +202,7 @@ def spec_scaffold(repo_path: str = ".", feature: str = "", output_dir: str = "sp
             first_item="(first user-facing capability)",
             first_value="(the user outcome it enables)",
         ),
-        "GATES.md": _GATES_MD.format(title=title),
+        "GATES.md": _GATES_MD.format(title=title, slug=slug),
     }
 
     written, skipped = [], []
