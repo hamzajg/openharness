@@ -50,6 +50,7 @@ def harness_evidence(
     file: str = "",
     caption: str = "",
     role: str = "",
+    snippet: str = "",
     note: str = "",
     timeout: int = 0,
     expected_failure: bool = False,
@@ -205,6 +206,7 @@ def harness_evidence(
                     role=role,
                     allow_old=allow_old,
                     by=by,
+                    snippet=snippet,
                 )
             except evidence.EvidenceError as ex:
                 raise SkillError(str(ex)) from ex
