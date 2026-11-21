@@ -8,7 +8,7 @@ Arguments (`$ARGUMENTS`). All are optional:
 
 | Arg | Default | Meaning |
 |---|---|---|
-| `--repo=sources/<repo>` | cwd inside `sources/` | Target repo. Must be in REPOS.md. |
+| `--repo=sources/<repo>` | cwd inside `sources/` | Target repo. Must be registered in the active registry (REPOS.md or .openharness/REPOS.local.md). |
 | `--feature=<name>` | first unfinished | Limit the loop to one `specs/<feature>/`. |
 | `--merge=review\|auto` | `review` | `review` keeps each PR open. `auto` merges green PRs only when required protections and checks are verified. |
 | `--review=required\|advisory` | `required` | Independent spec/delivery audit. `advisory` records nothing and enforces nothing. |

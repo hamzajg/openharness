@@ -11,7 +11,7 @@ allowed-tools: [Bash, Read, Grep, Edit, Write]
 ## Target repo
 If the session cwd is inside sources/<repo>, that repo is the default
 target. Otherwise ask the user which managed repo to operate on
-(see REPOS.md). Never guess.
+(see the active registry: REPOS.md or .openharness/REPOS.local.md). Never guess.
 
 ## Layered ENV
 If sources/<repo>/.openharness/ENV.md exists, prefer it over the global

@@ -1,5 +1,5 @@
 ---
-description: Interview the user about the product/ecosystem, write REPOS.md and ENV.md, offer to pull
+description: Interview the user, write the local repo registry and ENV.md, offer to pull
 allowed-tools: [Bash, Read, Grep, Edit, Write]
 ---
 # /init — Initialize the OpenHarness workspace
@@ -11,14 +11,14 @@ allowed-tools: [Bash, Read, Grep, Edit, Write]
 ## Target repo
 If the session cwd is inside sources/<repo>, that repo is the default
 target. Otherwise ask the user which managed repo to operate on
-(see REPOS.md). Never guess.
+(see the active registry: REPOS.md or .openharness/REPOS.local.md). Never guess.
 
 ## Layered ENV
 If sources/<repo>/.openharness/ENV.md exists, prefer it over the global
 .openharness/ENV.md for that repo. Compare with the live env probe
 output and surface any drift; do not silently choose.
 
-Read REPOS.md and .openharness/ENV.md.
+Read the active registry (REPOS.md or .openharness/REPOS.local.md) and .openharness/ENV.md.
 
 ## Workflow
 
@@ -37,6 +37,6 @@ Read REPOS.md and .openharness/ENV.md.
    !`python -m openharness run init_profile --product="<product>" --stage="<stage>" --repos="name:url:branch|stage,..." --languages="..." --frameworks="..." --infra="..." --ci="<ci>" --compliance="..." --branch_prefix="feat/" --constraints="..." --conventions="..." --landmines="..."`
    ```
 
-4. Read the newly written REPOS.md and .openharness/ENV.md. If anything looks wrong (e.g. URL parse failures in the table), edit manually.
+4. Read the newly written `.openharness/REPOS.local.md` and `.openharness/ENV.md`. The shipped `REPOS.md` stays an agnostic template. If anything looks wrong (e.g. URL parse failures in the table), edit manually.
 
 5. Offer to run `/pull` to clone all registered repos into `sources/`.

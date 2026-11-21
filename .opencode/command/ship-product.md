@@ -15,7 +15,7 @@ Run via Bash and read output:
 ## Target repo
 
 - If the cwd is inside `sources/<repo>`, that repo is the target.
-- Otherwise, ask the user which managed repo to use. See REPOS.md. Do not
+- Otherwise, ask the user which managed repo to use. See the active registry (REPOS.md or .openharness/REPOS.local.md). Do not
   guess.
 - Put all spec artifacts inside the target repo under `specs/`. They are
   product content. Commit them through PRs.
