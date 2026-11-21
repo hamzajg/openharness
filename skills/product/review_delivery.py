@@ -730,12 +730,24 @@ def _auth_claim_unnegated(text: str) -> bool:
     )
 
 
+def _deplural(word: str) -> str:
+    w = word.lower()
+    if w.endswith("ies") and len(w) > 4:
+        return w[:-3] + "y"
+    if w.endswith("es") and len(w) > 4:
+        return w[:-2]
+    if w.endswith("s") and len(w) > 4:
+        return w[:-1]
+    return w
+
+
 def _capability_terms(spec_text: str) -> set[str]:
     """Capability nouns declared out of scope, minus in-scope words.
 
     Terms come from SPEC.md `## Scope (out)` / `## Non-goals` /
     `## Out of scope` sections; anything also named under `## Scope (in)`
-    or matching a stopword is dropped to keep the signal precise.
+    (plural-tolerant) or matching a stopword is dropped to keep the
+    signal precise.
     """
     in_text = out_text = ""
     for m in _SCOPE_SECTION_RE.finditer(spec_text):
@@ -747,11 +759,12 @@ def _capability_terms(spec_text: str) -> set[str]:
             out_text += m.group(2)
         else:
             in_text += m.group(2)
-    in_words = {w.lower() for w in _WORD_RE.findall(in_text)}
+    in_norms = {_deplural(w) for w in _WORD_RE.findall(in_text)}
     return {
         w.lower()
         for w in _WORD_RE.findall(out_text)
-        if w.lower() not in in_words and w.lower() not in _CAPABILITY_STOPWORDS
+        if _deplural(w) not in in_norms
+        and w.lower() not in _CAPABILITY_STOPWORDS
     }
 
 
