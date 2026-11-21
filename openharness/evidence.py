@@ -48,6 +48,10 @@ TRACKED_ROOT = Path("evidence")
 KINDS = ("command", "browser", "api", "manual")
 STATUSES = ("pass", "fail", "skip", "manual")
 VERDICTS = ("pass", "fail", "partial")
+#: Optional `tdd` marker on a step: the TDD phase the run belongs to.
+#: `red` must be an expected failure, `green`/`refactor` must pass, and
+#: ship_loop requires them in red -> green -> refactor order.
+TDD_PHASES = ("red", "green", "refactor")
 
 #: Inline mode refuses to grow the page past this; images beyond it stay linked.
 INLINE_BUDGET = 6 * 1024 * 1024
@@ -241,9 +245,11 @@ def _schema_problems(m: Any) -> list[str]:
             out.append(f"{where}.exit_code must be an integer for a command step")
         if step.get("log") is not None and not isinstance(step.get("log"), str):
             out.append(f"{where}.log must be a path string")
-        for key in ("started_at", "note", "captured_by"):
+        for key in ("started_at", "note", "captured_by", "tdd"):
             if key in step and not isinstance(step[key], str):
                 out.append(f"{where}.{key} must be a string")
+        if "tdd" in step and step["tdd"] not in TDD_PHASES:
+            out.append(f"{where}.tdd must be one of {TDD_PHASES}")
         covers = step.get("covers", [])
         if not isinstance(covers, list) or not all(isinstance(x, str) for x in covers):
             out.append(f"{where}.covers must be a list of strings")
@@ -581,6 +587,7 @@ def record_step(
     cwd: str = ".",
     timeout: int = 0,
     expected_failure: bool = False,
+    tdd: str = "",
     step_id: str = "",
     note: str = "",
 ) -> dict[str, Any]:
@@ -596,6 +603,8 @@ def record_step(
         raise EvidenceError("cmd is required")
     if timeout < 0:
         raise EvidenceError("timeout must be zero (no limit) or positive")
+    if tdd and tdd not in TDD_PHASES:
+        raise EvidenceError(f"tdd must be one of {TDD_PHASES}, got {tdd!r}")
     sid = (step_id or _next_step_id(manifest)).strip()
     if not sid:
         raise EvidenceError("step id must not be empty")
@@ -673,6 +682,8 @@ def record_step(
         step["note"] = safe_note.strip()
     if expected_failure:
         step["expected_failure"] = True
+    if tdd:
+        step["tdd"] = tdd
     if timed_out:
         step["note"] = (
             (step.get("note", "") + "; ") if step.get("note") else ""
@@ -969,6 +980,51 @@ def verify(
         )
 
     return report
+
+
+def tdd_proof(manifest: dict) -> dict[str, Any]:
+    """Check a manifest for an ordered TDD red -> green -> refactor run.
+
+    Returns {"ok": bool, "problems": [str], "phases": {phase: step}}.
+    `red` must be a failed command step marked `expected_failure`; `green`
+    and `refactor` must pass; `started_at` must order red <= green <=
+    refactor. This proves the *runs* happened in order — whether the red
+    log shows the real scenario failure is the wave-reviewer's job.
+    """
+    problems: list[str] = []
+    phases: dict[str, dict] = {}
+    for phase in TDD_PHASES:
+        candidates = [
+            s for s in manifest.get("steps", []) if s.get("tdd") == phase
+        ]
+        if not candidates:
+            problems.append(f"no {phase!r} step recorded")
+            continue
+        # The earliest step per phase anchors the ordering check.
+        phases[phase] = min(
+            candidates, key=lambda s: s.get("started_at") or ""
+        )
+    for phase, step in phases.items():
+        sid = step.get("id", "?")
+        status = step.get("status")
+        if phase == "red":
+            if status != "fail":
+                problems.append(f"red step {sid} has status {status!r}, not 'fail'")
+            if not step.get("expected_failure"):
+                problems.append(
+                    f"red step {sid} is not marked expected_failure"
+                )
+        elif status != "pass":
+            problems.append(f"{phase} step {sid} has status {status!r}, not 'pass'")
+    if len(phases) == len(TDD_PHASES) and all(
+        s.get("started_at") for s in phases.values()
+    ):
+        stamps = {p: s["started_at"] for p, s in phases.items()}
+        if stamps["red"] > stamps["green"]:
+            problems.append("red step ran after the green step")
+        if stamps["green"] > stamps["refactor"]:
+            problems.append("green step ran after the refactor step")
+    return {"ok": not problems, "problems": problems, "phases": phases}
 
 
 def _same_commit(a: str, b: str) -> bool:

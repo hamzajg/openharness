@@ -166,3 +166,23 @@ repositories. An audit tool that leaks the operator's home path is a
 privacy regression in the one place its output is most visible — the
 committed spec dir. `~` is the standard, portable shorthand and preserves
 readability.
+
+### D015 — TDD is the default wave cycle, proven by evidence
+
+Rule: Every wave runs red → green → refactor and proves it in its
+evidence bundle: a `tdd: red` step that fails as expected, a `tdd: green`
+step that passes, and a `tdd: refactor` step that re-runs the suite after
+the KISS/DRY/SOLID review — required even when no code changed. The oracle
+(`ship_loop --action=complete`/`finish`) rejects a wave bundle without an
+ordered sequence; `--force` remains the escape. Tests are written from the
+spec's scenarios first — specification by example upstream, failing test
+downstream — never reverse-engineered after the implementation.
+
+Because: "Write tests first" was already agent guidance; guidance is not
+enforcement. The expensive failure is a plausible `VALIDATION.md` built on
+tests written to fit code that already existed — they pass, they cite the
+scenario, and they prove nothing about order. The bundle's recorded,
+hashed, timestamped command runs are the only place order can be proven
+without brittle git archaeology, so the cycle lives there (ADR 0008). The
+refactor step stays mandatory because "nothing to refactor" is itself a
+claim that deserves a green re-run, not an absence of evidence.

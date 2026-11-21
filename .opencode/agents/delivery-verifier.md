@@ -65,6 +65,10 @@ All waves must be recorded done. If not, report that. Do not validate.
    - the scenario exists in `EXAMPLES.feature` and is tagged to a wave
    - a test cites the scenario and passes when you run it
    - the wave's PR is merged, or open in review mode
+   - the wave's evidence bundle records an ordered TDD sequence
+     (`tdd: red` expected-failure → `tdd: green` → `tdd: refactor`);
+     `ship_validate`'s TDD section reports it per wave — a missing or
+     incomplete sequence is a process gap to report, not to repair here
 
    "No evidence found" means check by hand. It does not prove absence.
    Run the cited test commands. Report real counts.

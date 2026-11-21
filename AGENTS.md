@@ -67,7 +67,7 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   `delivery-verifier`), the independent audit (`delivery-auditor`), and the
   review (`decision-challenger`).
 - `SELF/` — the harness's own specs/principles (`PRINCIPLES.md`, decision
-  log D001–D014, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
+  log D001–D015, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
 - `REPOS.md` — YAML-frontmatter registry of managed repos (source of truth).
 - `tests/` — unittest-style pytest files per module.
 
@@ -118,6 +118,10 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   `/review-delivery` is advisory; `/ship-loop` enforces it with
   `--review=required` (the oracle default) and records the mode in loop
   state. It never marks a gate, merges, or edits product code.
+- **D015:** waves run TDD — tests are written from scenarios first, and the
+  evidence bundle must record an ordered `tdd: red` (expected failure) →
+  `green` → `refactor` step sequence or `complete`/`finish` rejects it
+  (ADR 0008). Refactor is a required green re-run, not an impression.
 
 ## Landmines
 
@@ -128,7 +132,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   registry.
 - `oh serve` observes session JSONL files the agent CLIs already write —
   don't add instrumentation hooks into agents.
-- Decision log D001–D014 in `SELF/PRINCIPLES.md` is normative — read it
+- Decision log D001–D015 in `SELF/PRINCIPLES.md` is normative — read it
   before structural changes.
 - The web UI must call the same verbs as the CLI (D005) — no business
   logic in TSX.
@@ -138,7 +142,9 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   The loop is driven by the agent, not by a daemon or cron (D001/D009).
 - `ship_loop --action=complete`/`finish` refuse to record without a
   rendered `harness_evidence` bundle under `.openharness/evidence/`
-  (gitignored local scratch). UI-touching waves must attach screenshots
+  (gitignored local scratch) that proves the TDD cycle — ordered
+  `--tdd=red --expected-failure` → `--tdd=green` → `--tdd=refactor`
+  steps. UI-touching waves must attach screenshots
   per the capture policy in `docs/plans/evidence-v2.md`; the harness
   never drives browsers itself.
 - Never mark a gate `met` without evidence or `waived` without a human's name
@@ -163,7 +169,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - Verify before claiming: run `pytest` (with `--no-deps` install path) and
   report the real result.
 - Keep changes minimal and consistent with surrounding code. Respect the
-  D001–D014 decision log.
+  D001–D015 decision log.
 - For product work, prefer `/ship-loop` (autonomous) or `/ship-product`
   (phased); both keep specs and loop state in the target repo under
   `specs/` and ship one wave per PR.

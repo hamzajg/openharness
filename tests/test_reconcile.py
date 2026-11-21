@@ -6,6 +6,7 @@ comparison logic, not the transport.
 """
 
 import re
+import sys
 import textwrap
 import types
 from pathlib import Path
@@ -74,6 +75,18 @@ def _bundles(root: Path, name: str) -> None:
             root, name, wave=wave, head="abc1234", run=f"run-w{wave}"
         )
         (b / "index.html").write_text("<html/>")
+        _tdd_steps(b)
+
+
+def _tdd_steps(bundle: Path) -> None:
+    """The ordered red -> green -> refactor runs ship_loop requires (ADR 0008)."""
+    py = f'"{sys.executable}"'
+    evidence.record_step(
+        bundle, title="RED", tdd="red", expected_failure=True,
+        cmd=f"{py} -c \"import sys; sys.exit(1)\"",
+    )
+    evidence.record_step(bundle, title="GREEN", tdd="green", cmd=f"{py} -c \"pass\"")
+    evidence.record_step(bundle, title="REFACTOR", tdd="refactor", cmd=f"{py} -c \"pass\"")
 
 
 def _run(root: Path, **kw):

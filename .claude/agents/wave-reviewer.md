@@ -51,6 +51,18 @@ If the PR or branch is missing, inspect `specs/<feature>/LOOP.md` and
      - the test exercises the behavior. It is not a tautology or a
        mock-only check.
      - the implementation satisfies the observable outcome.
+   - Check the TDD evidence in the wave's bundle (`.openharness/evidence/
+     <feature>/<run>/evidence.json` or the tracked `evidence/` root):
+     - an ordered `tdd: red` (status `fail` + `expected_failure`),
+       `tdd: green` (`pass`) and `tdd: refactor` (`pass`) step sequence
+       exists — `ship_loop` already requires this, so a missing sequence
+       means the wave bypassed the oracle: blocker.
+     - the red step's log shows the named scenario test failing for the
+       right reason — an assertion/scenario failure, not an import or
+       collection error, and not a failure in unrelated tests.
+     - the green and refactor steps run the wave's tests and pass; the
+       refactor step changed no observable behavior (no weakened or
+       deleted assertions).
 
 4. **Check for regressions.**
    - Look for changed behavior outside the wave's scope.

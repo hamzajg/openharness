@@ -95,7 +95,11 @@ result. A "done" without evidence is a false record.
 
 Every wave ships with an evidence bundle — the oracle refuses
 `--action=complete` (for that wave) and `--action=finish` until a bundle
-loads, passes `verify` and records the checked-out commit. Bundles live in
+loads, passes `verify`, records the checked-out commit, **and proves the
+TDD cycle**: an ordered `tdd: red` (expected-failure test run) →
+`tdd: green` → `tdd: refactor` step sequence. Mark steps with
+`--tdd=red|green|refactor` on `--action=step`; the red step must also
+carry `--expected-failure`. Bundles live in
 `.openharness/evidence/<feature>/<run-id>/` (gitignored scratch) or in the
 committable `evidence/` root when `new` is given `--tracked`. The harness does not drive browsers: Playwright, a human,
 or you produce screenshots/recordings; the bundle hashes and catalogs

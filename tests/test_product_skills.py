@@ -260,6 +260,7 @@ def test_ship_validate_writes_traceability(tmp_path):
     assert (d / "VALIDATION.md").is_file()
     assert "Traceability" in out and "Demo script" in out
     assert "test_demo.py" in out  # evidence found
+    assert "## TDD evidence" in out and "Wave 1: no bundle recorded" in out
 
 
 def test_ship_validate_finds_tsx_test_evidence(tmp_path):

@@ -1,4 +1,6 @@
+import json
 import re
+import sys
 import textwrap
 from pathlib import Path
 
@@ -125,6 +127,18 @@ def _bundles(root: Path, name: str) -> None:
             root, name, wave=wave, head="abc1234", run=f"run-w{wave}"
         )
         (b / "index.html").write_text("<html/>")
+        _tdd_steps(b)
+
+
+def _tdd_steps(bundle: Path) -> None:
+    """The ordered red -> green -> refactor runs ship_loop requires (ADR 0008)."""
+    py = f'"{sys.executable}"'
+    evidence.record_step(
+        bundle, title="RED", tdd="red", expected_failure=True,
+        cmd=f"{py} -c \"import sys; sys.exit(1)\"",
+    )
+    evidence.record_step(bundle, title="GREEN", tdd="green", cmd=f"{py} -c \"pass\"")
+    evidence.record_step(bundle, title="REFACTOR", tdd="refactor", cmd=f"{py} -c \"pass\"")
 
 
 def _run(root: Path, **kw) -> str:
@@ -150,6 +164,20 @@ def test_clean_delivery_audit_has_no_findings(tmp_path):
     out = _audit(tmp_path, phase="delivery", changed="src/cart/store.py")
     assert "Findings: **0 blockers · 0 concerns · 0 unverified**" in out
     assert "Validation rows: 2" in out
+
+
+def test_done_wave_without_tdd_steps_is_a_concern(tmp_path):
+    """ADR 0008: the audit surfaces missing TDD proof without re-blocking."""
+    d = _delivery(tmp_path)
+    bundle = tmp_path / ".openharness" / "evidence" / "cart" / "run-w1"
+    manifest_path = bundle / "evidence.json"
+    manifest = json.loads(manifest_path.read_text())
+    for s in manifest["steps"]:
+        s.pop("tdd", None)
+    manifest_path.write_text(json.dumps(manifest))
+    out = _audit(tmp_path, spec_dir=str(d), phase="delivery")
+    assert "[tdd-missing]" in out
+    assert "0 blockers" in out
 
 
 # ---------- artifacts ----------

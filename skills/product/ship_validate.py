@@ -22,6 +22,7 @@ import os
 import re
 from pathlib import Path
 
+from openharness import evidence as evidence_bundles
 from openharness.skill import skill
 
 _SKIP_DIRS = {
@@ -165,6 +166,26 @@ _STOPWORDS = {
 }
 
 
+def _tdd_status(root: Path, feature: str) -> dict[int, str]:
+    """Newest evidence bundle per wave -> TDD verdict string."""
+    status: dict[int, str] = {}
+    for row in evidence_bundles.list_bundles(root, feature=feature):
+        wave = row.get("wave")
+        if not isinstance(wave, int) or wave <= 0 or wave in status:
+            continue
+        try:
+            manifest = evidence_bundles.load(row["bundle"])
+        except evidence_bundles.EvidenceError:
+            continue
+        proof = evidence_bundles.tdd_proof(manifest)
+        status[wave] = (
+            "red→green→refactor ✓"
+            if proof["ok"]
+            else f"incomplete ({'; '.join(proof['problems'][:2])})"
+        )
+    return status
+
+
 def _tokens(name: str) -> set:
     return {w for w in re.findall(r"[a-z0-9]+", name.lower())
             if len(w) >= 4 and w not in _STOPWORDS}
@@ -283,6 +304,15 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
         waves = ", ".join(f"@w{w}" for w in sorted(s["waves"])) or "untagged"
         out.append(f"- {mark} `{s['name']}` ({waves})")
     out.append("")
+    tdd = _tdd_status(root, d.name)
+    out.append("## TDD evidence")
+    out.append("")
+    out.append("Ordered red → green → refactor steps recorded in the wave's")
+    out.append("evidence bundle (`--tdd=` on `harness_evidence --action=step`).")
+    out.append("")
+    for w in sorted(planned_waves):
+        out.append(f"- Wave {w}: {tdd.get(w, 'no bundle recorded')}")
+    out.append("")
     out.append("## Demo script (manual walkthrough)")
     out.append("")
     happy = [s for s in scenarios if s["happy"]] or [s for s in scenarios if s["waves"]]
@@ -336,6 +366,16 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
             "AC(s) " + ", ".join(f"AC{n}" for n in unproven)
             + " lack strong test evidence — add tests or record "
             "## Manual verification"
+        )
+    tdd_missing = [
+        w for w in sorted(planned_waves)
+        if tdd.get(w, "no bundle recorded") != "red→green→refactor ✓"
+    ]
+    if tdd_missing:
+        gaps.append(
+            "Wave(s) " + ", ".join(map(str, tdd_missing))
+            + " lack TDD red→green→refactor evidence in their bundle — "
+            "record --tdd= steps or re-run the wave under the TDD contract"
         )
     out.append("## Gaps")
     out.append("")

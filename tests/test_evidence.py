@@ -1176,3 +1176,87 @@ def test_attach_from_invalid_artifact(tmp_path):
 
     assert run.returncode == 2, run.stdout + run.stderr
     assert "artifact missing required field" in run.stderr
+
+
+# ---------- TDD steps (ADR 0008) ----------
+
+def _tdd_bundle(tmp_path: Path, *, red_expected: bool = True) -> Path:
+    """A bundle with a real ordered red -> green -> refactor run."""
+    bundle = evidence.new_bundle(
+        tmp_path, "cart", wave=1, head=HEAD, run="20260101T000000Z-tdd1"
+    )
+    py = f'"{sys.executable}"'
+    evidence.record_step(
+        bundle, title="RED", tdd="red", expected_failure=red_expected,
+        cmd=f"{py} -c \"import sys; sys.exit(1)\"",
+    )
+    evidence.record_step(
+        bundle, title="GREEN", tdd="green", cmd=f"{py} -c \"pass\""
+    )
+    evidence.record_step(
+        bundle, title="REFACTOR", tdd="refactor", cmd=f"{py} -c \"pass\""
+    )
+    return bundle
+
+
+def test_record_step_stamps_the_tdd_phase(tmp_path):
+    bundle = _tdd_bundle(tmp_path)
+    manifest = evidence.load(bundle)
+    assert [s["tdd"] for s in manifest["steps"]] == ["red", "green", "refactor"]
+
+
+def test_record_step_rejects_an_unknown_tdd_phase(tmp_path):
+    bundle = evidence.new_bundle(
+        tmp_path, "cart", head=HEAD, run="20260101T000000Z-tdd2"
+    )
+    with pytest.raises(evidence.EvidenceError):
+        evidence.record_step(bundle, cmd="true", tdd="purple")
+
+
+def test_tdd_proof_accepts_an_ordered_run(tmp_path):
+    manifest = evidence.load(_tdd_bundle(tmp_path))
+    proof = evidence.tdd_proof(manifest)
+    assert proof["ok"], proof["problems"]
+    assert set(proof["phases"]) == {"red", "green", "refactor"}
+
+
+def test_tdd_proof_requires_every_phase(tmp_path):
+    bundle = _tdd_bundle(tmp_path)
+    manifest = evidence.load(bundle)
+    manifest["steps"] = [s for s in manifest["steps"] if s["tdd"] != "refactor"]
+    proof = evidence.tdd_proof(manifest)
+    assert not proof["ok"]
+    assert any("refactor" in p for p in proof["problems"])
+
+
+def test_tdd_proof_rejects_a_red_step_that_passed(tmp_path):
+    bundle = _tdd_bundle(tmp_path)
+    manifest = evidence.load(bundle)
+    for s in manifest["steps"]:
+        if s["tdd"] == "red":
+            s["status"] = "pass"
+            s["exit_code"] = 0
+    proof = evidence.tdd_proof(manifest)
+    assert not proof["ok"]
+    assert any("red step" in p for p in proof["problems"])
+
+
+def test_tdd_proof_rejects_red_without_expected_failure(tmp_path):
+    manifest = evidence.load(_tdd_bundle(tmp_path, red_expected=False))
+    proof = evidence.tdd_proof(manifest)
+    assert not proof["ok"]
+    assert any("expected_failure" in p for p in proof["problems"])
+
+
+def test_tdd_proof_rejects_out_of_order_runs(tmp_path):
+    manifest = evidence.load(_tdd_bundle(tmp_path))
+    stamps = {
+        "red": "2026-01-01T00:00:03Z",
+        "green": "2026-01-01T00:00:01Z",
+        "refactor": "2026-01-01T00:00:02Z",
+    }
+    for s in manifest["steps"]:
+        s["started_at"] = stamps[s["tdd"]]
+    proof = evidence.tdd_proof(manifest)
+    assert not proof["ok"]
+    assert any("after" in p for p in proof["problems"])

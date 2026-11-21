@@ -664,6 +664,11 @@ def _evidence_error(
                 why = "; ".join(f.message for f in report.errors[:2])
                 rejected.append(f"{bundle.name}: verify failed ({why})")
                 continue
+            proof = evidence_bundles.tdd_proof(manifest)
+            if not proof["ok"]:
+                why = "; ".join(proof["problems"][:3])
+                rejected.append(f"{bundle.name}: TDD proof incomplete ({why})")
+                continue
             if wave is not None or required_waves is None:
                 return ""
             if recorded_wave in (None, 0):
@@ -699,6 +704,9 @@ def _evidence_error(
         f"--feature={feature} --wave={wave if wave is not None else '<N>'}",
         "  ... --action=step for build/tests; --action=attach for screenshots "
         "(UI waves: one per scenario touched) ...\n"
+        "  TDD is required: record `--action=step --tdd=red --expected-failure` "
+        "for the failing test run, `--tdd=green` once it passes, and "
+        "`--tdd=refactor` for the post-cleanup suite re-run ...\n"
         f"  ... --action=render --repo={root} --feature={feature}\n"
         f"  ... --action=verify --repo={root} --feature={feature}",
         "The bundle must cover this wave, verify clean and record the commit now "
