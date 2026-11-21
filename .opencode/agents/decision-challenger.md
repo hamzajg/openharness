@@ -100,7 +100,8 @@ If the source is missing, ask. Do not invent a decision.
      capabilities the spec/API does not provide — e.g. "Account", "Log
      in", "Sign up", "Password" when identity is anonymous or auth is
      out of scope. A mismatch between copy and shipped capability is a
-     design defect, not a wording nit.
+     design defect, not a wording nit. Name the exact string and the
+     capability it implies; judge intent in context, not by word matching.
 
 6. **Score with evidence.**
    - Fill the brief's scorecard (1–5) only where you have evidence:

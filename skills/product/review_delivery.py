@@ -115,63 +115,6 @@ _GAP_NOISE_RE = re.compile(
     r"disregarded|acceptable per spec)\b",
     re.I,
 )
-# Terminology vs product truth: user-facing copy must not promise
-# capabilities the spec disclaims. Two complementary checks:
-#  1. Generic — capability terms declared in SPEC.md "Scope (out)" /
-#     "Non-goals" sections are matched (with simple plural tolerance)
-#     against scenario/backlog wording and quoted/JSX text in changed
-#     UI sources.
-#  2. Auth phrases — "no auth"-style disclaimers additionally catch
-#     multi-word auth wording ("sign in", "log in") that single-term
-#     extraction cannot see.
-# Both report a concern for the auditor, never a blocker.
-_AUTH_DISCLAIMER_RE = re.compile(
-    r"\b(?:no auth|no real auth|without auth|not authenticated|"
-    r"unauthenticated|anonymous)\b",
-    re.I,
-)
-_AUTH_CLAIM_RE = re.compile(
-    r"\b(?:accounts?|log ?in|login|sign ?in|sign ?up|passwords?|"
-    r"register(?:s|ed|ing|ation)?|credentials?|"
-    r"authenticat\w*|authori[sz]ation)\b",
-    re.I,
-)
-_SCOPE_SECTION_RE = re.compile(
-    r"^##\s+(Scope\s*\(?(?:in|out)\)?|Non-goals?|Out of scope)\b"
-    r"(.*?)(?=^##\s|\Z)",
-    re.M | re.S | re.I,
-)
-_WORD_RE = re.compile(r"[A-Za-z]{5,}")
-_CAPABILITY_STOPWORDS = {
-    "about", "above", "across", "after", "again", "against", "along",
-    "also", "among", "another", "anything", "application", "applications",
-    "app", "apps", "around", "because", "become", "before", "being",
-    "below", "between", "build", "called", "cannot", "change", "changes",
-    "could", "domain", "domains", "doing", "done", "during", "each",
-    "either", "every", "example", "examples", "except", "feature",
-    "features", "first", "following", "front", "frontend", "future",
-    "given", "going", "having", "implementation", "instead", "itself",
-    "later", "least", "level", "like", "made", "make", "many", "might",
-    "more", "most", "much", "must", "name", "never", "next", "nice",
-    "nothing", "often", "once", "only", "other", "others", "over",
-    "part", "parts", "pass", "passed", "per",
-    "place", "please", "polish", "possible", "probably", "product",
-    "real", "really", "reason", "refactor", "related", "remain",
-    "requires", "right", "same", "scenario", "scenarios", "seem",
-    "should", "since", "small", "some", "something", "sometimes",
-    "still", "stuff", "such", "take", "than", "that", "their", "them",
-    "then", "there", "these", "they", "thing", "things", "this", "those",
-    "though", "through", "thus", "under", "until", "upon", "using",
-    "usually", "very", "want", "wants", "wave", "waves", "well", "were",
-    "what", "when", "where", "which", "while", "will", "with", "within",
-    "without", "would", "your", "yours",
-}
-_OUT_OF_SCOPE_HEADING_RE = re.compile(
-    r"out of scope|non-goal|excluded|future|won'?t have|deferred",
-    re.I,
-)
-_COPY_EXTS = {".tsx", ".jsx", ".html", ".vue", ".svelte"}
-_HEADING_RE = re.compile(r"^#{1,6}\s")
 _HALLUCINATION_RE = re.compile(
     r"\b(?:TODO|FIXME|XXX|HACK|NOT\s+IMPLEMENTED|NOT\s+YET\s+IMPLEMENTED|"
     r"COMING\s+SOON)\b",
@@ -709,83 +652,6 @@ def _out_of_scope_exempt(path: str) -> bool:
 
 # ------------------------------------------------------------------ audit
 
-_PROSE_LINE_RE = re.compile(r"[A-Za-z][A-Za-z0-9 ,.'&!?:;\-—]{2,80}")
-_CODEISH_RE = re.compile(r"[=;{}<>()\\/]")
-
-
-def _copy_fragments(line: str) -> list[str]:
-    """User-visible text on a source line: quoted strings, JSX text,
-    and bare prose lines (JSX text often sits alone between tags)."""
-    frags = [m.group(0) for m in _QUOTED_RE.finditer(line)]
-    frags.extend(re.findall(r">([^<>{}]+)<", line))
-    stripped = line.strip()
-    if _PROSE_LINE_RE.fullmatch(stripped) and not _CODEISH_RE.search(stripped):
-        frags.append(stripped)
-    return frags
-
-
-def _auth_claim_unnegated(text: str) -> bool:
-    return bool(_AUTH_CLAIM_RE.search(text)) and not (
-        _AUTH_DISCLAIMER_RE.search(text) or _NEGATED_RE.search(text)
-    )
-
-
-def _deplural(word: str) -> str:
-    w = word.lower()
-    if w.endswith("ies") and len(w) > 4:
-        return w[:-3] + "y"
-    if w.endswith("es") and len(w) > 4:
-        return w[:-2]
-    if w.endswith("s") and len(w) > 4:
-        return w[:-1]
-    return w
-
-
-def _capability_terms(spec_text: str) -> set[str]:
-    """Capability nouns declared out of scope, minus in-scope words.
-
-    Terms come from SPEC.md `## Scope (out)` / `## Non-goals` /
-    `## Out of scope` sections; anything also named under `## Scope (in)`
-    (plural-tolerant) or matching a stopword is dropped to keep the
-    signal precise.
-    """
-    in_text = out_text = ""
-    for m in _SCOPE_SECTION_RE.finditer(spec_text):
-        heading = m.group(1).strip().lower()
-        is_out = "out" in heading or heading.startswith(
-            ("non-goal", "out of scope")
-        )
-        if is_out:
-            out_text += m.group(2)
-        else:
-            in_text += m.group(2)
-    in_norms = {_deplural(w) for w in _WORD_RE.findall(in_text)}
-    return {
-        w.lower()
-        for w in _WORD_RE.findall(out_text)
-        if _deplural(w) not in in_norms
-        and w.lower() not in _CAPABILITY_STOPWORDS
-    }
-
-
-def _capability_pattern(terms: set[str]) -> re.Pattern | None:
-    if not terms:
-        return None
-    variants: set[str] = set()
-    for t in terms:
-        variants.add(t)
-        variants.add(t[:-1] if t.endswith("s") else t + "s")
-    body = "|".join(
-        sorted((re.escape(v) for v in variants), key=len, reverse=True)
-    )
-    return re.compile(rf"\b(?:{body})\b", re.I)
-
-
-def _capability_hit(pattern: re.Pattern, text: str) -> str | None:
-    m = pattern.search(text)
-    return m.group(0) if m else None
-
-
 def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> tuple[str, list[Finding]]:
     findings: list[Finding] = []
     artifacts = {
@@ -927,44 +793,6 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
                     "blocker", "unresolved-spec", f"{name}:{i}",
                     f"unresolved marker: {line.strip()[:110]}",
                 ))
-
-    # --- terminology vs product truth ---------------------------------
-    # Copy must not promise capabilities the spec places out of scope.
-    # Generic rule: capability nouns from SPEC.md Scope(out)/Non-goals
-    # matched against scenario/backlog wording and shipped UI copy;
-    # auth-phrase rule catches multi-word auth wording the term pass
-    # cannot see. Concerns for the auditor, never blockers.
-    cap_re = _capability_pattern(_capability_terms(spec_text))
-    auth_disclaimed = bool(_AUTH_DISCLAIMER_RE.search(spec_text))
-
-    def _capability_hits(text: str) -> list[str]:
-        if _NEGATED_RE.search(text):
-            return []
-        hits = []
-        if cap_re:
-            h = _capability_hit(cap_re, text)
-            if h:
-                hits.append(h)
-        if auth_disclaimed and _auth_claim_unnegated(text):
-            m = _AUTH_CLAIM_RE.search(text)
-            hits.append(m.group(0) if m else "auth")
-        return hits
-
-    if cap_re or auth_disclaimed:
-        for name in ("EXAMPLES.feature", "BACKLOG.md"):
-            deferred = False
-            for i, line in enumerate(artifacts[name].splitlines(), 1):
-                if _HEADING_RE.match(line):
-                    deferred = bool(_OUT_OF_SCOPE_HEADING_RE.search(line))
-                if deferred or _NEGATED_RE.search(line):
-                    continue
-                hits = _capability_hits(line)
-                if hits:
-                    findings.append(Finding(
-                        "concern", "terminology-capability", f"{name}:{i}",
-                        "wording implies out-of-scope capability "
-                        f"({', '.join(hits)}): {line.strip()[:90]}",
-                    ))
 
     # --- value contract (D017): advisory here, enforced by the G0 gate --
     vc_ok, vc_problems = value_contract_status(spec_text)
@@ -1259,27 +1087,6 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
                         f"shipped code contains an unfinished marker: {line.strip()[:100]}",
                     ))
                     break
-
-        if cap_re or auth_disclaimed:
-            for path in changed_files:
-                p = root / path
-                if p.suffix.lower() not in _COPY_EXTS or not p.is_file():
-                    continue
-                for i, line in enumerate(_read(p).splitlines(), 1):
-                    hit = next(
-                        (h for f in _copy_fragments(line)
-                         for h in _capability_hits(f)),
-                        None,
-                    )
-                    if hit is not None:
-                        findings.append(Finding(
-                            "concern", "terminology-capability",
-                            f"{path}:{i}",
-                            "user-facing copy implies an out-of-scope "
-                            f"capability (`{hit}`): "
-                            f"`{line.strip()[:80]}`",
-                        ))
-                        break
 
     # --- assemble ------------------------------------------------------
     findings = _trim(findings)

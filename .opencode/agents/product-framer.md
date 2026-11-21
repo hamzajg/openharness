@@ -101,7 +101,9 @@ Otherwise stop and report that you need a target repo.
    - Terminology honesty: scenario and story wording (and any quoted
      UI copy) must not promise capabilities listed as out of scope —
      e.g. "sign in", "account", or "password" when auth is a non-goal.
-     If a capability is deferred, name the deferred state honestly.
+     If a capability is deferred, name the deferred state honestly — e.g.
+     "auth is out; identity is anonymous" — so a reviewer can compare
+     shipped copy against the plain-language Scope (out) list.
    - For each high-impact decision, prefix it with `REVIEW:` and list it in
      the report's REVIEW line so the orchestrator runs
      `/challenge-decision` before wave planning (gate G1). Do not run the

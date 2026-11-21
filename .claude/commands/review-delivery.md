@@ -54,7 +54,9 @@ Arguments (`$ARGUMENTS`), all optional:
    - scope drift and unfinished markers in changed code.
 
    The brief is **not** a verdict. A clean brief means nothing mechanical was
-   found. It does not mean the feature is correct.
+   found. It does not mean the feature is correct. In particular, it does not
+   judge copy honesty — deciding whether wording promises an out-of-scope
+   capability is the auditor's job.
 
 3. **Delegate the judgment.** Give **delivery-auditor** the repo, spec dir,
    phase, brief, and changed files. It must:
@@ -64,6 +66,8 @@ Arguments (`$ARGUMENTS`), all optional:
    - run the real test command when the toolchain is available;
    - check the demo script's happy path end to end;
    - compare changed public contracts with the spec and README;
+   - do the mandatory copy-honesty check: Scope(out) vs scenario, backlog
+     and changed UI copy, with `file:line` for each mismatch;
    - record dismissed findings with a reason, and unverified items honestly;
    - fill the verdict block.
 

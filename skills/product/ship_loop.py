@@ -486,14 +486,15 @@ def _phase_guidance(root: Path) -> str:
         "   highest score and record the choice in SPEC.md → Decisions.",
         "3. Scaffold: `python -m openharness run spec_scaffold --repo_path="
         f"{root} --feature=\"<name>\"`",
-        "4. Fill SPEC.md (incl. `## Decisions` — every one-way-door choice,",
-        "   options + simplest/reversible alternative, consequences),",
-        "   EXAMPLES.feature (@w<N> tags) and BACKLOG.md (user stories, one",
-        "   `## US<n> — ...` block each). Keep the scaffold's G1 gate.",
+        "4. Fill SPEC.md (incl. `## Value contract` with a numeric target and",
+        "   `## Decisions` — every one-way-door choice, options + simplest/",
+        "   reversible alternative, consequences), EXAMPLES.feature (@w<N>",
+        "   tags) and BACKLOG.md (user stories, one `## US<n> — ...` block",
+        "   each). Keep the scaffold's G0 (value contract) and G1 gates.",
         "5. Challenge the decisions: `challenge_decision --spec_dir=<dir> --write`,",
         "   decision-challenger fills DECISION-REVIEW.md, record gate G1 met.",
         "6. `python -m openharness run wave_plan --spec_dir="
-        f"{root}/specs/<feature>` (after G1 is met and SPEC-AUDIT passes).",
+        f"{root}/specs/<feature>` (after G0 and G1 are met and SPEC-AUDIT passes).",
         "",
         "Then call `ship_loop --action=next` again to start wave 1.",
     ])

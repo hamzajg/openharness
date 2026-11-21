@@ -142,6 +142,8 @@ def test_no_specs_returns_frame_guidance(tmp_path):
     assert "no specs yet" in out
     assert "discover_product" in out
     assert "spec_scaffold" in out
+    assert "G0" in out and "Value contract" in out
+    assert "G1" in out
 
 
 def test_missing_artifacts_ask_for_spec(tmp_path):

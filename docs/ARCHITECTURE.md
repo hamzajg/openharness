@@ -60,6 +60,9 @@ OpenHarness is simultaneously:
   tests and fills `PASS`/`CONCERNS`/`BLOCK` → `SPEC-AUDIT.md` or
   `DELIVERY-AUDIT.md`. `ship_loop --review=required` refuses to plan or finish
   without a filled verdict (D013); the audit never marks a gate.
+  Copy honesty is judged by `delivery-auditor` from Scope(out) and changed
+  UI copy; the deterministic brief deliberately does not match capability
+  terms — context decides whether wording is a promise.
 - **Decision review:** `/challenge-decision` → `challenge_decision` builds a
   deterministic brief (record completeness, heuristic code signals, design
   moves, lens questions) → `decision-challenger` supplies alternatives,
