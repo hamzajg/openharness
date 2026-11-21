@@ -7,4 +7,3 @@ __pycache__/
 .openharness/chroma/
 .DS_Store
 .openharness/evidence/
-.openharness/ENV.md
