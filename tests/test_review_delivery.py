@@ -1084,3 +1084,49 @@ def test_auth_wording_in_shipped_ui_copy_is_flagged(tmp_path):
                  changed="web/src/Header.tsx,src/cart/store.py")
     assert "[terminology-capability]" in out
     assert "Account" in out
+
+
+def test_out_of_scope_capability_term_in_scenario_is_flagged(tmp_path):
+    """Generic rule: any capability noun declared out of scope."""
+    _spec_only(tmp_path)
+    spec = tmp_path / "specs" / "cart" / "SPEC.md"
+    spec.write_text(spec.read_text().replace(
+        "Payments and inventory reservation.",
+        "Payments and inventory reservation; notifications are deferred.",
+    ))
+    feat = tmp_path / "specs" / "cart" / "EXAMPLES.feature"
+    feat.write_text(feat.read_text().replace(
+        "Then it appears", "Then it appears and a notification is sent"))
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    assert "[terminology-capability]" in out
+    assert "notification" in out
+
+
+def test_capability_term_in_shipped_ui_copy_is_flagged(tmp_path):
+    d = _delivery(tmp_path)
+    spec = tmp_path / "specs" / "cart" / "SPEC.md"
+    spec.write_text(spec.read_text().replace(
+        "Payments and inventory reservation.",
+        "Payments and inventory reservation; notifications are deferred.",
+    ))
+    _write(tmp_path, "web/src/Header.tsx",
+           "export default () => <button>Enable notifications</button>\n")
+    out = _audit(tmp_path, spec_dir=str(d), phase="delivery",
+                 changed="web/src/Header.tsx")
+    assert "[terminology-capability]" in out
+    assert "notification" in out
+
+
+def test_term_present_in_scope_in_is_not_flagged(tmp_path):
+    """A word named under Scope (in) is not treated as out of scope."""
+    _spec_only(tmp_path)
+    spec = tmp_path / "specs" / "cart" / "SPEC.md"
+    spec.write_text(spec.read_text().replace(
+        "- `src/cart` — cart domain, storage, and HTTP surface.",
+        "- `src/cart` — cart domain, storage, notifications inbox, and HTTP surface.",
+    ).replace(
+        "Payments and inventory reservation.",
+        "Payments and inventory reservation; notifications are deferred.",
+    ))
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    assert "[terminology-capability]" not in out
