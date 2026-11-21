@@ -378,6 +378,30 @@ def test_ship_validate_counts_groovy_specs(tmp_path):
     assert "DemoSpec.groovy" in out
 
 
+def test_ship_validate_named_scenarios_do_not_expand_to_whole_wave(tmp_path):
+    from skills.product.ship_validate import ship_validate
+    repo = tmp_path / "repo"
+    d = repo / "specs" / "demo"
+    d.mkdir(parents=True)
+    (d / "SPEC.md").write_text(
+        "# Spec: Demo\n\n## Acceptance criteria\n\n"
+        "| # | Criterion | Scenario(s) |\n|---|-----------|-------------|\n"
+        "| 1 | It works | Create base |\n"
+        "| 2 | Everything in wave 1 | @w1 |\n"
+    )
+    (d / "EXAMPLES.feature").write_text(
+        "Feature: Demo\n\n  @w1\n  Scenario: Create base\n    Given x\n\n"
+        "  @w1\n  Scenario: Other thing\n    Given x\n"
+    )
+    (d / "WAVES.md").write_text("# Waves\n\n## Wave 1 — iteration 1\n\n| Item |\n")
+    _write(repo, "tests/test_demo.py", "def test_create_base():\n    assert True\n")
+    out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    row1 = next(line for line in out.splitlines() if line.startswith("| 1 |"))
+    row2 = next(line for line in out.splitlines() if line.startswith("| 2 |"))
+    assert "Other thing" not in row1
+    assert "Other thing" in row2  # explicit @w1 still expands to the wave
+
+
 def test_ship_validate_parses_numbered_acceptance_criteria(tmp_path):
     from skills.product.ship_validate import ship_validate
     repo = tmp_path / "repo"

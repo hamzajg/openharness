@@ -96,14 +96,22 @@ def _cell(text: str, limit: int = 60) -> str:
 
 
 def _link_refs(refs: str, scenarios: list):
-    """Resolve @wN tags and verbatim scenario names in a reference cell."""
-    waves = {int(w) for w in _TAG_RE.findall(refs)}
+    """Resolve @wN tags and verbatim scenario names in a reference cell.
+
+    Returns (waves, linked, explicit_waves): `waves` is the union used for
+    display, `linked` the scenario names found verbatim, and
+    `explicit_waves` only the @wN tags — wave expansion to every scenario
+    in the wave is legitimate for an explicit tag, not for a wave inferred
+    from a named scenario.
+    """
+    explicit = {int(w) for w in _TAG_RE.findall(refs)}
     cell = refs.lower()
     linked = {s["name"] for s in scenarios if s["name"].lower() in cell}
+    waves = set(explicit)
     for s in scenarios:
         if s["name"] in linked:
             waves |= s["waves"]
-    return waves, linked
+    return waves, linked, explicit
 
 
 def _acceptance_block(spec_text: str) -> tuple[str, bool]:
@@ -129,16 +137,22 @@ def _ac_rows(spec_text: str, scenarios: list):
         criterion, scen_refs = m.group(1).strip(), m.group(2)
         if criterion.lower() in ("criterion", "---") or set(criterion) <= {"-", ":"}:
             continue
-        waves, linked = _link_refs(scen_refs, scenarios)
-        rows.append({"criterion": criterion, "waves": waves, "scenarios": linked})
+        waves, linked, explicit = _link_refs(scen_refs, scenarios)
+        rows.append({
+            "criterion": criterion, "waves": waves, "scenarios": linked,
+            "explicit_waves": explicit,
+        })
     if rows or not has_section:
         return rows
     for m in _NUMBERED_AC_RE.finditer(block):
         criterion = m.group(2).strip()
         if not criterion or criterion.lower() in ("criterion", "acceptance criteria"):
             continue
-        waves, linked = _link_refs(criterion, scenarios)
-        rows.append({"criterion": criterion, "waves": waves, "scenarios": linked})
+        waves, linked, explicit = _link_refs(criterion, scenarios)
+        rows.append({
+            "criterion": criterion, "waves": waves, "scenarios": linked,
+            "explicit_waves": explicit,
+        })
     return rows
 
 
@@ -241,7 +255,7 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
             scen_by_wave.setdefault(w, []).append(s["name"])
     for i, ac in enumerate(acs, 1):
         names = set(ac.get("scenarios", ()))
-        for w in sorted(ac["waves"]):
+        for w in sorted(ac.get("explicit_waves", ())):
             names.update(scen_by_wave.get(w, []))
         names = sorted(names)
         strong = sorted({h for n in names for h in evidence.get(n, {}).get("strong", [])})
@@ -306,7 +320,7 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
             unlinked.append(i)
             continue
         names = set(ac["scenarios"])
-        for w in ac["waves"]:
+        for w in ac.get("explicit_waves", ()):
             names.update(scen_by_wave.get(w, []))
         if i not in manual and not any(
             evidence.get(n, {}).get("strong") for n in names
