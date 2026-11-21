@@ -211,7 +211,7 @@ def test_next_marks_feature_done_when_validation_exists(tmp_path):
     _run(tmp_path, action="complete", wave=1, note="ok")
     _run(tmp_path, action="start", wave=2)
     _run(tmp_path, action="complete", wave=2, note="ok")
-    (d / "VALIDATION.md").write_text("# Validation\n")
+    _validation(d)
     (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
     out = _run(tmp_path)
     assert out.startswith("DONE")
@@ -223,7 +223,7 @@ def test_finish_requires_validation_and_finished_waves(tmp_path):
     _run(tmp_path, action="start", wave=1)
     out = _run(tmp_path, action="finish")
     assert out.startswith("ERROR") and "not done" in out
-    (d / "VALIDATION.md").write_text("# Validation\n")
+    _validation(d)
     out = _run(tmp_path, action="finish")
     assert out.startswith("ERROR") and "not done" in out
     (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
@@ -240,7 +240,7 @@ def test_finish_requires_validation_file(tmp_path):
     _run(tmp_path, action="complete", wave=2, note="ok")
     out = _run(tmp_path, action="finish")
     assert out.startswith("ERROR") and "VALIDATION.md is missing" in out
-    (d / "VALIDATION.md").write_text("# Validation\n")
+    _validation(d)
     (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
     assert "marked done" in _run(tmp_path, action="finish")
 
@@ -387,7 +387,7 @@ def test_finish_requires_rendered_evidence_bundle(tmp_path):
     _run(tmp_path, action="complete", wave=1, note="ok")
     _run(tmp_path, action="start", wave=2)
     _run(tmp_path, action="complete", wave=2, note="ok")
-    (d / "VALIDATION.md").write_text("# Validation\n")
+    _validation(d)
     (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
     import shutil
     shutil.rmtree(tmp_path / ".openharness" / "evidence" / "cart-checkout")
@@ -405,7 +405,7 @@ def test_moves_to_next_feature_after_one_is_done(tmp_path):
         _run(tmp_path, action="complete", wave=1, note="ok")
         _run(tmp_path, action="start", wave=2)
         _run(tmp_path, action="complete", wave=2, note="ok")
-        (d / "VALIDATION.md").write_text("# Validation\n")
+        _validation(d)
         (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
     out = _run(tmp_path, action="finish")
     assert "wishlist" in out
@@ -415,7 +415,7 @@ def test_moves_to_next_feature_after_one_is_done(tmp_path):
 
 def test_done_when_every_feature_is_done(tmp_path):
     d = _spec(tmp_path)
-    (d / "VALIDATION.md").write_text("# Validation\n")
+    _validation(d)
     (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
     _run(tmp_path, action="finish", force=True)
     out = _run(tmp_path)
@@ -497,6 +497,20 @@ def _all_waves_done(root: Path) -> None:
     _run(root, action="complete", wave=2, note="2/2 tests, CI green")
 
 
+def _validation(d: Path, evidence_cell: str = "test_cart.py") -> None:
+    """A VALIDATION.md whose AC rows carry strong test evidence."""
+    (d / "VALIDATION.md").write_text(textwrap.dedent(f"""\
+        # Validation — {d.name}
+
+        ## Traceability
+
+        | AC | Criterion | Scenarios | Wave(s) | Test evidence |
+        |----|-----------|-----------|---------|---------------|
+        | 1 | Add an item | add an item | 1 | {evidence_cell} |
+        | 2 | Checkout | checkout | 2 | {evidence_cell} |
+        """))
+
+
 def test_review_required_is_default_and_requires_audit(tmp_path):
     _unplanned(tmp_path)
     out = _run(tmp_path)
@@ -559,7 +573,7 @@ def test_review_required_blocks_on_block_verdict(tmp_path):
 def test_review_required_requires_delivery_audit_before_finish(tmp_path):
     d = _spec(tmp_path)
     _all_waves_done(tmp_path)
-    (d / "VALIDATION.md").write_text("# Validation\n")
+    _validation(d)
     out = _run(tmp_path, review="required")
     assert "audit the delivery" in out
     assert "DELIVERY-AUDIT.md" in out
@@ -568,7 +582,7 @@ def test_review_required_requires_delivery_audit_before_finish(tmp_path):
 def test_review_required_delivery_pass_marks_feature_done(tmp_path):
     d = _spec(tmp_path)
     _all_waves_done(tmp_path)
-    (d / "VALIDATION.md").write_text("# Validation\n")
+    _validation(d)
     (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
     out = _run(tmp_path, review="required")
     assert out.startswith("DONE")
@@ -578,7 +592,7 @@ def test_review_required_delivery_pass_marks_feature_done(tmp_path):
 def test_review_required_finish_action_enforces_delivery_audit(tmp_path):
     d = _spec(tmp_path)
     _all_waves_done(tmp_path)
-    (d / "VALIDATION.md").write_text("# Validation\n")
+    _validation(d)
 
     out = _run(tmp_path, action="finish", review="required")
     assert "audit the delivery" in out
@@ -673,7 +687,7 @@ def test_wave_plan_warnings_block_wave_start(tmp_path):
 def test_finish_requires_evidence_for_every_done_wave(tmp_path):
     d = _spec(tmp_path)
     _all_waves_done(tmp_path)
-    (d / "VALIDATION.md").write_text("# Validation\n")
+    _validation(d)
     (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
 
     evidence_dir = tmp_path / ".openharness" / "evidence" / "cart-checkout"
@@ -688,3 +702,71 @@ def test_finish_requires_evidence_for_every_done_wave(tmp_path):
     )
     (feature_bundle / "index.html").write_text("<html/>")
     assert "marked done" in _run(tmp_path, action="finish")
+
+
+# ---------- acceptance-evidence bar at finish ----------
+
+def _weak_validation(d: Path) -> None:
+    """VALIDATION.md rows with only weak/no automated evidence."""
+    (d / "VALIDATION.md").write_text(textwrap.dedent("""\
+        # Validation — cart-checkout
+
+        ## Traceability
+
+        | AC | Criterion | Scenarios | Wave(s) | Test evidence |
+        |----|-----------|-----------|---------|---------------|
+        | 1 | Add an item | add an item | 1 | (weak) test_cart.py |
+        | 2 | Checkout | checkout | 2 | — |
+        """))
+
+
+def test_finish_rejects_unproven_acceptance_criteria(tmp_path):
+    d = _spec(tmp_path)
+    _all_waves_done(tmp_path)
+    _weak_validation(d)
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+
+    out = _run(tmp_path, action="finish")
+    assert out.startswith("ERROR") and "AC1" in out and "AC2" in out
+    assert "not proof" in out
+    assert "Status: done" not in (d / "LOOP.md").read_text()
+
+    # A bare marker is not verification; a substantive entry is.
+    with (d / "VALIDATION.md").open("a") as f:
+        f.write("\n## Manual verification\n\n- AC 1\n")
+    out = _run(tmp_path, action="finish")
+    assert out.startswith("ERROR") and "AC1" in out and "AC2" in out
+
+    with (d / "VALIDATION.md").open("a") as f:
+        f.write(
+            "- AC 1 — ran `pytest tests/test_cart.py` → 4 passed\n"
+            "- AC 2 — manual checkout walkthrough → order created\n"
+        )
+    out = _run(tmp_path, action="finish")
+    assert "marked done" in out
+
+
+def test_next_does_not_mark_done_with_unproven_ac(tmp_path):
+    d = _spec(tmp_path)
+    _all_waves_done(tmp_path)
+    _weak_validation(d)
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+
+    out = _run(tmp_path)
+    assert "prove acceptance criteria" in out
+    assert "unproven: AC1, AC2" in out
+    assert "Status: done" not in (d / "LOOP.md").read_text()
+
+
+def test_finish_rejects_validation_without_rows(tmp_path):
+    d = _spec(tmp_path)
+    _all_waves_done(tmp_path)
+    (d / "VALIDATION.md").write_text("# Validation\n\n## Gaps\n\n- none\n")
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+
+    out = _run(tmp_path, action="finish")
+    assert out.startswith("ERROR") and "no traceability rows" in out
+
+    out = _run(tmp_path)
+    assert "prove acceptance criteria" in out
+    assert "no traceability rows" in out

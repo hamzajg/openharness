@@ -649,7 +649,7 @@ def test_validation_without_rows_is_a_blocker(tmp_path):
     assert "[no-validation-rows]" in out
 
 
-def test_validation_gaps_and_weak_evidence_are_concerns(tmp_path):
+def test_unproven_ac_evidence_is_a_blocker(tmp_path):
     d = _delivery(tmp_path)
     (d / "VALIDATION.md").write_text(textwrap.dedent("""\
         # Validation — cart
@@ -671,6 +671,30 @@ def test_validation_gaps_and_weak_evidence_are_concerns(tmp_path):
     assert "[ac-no-evidence]" in out
     assert "[validation-gap]" in out
     assert "[aspirational-validation]" in out
+    blockers = out.split("## Blockers", 1)[1].split("## Concerns", 1)[0]
+    assert "[ac-weak-evidence]" in blockers and "[ac-no-evidence]" in blockers
+
+
+def test_manual_verification_clears_unproven_ac_blockers(tmp_path):
+    d = _delivery(tmp_path)
+    (d / "VALIDATION.md").write_text(textwrap.dedent("""\
+        # Validation — cart
+
+        ## Traceability
+
+        | AC | Criterion | Scenarios | Wave(s) | Test evidence |
+        |----|-----------|-----------|---------|---------------|
+        | 1 | Adding an item shows it | add an item | 1 | (weak) test_cart.py |
+        | 2 | Checkout creates an order | checkout | 2 | — |
+
+        ## Manual verification
+
+        - AC 1 — ran `pytest tests/test_cart.py` → 4 passed
+        - AC 2 — manual checkout walkthrough → order created
+        """))
+    out = _audit(tmp_path, phase="delivery", changed="src/cart/store.py")
+    assert "ac-weak-evidence" not in out
+    assert "ac-no-evidence" not in out
 
 
 def test_expected_behavior_language_is_not_aspirational(tmp_path):

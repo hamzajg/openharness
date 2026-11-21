@@ -40,7 +40,7 @@ original list:
 | `plan` → wave 1 | `WAVES.md` | `Before: wave:1` gates; no unresolved `## Warnings`; the spec audit still gates the first wave, so a plan written without it does not reach code |
 | wave N | backlog items tagged `@wN` | `Before: wave:N` gates; `complete` needs an evidence bundle that records wave N, passes `verify` and is bound to the checked-out HEAD (ADR 0007) |
 | waves done → `validate` | every wave `done` | `Before: validate` gates |
-| `validate` → `finish` | `VALIDATION.md` | `Before: finish` gates; `DELIVERY-AUDIT.md` with a filled verdict (D013); a feature-level bundle or a verifying bundle for every done wave at HEAD (ADR 0007) |
+| `validate` → `finish` | `VALIDATION.md` | `Before: finish` gates; every AC proven — strong test evidence or a `## Manual verification` entry, weak token matches don't count; `DELIVERY-AUDIT.md` with a filled verdict (D013); a feature-level bundle or a verifying bundle for every done wave at HEAD (ADR 0007) |
 
 `--review=required` is the default and turns the audit rows on;
 `--review=advisory` is the explicit opt-out. `done` still means

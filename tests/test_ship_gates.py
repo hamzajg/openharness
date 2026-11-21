@@ -96,6 +96,20 @@ def _finish_waves(root: Path, d: Path) -> None:
     _run(root, action="complete", wave=2, note="ok")
 
 
+def _validation(d: Path) -> None:
+    """A VALIDATION.md whose AC rows carry strong test evidence."""
+    (d / "VALIDATION.md").write_text(textwrap.dedent("""\
+        # Validation — cart-checkout
+
+        ## Traceability
+
+        | AC | Criterion | Scenarios | Wave(s) | Test evidence |
+        |----|-----------|-----------|---------|---------------|
+        | 1 | Add an item | add an item | 1 | test_cart.py |
+        | 2 | Checkout | checkout | 2 | test_cart.py |
+        """))
+
+
 # ---------- authoring / compatibility ----------
 
 def test_scaffold_creates_design_challenge_gate(tmp_path):
@@ -194,7 +208,7 @@ def test_future_gate_does_not_block_earlier_phase(tmp_path):
 def test_gate_before_finish_blocks_auto_done_and_finish(tmp_path):
     d = _spec(tmp_path)
     _finish_waves(tmp_path, d)
-    (d / "VALIDATION.md").write_text("# Validation\n")
+    _validation(d)
     _gates(d, _gate("G1", "Legal sign-off", "finish", Type="quality",
                     Resolver="human", Check="manual"))
     out = _run(tmp_path)

@@ -318,6 +318,10 @@ def _parse_gates(text: str) -> dict[str, dict]:
     return out
 
 
+_MANUAL_SECTION_RE = re.compile(r"^##\s+Manual verification\s*$", re.M | re.I)
+_MANUAL_AC_RE = re.compile(r"^\s*-\s*AC\s*(\d+)\b\s*[—:–-]?\s*(.+?)\s*$")
+
+
 def _parse_validation(text: str) -> list[dict]:
     rows = []
     for m in _VALIDATION_ROW_RE.finditer(text):
@@ -332,6 +336,22 @@ def _parse_validation(text: str) -> list[dict]:
             "evidence": m.group(5).strip(),
         })
     return rows
+
+
+def _manual_acs(text: str) -> set[int]:
+    """AC numbers with a substantive `## Manual verification` entry."""
+    m = _MANUAL_SECTION_RE.search(text)
+    if not m:
+        return set()
+    rest = text[m.end():]
+    nxt = re.search(r"^##\s+", rest, re.M)
+    block = rest[:nxt.start()] if nxt else rest
+    out = set()
+    for line in block.splitlines():
+        am = _MANUAL_AC_RE.match(line)
+        if am and len(am.group(2)) >= 10:
+            out.add(int(am.group(1)))
+    return out
 
 
 # ------------------------------------------------------------ claim checks
@@ -929,18 +949,22 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
                 "blocker", "no-validation-rows", "VALIDATION.md",
                 "no traceability rows parsed — validation is not evidence",
             ))
+        manual = _manual_acs(validation_text)
         for row in validation:
             ev = row["evidence"]
-            if ev in ("", "—", "-"):
-                findings.append(Finding(
-                    "concern", "ac-no-evidence", "VALIDATION.md",
-                    f"AC {row['n']} has no test evidence",
-                ))
-            elif ev.startswith("(weak)"):
-                findings.append(Finding(
-                    "concern", "ac-weak-evidence", "VALIDATION.md",
-                    f"AC {row['n']} has only weak token-match evidence: {ev}",
-                ))
+            weak = ev.lower().startswith("(weak)")
+            placeholder = ev in ("", "—", "-", "–")
+            if not (weak or placeholder):
+                continue
+            if row["n"] in manual:
+                continue
+            code = "ac-weak-evidence" if weak else "ac-no-evidence"
+            findings.append(Finding(
+                "blocker", code, "VALIDATION.md",
+                f"AC {row['n']} has "
+                f"{'only weak token-match' if weak else 'no'} test evidence "
+                "and no `## Manual verification` entry",
+            ))
         if re.search(r"Scenarios:\s*0\b", validation_text) or re.search(
             r"\b0/0\b", validation_text
         ):

@@ -38,8 +38,12 @@ anything (D001, D009).
   `LOOP.state.json` carries the same fields plus `review`
   (`required`/`advisory`); `ship_loop` is still the only writer of both.
 - `specs/<feature>/VALIDATION.md` — written by `ship_validate`; required by
-  `finish`. It holds acceptance evidence and an optional post-release outcome
-  follow-up, which is not a finish gate.
+  `finish`. It holds acceptance evidence and an optional post-release
+  outcome follow-up, which is not a finish gate. `finish` (and the
+  `FEATURE-DONE` path of `next`) requires every traceability row to carry
+  strong test evidence or a `## Manual verification` entry naming the AC
+  with the command run and observed result — weak `(weak)` token matches
+  and `—` placeholders do not count as proof.
 - `specs/<feature>/SPEC-AUDIT.md` — written by `review_delivery` +
   `delivery-auditor`; the spec review artifact.
 - `specs/<feature>/DELIVERY-AUDIT.md` — same pair; the delivery review
