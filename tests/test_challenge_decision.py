@@ -281,9 +281,9 @@ def test_write_without_destination_is_an_error(tmp_path):
 def test_brief_has_lenses_scorecard_and_verdict(tmp_path):
     _adr(tmp_path)
     out = _run(tmp_path, adr="docs/adr/0007-order-store.md")
-    for lens in ("Problem & forces", "Alternatives & tradeoffs", "Domain fit (DDD)",
-                 "Architecture & boundaries", "Testable design", "Craftsmanship",
-                 "Decision record"):
+    for lens in ("Problem & forces", "Value & economics", "Alternatives & tradeoffs",
+                 "Domain fit (DDD)", "Architecture & boundaries", "Testable design",
+                 "Craftsmanship", "Decision record"):
         assert f"### " in out and lens in out
     assert "| Lens | Score | Evidence" in out
     assert "VERDICT: ACCEPT | REVISE | REVISIT | SPLIT" in out

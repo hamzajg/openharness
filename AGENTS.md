@@ -67,7 +67,7 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   `delivery-verifier`), the independent audit (`delivery-auditor`), and the
   review (`decision-challenger`).
 - `SELF/` — the harness's own specs/principles (`PRINCIPLES.md`, decision
-  log D001–D016, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
+  log D001–D017, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
 - `REPOS.md` — shipped, agnostic registry template. `/init` writes the concrete
   repo list to `.openharness/REPOS.local.md` (gitignored by default); that file
   is the active registry when present, otherwise the template is used (D007).
@@ -105,8 +105,9 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   agent owns execution. Default merge policy is `review` (PRs stay open).
   `done` means acceptance-validated, not necessarily merged or deployed.
   Dependent waves stack on open predecessor PRs and must be retargeted and
-  retested after the parent merges. Specs record an outcome hypothesis;
-  post-release learning is optional and is not a finish gate.
+  retested after the parent merges. Specs record a value contract (D017) and
+  an outcome hypothesis; post-release learning is optional and is not a
+  finish gate.
 - **D010:** phase transitions are guarded by gates declared in
   `specs/<feature>/GATES.md` and tracked in `LOOP.md`. A blocking gate stops
   its phase; only a named human can waive one. Agent-owned gates are resolved
@@ -129,6 +130,13 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - **D016:** the core LOC ceiling is 330 (up from 300) to accommodate the
   permanent interpreter guard, `SkillError`, and evidence `--` passthrough.
   Delete code before growing it again; a further raise needs a new decision.
+- **D017:** outcomes over output. Every spec carries a one-page `## Value
+  contract` (problem, users, baseline/current cost, numeric target indicator,
+  economic hypothesis, owner/date). `spec_scaffold` emits a blocking `Before:
+  plan` gate `G0`; `ship_loop` refuses an unfilled contract. The challenge
+  lens and audit finding are advisory; measured outcomes stay post-release
+  learning (D009). No scoring engine, ROI calculator, or new runtime module
+  (ADR 0009).
 
 ## Landmines
 
@@ -139,7 +147,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   repos in `.openharness/REPOS.local.md`; leave the tracked `REPOS.md` agnostic.
 - `oh serve` observes session JSONL files the agent CLIs already write —
   don't add instrumentation hooks into agents.
-- Decision log D001–D016 in `SELF/PRINCIPLES.md` is normative — read it
+- Decision log D001–D017 in `SELF/PRINCIPLES.md` is normative — read it
   before structural changes.
 - The web UI must call the same verbs as the CLI (D005) — no business
   logic in TSX.
@@ -176,7 +184,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - Verify before claiming: run `pytest` (with `--no-deps` install path) and
   report the real result.
 - Keep changes minimal and consistent with surrounding code. Respect the
-  D001–D016 decision log.
+  D001–D017 decision log.
 - For product work, prefer `/ship-loop` (autonomous) or `/ship-product`
   (phased); both keep specs and loop state in the target repo under
   `specs/` and ship one wave per PR.

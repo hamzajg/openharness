@@ -61,10 +61,10 @@ feature:
 
 | Command | Shape |
 |---|---|
-| `/ship-product` | Phased, human-in-the-loop: discover → frame → spec/outcome hypothesis → examples → waves → implement → validate. One feature at a time. |
+| `/ship-product` | Phased, human-in-the-loop: discover → frame → spec/value contract → examples → waves → implement → validate. One feature at a time. |
 | `/ship-loop` | Autonomous loop over the same pipeline: the oracle picks the next action, subagents execute it, every wave is one PR. Stacks on open predecessor PRs; `done` means acceptance-validated, not necessarily merged or deployed. Runs with `--review=required`: a spec audit gates planning and a delivery audit gates `finish`. |
 | `/review-delivery` | Independent audit of one feature's spec or delivery: a deterministic brief checks claims against the repo, then `delivery-auditor` re-verifies the code and tests and returns `PASS`/`CONCERNS`/`BLOCK`. |
-| `/challenge-decision` | Advisory design review: steelman a decision, generate alternatives, weigh tradeoffs, apply DDD/architecture/testability/craftsmanship lenses. The verdict never blocks — but inside `/ship-loop` the review artifact is a required gate (`G1`) before wave planning. |
+| `/challenge-decision` | Advisory design review: steelman a decision, generate alternatives, weigh tradeoffs, apply value/DDD/architecture/testability/craftsmanship lenses. The verdict never blocks — but inside `/ship-loop` the review artifact is a required gate (`G1`) before wave planning. |
 
 ```
 /ship-loop --repo=sources/portal-api --merge=review --max=25
@@ -88,7 +88,9 @@ security/legal review. Declare them in `specs/<feature>/GATES.md`
 past a phase while a blocking gate is `pending`/`failed`, and only a named
 human can waive one. Status and evidence live in `LOOP.md`.
 
-**Product learning.** Feature specs record an outcome hypothesis, its
+**Product learning.** Feature specs record a `## Value contract` before
+planning (problem, users, baseline/current cost, numeric target with review
+window, economic hypothesis, owner/date), plus an outcome hypothesis, its
 evidence or assumption, an observable signal, and a follow-up owner/date
 when known. Post-release results can be recorded in `VALIDATION.md`; this
 follow-up does not block acceptance validation. Close-out distinguishes

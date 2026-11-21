@@ -50,6 +50,28 @@ DECISION_REVIEW = textwrap.dedent("""\
     """)
 
 
+FILLED_VALUE_CONTRACT = """\
+## Value contract
+
+- Problem: 12% of carts are abandoned weekly; support answers 6h of repeat tickets.
+- Users: shoppers lose work; support agents answer the same question.
+- Baseline / current cost: 12% abandonment and 6h support per week.
+- Target outcome indicator: abandonment below 4% within 30 days of release.
+- Economic hypothesis: 8h/week saved outweighs build and three-year run cost.
+- Owner / date: product owner, 2026-12-21.
+"""
+
+
+def _fill_value_contract(d: Path) -> None:
+    spec = d / "SPEC.md"
+    text = re.sub(
+        r"^## Value contract\s*$[\s\S]*?(?=^## )",
+        FILLED_VALUE_CONTRACT + "\n",
+        spec.read_text(), count=1, flags=re.M,
+    )
+    spec.write_text(text)
+
+
 def _write(root: Path, rel: str, content: str) -> Path:
     p = root / rel
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -64,9 +86,14 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
     (d / "BACKLOG.md").write_text(BACKLOG)
     (d / "EXAMPLES.feature").write_text(FEATURE)
     wave_plan.invoke(spec_dir=str(d))
-    # Loop defaults are enforced now: satisfy the scaffold's G1
-    # design-challenge gate and the required spec audit so wave-mechanics
+    # Loop defaults are enforced now: satisfy the scaffold's G0 value and G1
+    # design-challenge gates plus the required spec audit so wave-mechanics
     # tests exercise the loop, not the policy gates.
+    _fill_value_contract(d)
+    ship_loop.invoke(
+        repo_path=str(root), spec_dir=str(d), action="gate", gate="G0",
+        status="met", evidence=f"file:{d.relative_to(root)}/SPEC.md",
+    )
     (d / "DECISION-REVIEW.md").write_text(DECISION_REVIEW)
     ship_loop.invoke(
         repo_path=str(root), spec_dir=str(d), action="gate", gate="G1",
@@ -128,8 +155,13 @@ def test_missing_artifacts_ask_for_spec(tmp_path):
 def test_scaffolded_without_waves_asks_for_plan(tmp_path):
     spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
     d = tmp_path / "specs" / "cart-checkout"
-    # G1 (design decisions challenged) blocks planning until the review
-    # artifact exists; the required spec audit blocks it next.
+    # G0 (value contract) blocks planning first, then G1 (design decisions
+    # challenged), then the required spec audit.
+    out = _run(tmp_path)
+    assert "GATE:" in out and "G0" in out and "Value contract" in out
+    _fill_value_contract(d)
+    _run(tmp_path, action="gate", gate="G0", status="met",
+         evidence="file:specs/cart-checkout/SPEC.md")
     out = _run(tmp_path)
     assert "GATE:" in out and "G1" in out
     assert "DECISION-REVIEW.md" in out

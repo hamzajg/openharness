@@ -59,21 +59,24 @@ brief; `--force` to overwrite an existing review.
   reviewer knows it was examined.
 - **Design moves** — neutral moves to test (invert a dependency, shrink the
   decision, separate read/write shapes, introduce an ACL).
-- **Challenge questions** across seven lenses, each with "good looks like".
+- **Challenge questions** across eight lenses, each with "good looks like".
 - **Scorecard + verdict block** — filled by the agent, never by the skill.
 
 ## Lenses
 1. Problem & forces
-2. Alternatives & tradeoffs
-3. Domain fit (DDD): bounded context, ubiquitous language, aggregates,
+2. Value & economics (D017): value gap, who bears the current cost, numeric
+   outcome target and window, lifecycle cost/benefit, adoption signal, and
+   "do nothing" as an option.
+3. Alternatives & tradeoffs
+4. Domain fit (DDD): bounded context, ubiquitous language, aggregates,
    invariants, consistency boundary, domain events, anti-corruption layer.
-4. Architecture & boundaries: dependency direction, ports/adapters, smallest
+5. Architecture & boundaries: dependency direction, ports/adapters, smallest
    boundary, failure modes, data ownership, migration/rollback.
-5. Testable design: seams, deterministic time/IO, unit vs integration vs
+6. Testable design: seams, deterministic time/IO, unit vs integration vs
    contract tests, scenario→test traceability, production failure signal.
-6. Craftsmanship: smallest reversible step, names, error model, no
+7. Craftsmanship: smallest reversible step, names, error model, no
    speculative abstraction.
-7. Decision record: status/owner/date, consequences, revisit trigger, links.
+8. Decision record: status/owner/date, consequences, revisit trigger, links.
 
 ## Verdicts
 `ACCEPT` · `REVISE` (smallest next step) · `REVISIT` (evidence missing) ·

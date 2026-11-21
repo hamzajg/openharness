@@ -7,7 +7,7 @@ import pytest
 
 from openharness.skill import SkillError
 from skills.product.discover_product import discover_product
-from skills.product.spec_scaffold import spec_scaffold
+from skills.product.spec_scaffold import spec_scaffold, value_contract_status
 from skills.product.wave_plan import wave_plan
 
 
@@ -51,9 +51,44 @@ def test_spec_scaffold_creates_artifacts_with_outcome_hypothesis(tmp_path):
     spec = (d / "SPEC.md").read_text()
     assert "## Outcome hypothesis" in spec
     assert "Opportunity evidence" in spec
-    assert "do not invent targets" in spec
+    assert "do not invent baselines" in spec
+    assert "target lives in the Value contract" in spec
+    assert "## Value contract" in spec
+    for field in ("Baseline / current cost", "Target outcome indicator",
+                  "Economic hypothesis", "Owner / date"):
+        assert field in spec
     assert "user-notifications" in out
     assert "@w1" in (d / "EXAMPLES.feature").read_text()
+
+
+def test_value_contract_needs_filled_fields_and_a_numeric_target():
+    ok, problems = value_contract_status("# Spec: Demo\n\n## Problem\n\nNo contract here.\n")
+    assert not ok and "## Value contract" in problems
+
+    filled = """## Value contract
+
+- Problem: 12% of carts are abandoned weekly; support answers 6h of repeat tickets.
+- Users: shoppers lose work; support agents answer the same question.
+- Baseline / current cost: 12% abandonment and 6h support per week.
+- Target outcome indicator: abandonment below 4% within 30 days of release.
+- Economic hypothesis: 8h/week saved outweighs build and three-year run cost.
+- Owner / date: product owner, 2026-12-21.
+
+## Scope (in)
+"""
+    ok, problems = value_contract_status(filled)
+    assert ok and problems == []
+
+    vague = filled.replace("below 4% within 30 days", "much lower soon")
+    ok, problems = value_contract_status(vague)
+    assert not ok and any("numeric target" in p for p in problems)
+
+    template = filled.replace(
+        "- Problem: 12% of carts are abandoned weekly; support answers 6h of repeat tickets.",
+        "- Problem: (severity, frequency; what hurts today)",
+    )
+    ok, problems = value_contract_status(template)
+    assert not ok and "Problem" in problems
 
 
 def test_spec_scaffold_never_overwrites(tmp_path):

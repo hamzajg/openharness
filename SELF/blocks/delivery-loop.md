@@ -16,7 +16,9 @@ anything (D001, D009).
 
 ## State model
 - `specs/<feature>/WAVES.md` — the plan. Written by `wave_plan`, never by the loop.
-- `specs/<feature>/SPEC.md` — includes the expected user outcome, evidence or
+- `specs/<feature>/SPEC.md` — includes a parseable `## Value contract`
+  (problem, users, baseline/current cost, numeric target indicator, economic
+  hypothesis, owner/date), plus the expected user outcome, evidence or
   assumption, an observable signal, and a follow-up owner/date when known.
 - `specs/<feature>/GATES.md` — preconditions for phase transitions (definitions
   only). Written by the agent (product-framer); `ship_loop` parses it.
@@ -75,7 +77,10 @@ Status lives in `LOOP.md`: `pending` · `met` · `waived` · `failed`.
   verdict block — a single-value `VERDICT:` plus substantive `STEELMAN:`,
   `SMALLEST NEXT STEP:` and `REVISIT TRIGGER:` entries — not the
   challenge template's `ACCEPT | REVISE | ...` alternation or `<...>`
-  placeholders.
+  placeholders. A `file:` check for `SPEC.md` additionally requires a
+  filled `## Value contract` (D017): all six fields substantive and a
+  numeric target; template guidance or a vague target makes the gate
+  `stale`.
 - `waived` requires `--waived-by` and `--note`; only a human can waive.
 - Overdue gates keep blocking: a pending `Before: spec` gate still blocks
   wave 1 if artifacts were filled out of order.
@@ -155,10 +160,13 @@ or waived.
 
 - Product framing distinguishes repository findings from customer evidence.
   An unverified user need remains an explicit assumption, not a research claim.
-- `SPEC.md` records an outcome hypothesis and a signal without inventing
-  targets or baselines. After release, `VALIDATION.md` may record the observed
-  result, source, owner/date, and learning. A pending follow-up is not an
-  acceptance gap or a finish blocker.
+- `SPEC.md` records the D017 value contract *before planning*: the value gap,
+  who pays for it today, a numeric target with a window, a lifecycle-cost
+  hypothesis, and an owner/date. It also records an outcome hypothesis and a
+  signal without inventing baselines. After release, `VALIDATION.md` may
+  record the observed result, adoption, cost/TCO notes, source, owner/date,
+  and learning. A pending follow-up is not an acceptance gap or a finish
+  blocker (D009).
 - Close-out reports acceptance, PR merge, and deployment state separately.
   Phase and PR review times may be reported only when supported by actual
   timestamps; they are for finding friction, not ranking teams.
@@ -194,6 +202,9 @@ or waived.
   `evidence/` (`--tracked`).
 - A blocking gate stops its phase; the agent resolves `agent` gates inline and
   blocks for `human` gates — it never self-approves a human gate or a waiver.
+- D017's value contract is required before planning through blocking gate G0.
+  The `Value & economics` challenge lens and the audit's
+  `value-contract-missing` finding are advisory; neither is a gate.
 - Overdue gates keep blocking; advisory gates never do.
 - Events are append-only (last 200 kept).
 - Default merge policy is `review`: PRs stay open for a human.

@@ -29,6 +29,7 @@ from pathlib import Path
 
 from openharness import evidence as evidence_bundles
 from openharness.skill import skill
+from skills.product.spec_scaffold import value_contract_status
 
 _SKIP_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
@@ -792,6 +793,17 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
                     "blocker", "unresolved-spec", f"{name}:{i}",
                     f"unresolved marker: {line.strip()[:110]}",
                 ))
+
+    # --- value contract (D017): advisory here, enforced by the G0 gate --
+    vc_ok, vc_problems = value_contract_status(spec_text)
+    if not vc_ok:
+        findings.append(Finding(
+            "concern", "value-contract-missing",
+            f"specs/{spec_dir.name}/SPEC.md",
+            "value contract is missing or unmeasurable: "
+            + ", ".join(vc_problems[:4])
+            + " (advisory — the Before: plan gate enforces it)",
+        ))
 
     # --- claim verification -------------------------------------------
     checked_paths = 0

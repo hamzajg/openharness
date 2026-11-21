@@ -25,6 +25,7 @@ from pathlib import Path
 
 from openharness import evidence as evidence_bundles
 from openharness.skill import SkillError, skill
+from skills.product.spec_scaffold import value_contract_status
 
 _WAVE_RE = re.compile(r"^##\s+Wave\s+(\d+)\b.*$", re.M)
 _SCENARIO_RE = re.compile(r"^\s*Scenario(?: Outline)?:\s*(.+?)\s*$")
@@ -361,6 +362,8 @@ def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
             return "stale", evidence
         if path.name == "DECISION-REVIEW.md" and not _filled_decision_review(path):
             return "stale", evidence
+        if path.name == "SPEC.md" and not value_contract_status(_read(path))[0]:
+            return "stale", evidence
     if status in ("met", "failed"):
         return status, evidence
     return "pending", evidence
@@ -445,6 +448,8 @@ def _gate_directive(root: Path, spec_dir: Path, phase: str, blocking: list[tuple
             lines.append("  fix: the evidence no longer satisfies the gate — restore it or re-record the gate")
         elif gate["resolver"] == "agent":
             hint = "create the artifact" if gate["type"] in ("artifact", "data") else "run the check"
+            if gate["check"].lower().endswith("spec.md"):
+                hint = "fill `## Value contract` in SPEC.md (D017)"
             lines.append(f"  next (agent): {hint}, then record it:")
             lines.append(
                 f"    python -m openharness run ship_loop --action=gate --spec_dir={rel} "
@@ -1174,6 +1179,15 @@ def ship_loop(
                             "decision-challenger fill VERDICT, STEELMAN, "
                             "SMALLEST NEXT STEP and REVISIT TRIGGER first"
                         )
+                    if path.name == "SPEC.md":
+                        ok, problems = value_contract_status(_read(path))
+                        if not ok:
+                            return (
+                                "ERROR: SPEC.md has no filled value contract — "
+                                + ", ".join(problems[:3])
+                                + ". Fill all fields with a measurable target "
+                                "before marking this gate met (D017)"
+                            )
                 row.update({"status": "met", "evidence": _clean(evidence), "updated": _now()})
                 _event(state, f"gate {gid} met: {_clean(evidence)}")
             elif status == "waived":
