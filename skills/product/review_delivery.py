@@ -49,6 +49,8 @@ _MAX_PER_CODE = 20
 _SCENARIO_RE = re.compile(r"^\s*Scenario(?: Outline)?:\s*(.+?)\s*$")
 _TAG_RE = re.compile(r"@w(\d+)")
 _AC_RE = re.compile(r"^\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|\s*$")
+_NUMBERED_AC_RE = re.compile(r"^\s*(\d+)[.)]\s+(.+?)\s*$")
+_AC_SECTION_RE = re.compile(r"^##\s+Acceptance criteria\s*$", re.M | re.I)
 _ITEM_RE = re.compile(r"^##\s+(B|US)(\d+)\s*[—-]\s*(.+)$", re.M)
 _WAVE_RE = re.compile(r"^##\s+Wave\s+(\d+)\b.*$", re.M)
 _GATE_RE = re.compile(r"^##\s+(G\d+)\s*[—-]\s*(.+)$", re.M)
@@ -112,7 +114,12 @@ _GAP_NOISE_RE = re.compile(
     re.I,
 )
 _HALLUCINATION_RE = re.compile(
-    r"\b(?:TODO|FIXME|XXX|not implemented|coming soon|placeholder)\b", re.I
+    r"\b(?:TODO|FIXME|XXX|HACK|NOT\s+IMPLEMENTED|NOT\s+YET\s+IMPLEMENTED|"
+    r"COMING\s+SOON)\b",
+    re.I,
+)
+_QUOTED_RE = re.compile(
+    r"'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"|`(?:\\.|[^`\\])*`"
 )
 _PLACEHOLDER_EVIDENCE = re.compile(
     r"^(?:done|ok|okay|yes|no|n/?a|tbd|todo|pending|green|"
@@ -184,22 +191,55 @@ def _parse_scenarios(text: str) -> list[dict]:
     return out
 
 
+def _acceptance_block(text: str) -> tuple[str, int] | None:
+    """Return (block, first_line_no) for `## Acceptance criteria`, if present."""
+    m = _AC_SECTION_RE.search(text)
+    if not m:
+        return None
+    rest = text[m.end():]
+    nxt = re.search(r"^##\s+", rest, re.M)
+    block = rest[:nxt.start()] if nxt else rest
+    # m.end() is the end of the heading line; the block starts on the next line.
+    return block, text[:m.end()].count("\n") + 2
+
+
 def _parse_acs(text: str) -> list[dict]:
-    out = []
-    for i, line in enumerate(text.splitlines(), 1):
+    has_section = _acceptance_block(text) is not None
+    section = _acceptance_block(text) or (text, 1)
+    block, first_line = section
+    table_rows: list[dict] = []
+    numbered_rows: list[dict] = []
+    for offset, line in enumerate(block.splitlines()):
+        line_no = first_line + offset
         m = _AC_RE.match(line)
-        if not m:
+        if m:
+            criterion = m.group(2).strip()
+            if criterion.lower() == "criterion" or set(criterion) <= {"-", ":"}:
+                continue
+            table_rows.append({
+                "n": int(m.group(1)),
+                "criterion": criterion,
+                "refs": m.group(3).strip(),
+                "line": line_no,
+            })
             continue
-        criterion = m.group(2).strip()
-        if criterion.lower() == "criterion" or set(criterion) <= {"-", ":"}:
+        if not has_section:
             continue
-        out.append({
-            "n": int(m.group(1)),
+        nm = _NUMBERED_AC_RE.match(line)
+        if not nm or line.lstrip().startswith("|"):
+            continue
+        criterion = nm.group(2).strip()
+        if not criterion or criterion.lower() in ("criterion", "acceptance criteria"):
+            continue
+        # Numbered items carry their scenario refs inline (`@w1`, a verbatim
+        # scenario name, or both); the text itself is the reference cell.
+        numbered_rows.append({
+            "n": int(nm.group(1)),
             "criterion": criterion,
-            "refs": m.group(3).strip(),
-            "line": i,
+            "refs": criterion,
+            "line": line_no,
         })
-    return out
+    return table_rows or numbered_rows
 
 
 def _parse_backlog(text: str) -> list[dict]:
@@ -569,9 +609,19 @@ def _is_test_path(path: str) -> bool:
     )
 
 
+def _unfinished_marker(line: str) -> bool:
+    """True for explicit unfinished markers outside string literals.
+
+    Quoted values are blanked first so domain enums (`status: 'todo'`), HTML
+    attributes (`placeholder="New name"`), and fixture strings do not read as
+    unfinished implementation.
+    """
+    return bool(_HALLUCINATION_RE.search(_QUOTED_RE.sub('""', line)))
+
+
 def _out_of_scope_exempt(path: str) -> bool:
     return (
-        path.startswith(("specs/", "docs/", ".github/"))
+        path.startswith(("specs/", "docs/", ".github/", "evidence/", ".openharness/evidence/"))
         or path in {"README.md", "AGENTS.md", "CHANGELOG.md"}
         or path.endswith((".lock", "package-lock.json", "yarn.lock", "poetry.lock"))
         or _is_test_path(path)
@@ -964,7 +1014,7 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
             if p.suffix.lower() not in _CODE_EXTS or not p.is_file():
                 continue
             for i, line in enumerate(_read(p).splitlines(), 1):
-                if _HALLUCINATION_RE.search(line):
+                if _unfinished_marker(line):
                     findings.append(Finding(
                         "concern", "unfinished-code", f"{path}:{i}",
                         f"shipped code contains an unfinished marker: {line.strip()[:100]}",

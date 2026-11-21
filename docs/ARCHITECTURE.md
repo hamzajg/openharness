@@ -48,8 +48,10 @@ OpenHarness is simultaneously:
 - **Product delivery:** `/ship-loop` → `ship_loop --action=next` reads
   `specs/<feature>/{SPEC.md,EXAMPLES.feature,BACKLOG.md,GATES.md,WAVES.md,LOOP.md,LOOP.state.json}`
   → checks blocking gates for the current phase → returns one directive (or a
-  `GATE:` directive) → the agent delegates it to a subagent role → outcome
-  recorded back into `LOOP.md`/`LOOP.state.json`. No harness-side scheduling (D001, D009).
+  `GATE:`/`NEXT: fix wave-plan warnings` directive) → the agent delegates it
+  to a subagent role → outcome recorded back into `LOOP.md`/`LOOP.state.json`.
+  The audit mode (`review`) is persisted in that state. No harness-side
+  scheduling (D001, D009).
 - **Independent audit:** `/review-delivery` → `review_delivery` builds a
   deterministic brief (artifact presence, AC → scenario → wave → backlog →
   LOOP traceability, claimed path/script/endpoint/ADR existence, evidence

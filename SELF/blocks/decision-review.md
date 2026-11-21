@@ -12,7 +12,9 @@ before it becomes expensive. Its verdict is advisory and never a gate
 (D011). The review *artifact* is different: `spec_scaffold` emits a
 blocking `Before: plan` gate (`G1 — Design decisions challenged`,
 `Check: file:specs/<feature>/DECISION-REVIEW.md`) so the review must exist
-before wave planning; the verdict still does not block.
+before wave planning; the verdict still does not block. The `file:` gate
+requires a filled `VERDICT:` line — the deterministic template's
+`VERDICT: ACCEPT | REVISE | REVISIT | SPLIT` alternation does not count.
 
 Two halves:
 

@@ -37,6 +37,7 @@ _STATE_ROW_RE = re.compile(
 )
 _STATUS_RE = re.compile(r"^Status:\s*(\S+)\s*$", re.M)
 _ITER_RE = re.compile(r"^Iterations:\s*(\d+)\s*$", re.M)
+_REVIEW_RE = re.compile(r"^Review:\s*(\S+)\s*$", re.M)
 _GATE_RE = re.compile(r"^##\s+(G\d+)\s*[—-]\s*(.+)$", re.M)
 _GATE_STATE_RE = re.compile(
     r"^\|\s*(G\d+)\s*\|\s*([a-z-]+)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*$",
@@ -111,15 +112,33 @@ def _parse_waves(spec_dir: Path) -> dict[int, dict]:
     return dict(sorted(waves.items()))
 
 
+def _wave_warnings(spec_dir: Path) -> list[str]:
+    """Unresolved `## Warnings` bullets emitted by wave_plan into WAVES.md."""
+    text = _read(spec_dir / "WAVES.md")
+    m = re.search(r"^##\s+Warnings\s*$", text, re.M)
+    if not m:
+        return []
+    rest = text[m.end():]
+    nxt = re.search(r"^##\s+", rest, re.M)
+    block = rest[:nxt.start()] if nxt else rest
+    return [
+        line[2:].strip()
+        for line in block.splitlines()
+        if line.lstrip().startswith("- ")
+    ]
+
+
 def _load_state(spec_dir: Path) -> dict:
     state_file = spec_dir / "LOOP.state.json"
     if state_file.is_file():
         try:
             data = json.loads(state_file.read_text())
             status = data.get("status")
+            review = data.get("review", "")
             return {
                 "status": status if status in _FEATURE_STATUSES else "running",
                 "iterations": int(data.get("iterations", 0)),
+                "review": review if review in ("advisory", "required") else "",
                 "waves": {int(k): v for k, v in data.get("waves", {}).items()},
                 "gates": data.get("gates", {}),
                 "events": data.get("events", []),
@@ -129,6 +148,10 @@ def _load_state(spec_dir: Path) -> dict:
     text = _read(spec_dir / "LOOP.md")
     status = (_STATUS_RE.search(text).group(1) if _STATUS_RE.search(text) else "running")
     iterations = int(_ITER_RE.search(text).group(1)) if _ITER_RE.search(text) else 0
+    review_m = _REVIEW_RE.search(text)
+    review = review_m.group(1) if review_m else ""
+    if review not in ("advisory", "required"):
+        review = ""
     if status not in _FEATURE_STATUSES:
         status = "running"
     waves = {}
@@ -158,6 +181,7 @@ def _load_state(spec_dir: Path) -> dict:
     return {
         "status": status,
         "iterations": iterations,
+        "review": review,
         "waves": waves,
         "gates": gates,
         "events": events,
@@ -171,6 +195,7 @@ def _save_state(spec_dir: Path, state: dict) -> None:
         "",
         f"Status: {state['status']}",
         f"Iterations: {state['iterations']}",
+        f"Review: {state.get('review') or 'required'}",
         f"Updated: {_now()}",
         "",
         "| Wave | Status | Branch | PR | Evidence | Updated |",
@@ -209,6 +234,7 @@ def _save_state(spec_dir: Path, state: dict) -> None:
         "feature": spec_dir.name,
         "status": state["status"],
         "iterations": state["iterations"],
+        "review": state.get("review") or "required",
         "updated": _now(),
         "waves": {str(w): state["waves"][w] for w in sorted(state["waves"])},
         "gates": state.get("gates", {}),
@@ -284,6 +310,19 @@ def _parse_gates(spec_dir: Path) -> dict[str, dict]:
     return gates
 
 
+def _filled_decision_review(path: Path) -> bool:
+    """True when DECISION-REVIEW.md has a verdict, not the template alternation."""
+    for line in _read(path).splitlines():
+        m = re.match(
+            r"^\s*VERDICT:\s*(?:ACCEPT|REVISE|REVISIT|SPLIT)\b",
+            line,
+            re.I,
+        )
+        if m and "|" not in line:
+            return True
+    return False
+
+
 def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
     """(effective status, evidence) — `stale` means met but evidence vanished."""
     row = state["gates"].get(gate["id"], {})
@@ -293,7 +332,10 @@ def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
         return "waived", evidence
     if status == "met" and gate["check"].lower().startswith("file:"):
         rel = gate["check"].split(":", 1)[1].strip()
-        if not rel or not (root / rel).exists():
+        path = root / rel if rel else Path("")
+        if not rel or not path.exists():
+            return "stale", evidence
+        if path.name == "DECISION-REVIEW.md" and not _filled_decision_review(path):
             return "stale", evidence
     if status in ("met", "failed"):
         return status, evidence
@@ -376,7 +418,7 @@ def _gate_directive(root: Path, spec_dir: Path, phase: str, blocking: list[tuple
                 f"in `{rel}/GATES.md`"
             )
         elif status == "stale":
-            lines.append("  fix: the evidence file is gone — restore it or re-record the gate")
+            lines.append("  fix: the evidence no longer satisfies the gate — restore it or re-record the gate")
         elif gate["resolver"] == "agent":
             hint = "create the artifact" if gate["type"] in ("artifact", "data") else "run the check"
             lines.append(f"  next (agent): {hint}, then record it:")
@@ -548,20 +590,25 @@ def _audit_block_brief(root: Path, spec_dir: Path, phase: str) -> str:
 
 
 
-def _evidence_error(root: Path, feature: str, wave: int | None = None) -> str:
-    """ADR 0007: a wave is done only when a bundle for it verifies at HEAD.
+def _evidence_error(
+    root: Path,
+    feature: str,
+    wave: int | None = None,
+    required_waves: set[int] | None = None,
+) -> str:
+    """ADR 0007: completion is proven only by verifying evidence bundles.
 
-    A directory holding an `index.html` proves nothing: the bundle must load,
-    record the wave being closed (`wave=None` accepts any wave for a feature
-    close-out), pass `evidence.verify` — hashes, artifacts, secrets, verdict —
-    and be bound to the checked-out commit. Both roots count: the gitignored
-    scratch dir and the committable `evidence/` (ADR 0007 amendment).
+    `wave=N` requires a bundle recorded for that wave. Feature close-out
+    (`wave=None`) accepts a feature-level bundle (`wave` 0/None) or, when
+    `required_waves` is given, one verified bundle for every done wave —
+    a single later-wave bundle must not prove the whole feature.
     """
     roots = [
         evidence_bundles.bundle_root(root),
         evidence_bundles.bundle_root(root, tracked=True),
     ]
     rejected: list[str] = []
+    covered: set[int] = set()
     for base in roots:
         feature_dir = base / feature
         if not feature_dir.is_dir():
@@ -593,11 +640,27 @@ def _evidence_error(root: Path, feature: str, wave: int | None = None) -> str:
                 why = "; ".join(f.message for f in report.errors[:2])
                 rejected.append(f"{bundle.name}: verify failed ({why})")
                 continue
-            return ""
+            if wave is not None or required_waves is None:
+                return ""
+            if recorded_wave in (None, 0):
+                return ""
+            if recorded_wave in required_waves:
+                covered.add(recorded_wave)
+                continue
+            rejected.append(
+                f"{bundle.name}: records wave {recorded_wave}, "
+                "not required for finish"
+            )
 
-    what = f"wave {wave}" if wave is not None else "this feature"
+    if required_waves is not None:
+        missing = sorted(w for w in required_waves if w not in covered)
+        if not missing:
+            return ""
+        what = f"waves {', '.join(map(str, missing))} of {feature!r}"
+    else:
+        what = f"wave {wave}" if wave is not None else "this feature"
     lines = [
-        f"ERROR: no verified evidence bundle for {what} of {feature!r} — "
+        f"ERROR: no verified evidence bundle for {what} — "
         "a wave is not proven by a sentence.",
         f"Looked in {roots[0]} and {roots[1]}.",
     ]
@@ -691,6 +754,22 @@ def _decide(
                 return _audit_brief(root, spec_dir, "spec", audit)
             if audit == "block":
                 return _audit_block_brief(root, spec_dir, "spec")
+        warnings = _wave_warnings(spec_dir)
+        if warnings:
+            rel = _rel(root, spec_dir)
+            lines = [
+                f"NEXT: fix wave-plan warnings for {spec_dir.name}",
+                "",
+                "WAVES.md still carries unresolved warnings:",
+            ]
+            lines += [f"- {w}" for w in warnings]
+            lines += [
+                "",
+                "Fix BACKLOG.md / EXAMPLES.feature, re-run",
+                f"`python -m openharness run wave_plan --spec_dir={rel}`,",
+                "then call `ship_loop --action=next` again.",
+            ]
+            return "\n".join(lines)
         return _wave_brief(root, spec_dir, state, pending[0], waves)
 
     if not (spec_dir / "VALIDATION.md").is_file():
@@ -762,7 +841,7 @@ def ship_loop(
     evidence: str = "",
     waived_by: str = "",
     max_iterations: int = 25,
-    review: str = "required",
+    review: str = "",
     force: bool = False,
     offline: bool = False,
 ) -> str:
@@ -801,13 +880,14 @@ def ship_loop(
         refuses to start wave 1 until the spec audit passes, and refuses to
         finish until `DELIVERY-AUDIT.md` has one. A `BLOCK` verdict stops
         the loop. `advisory` keeps existing loops working and never
-        enforces the audit.
+        enforces the audit. The mode is persisted in loop state once a
+        mutating action records it; pass `--review` again to change it.
       force: Allow out-of-order start/complete or a full reset.
       offline: For `reconcile` only — check git facts and skip GitHub, so
         PR/CI claims are reported as unverified instead of quietly assumed.
     """
     budget = max(1, int(max_iterations))
-    if review not in ("advisory", "required"):
+    if review not in ("", "advisory", "required"):
         return "ERROR: --review must be advisory|required"
     root = Path(repo_path).resolve()
     if not root.is_dir():
@@ -839,6 +919,8 @@ def ship_loop(
         )
         state = _load_state(d)
         waves = _parse_waves(d)
+        review = review or state.get("review") or "required"
+        state["review"] = review
 
         if action in ("reconcile", "check"):
             # Read-only: the record is the claim, git and GitHub are the truth.
@@ -916,8 +998,15 @@ def ship_loop(
                     return "ERROR: --evidence is required to mark a gate met"
                 if g["check"].lower().startswith("file:"):
                     rel = g["check"].split(":", 1)[1].strip()
-                    if not rel or not (root / rel).exists():
+                    path = root / rel if rel else Path("")
+                    if not rel or not path.exists():
                         return f"ERROR: evidence file `{rel}` does not exist — create it first"
+                    if path.name == "DECISION-REVIEW.md" and not _filled_decision_review(path):
+                        return (
+                            "ERROR: DECISION-REVIEW.md has no filled VERDICT — "
+                            "run /challenge-decision and have decision-challenger "
+                            "complete the scorecard/verdict first"
+                        )
                 row.update({"status": "met", "evidence": _clean(evidence), "updated": _now()})
                 _event(state, f"gate {gid} met: {_clean(evidence)}")
             elif status == "waived":
@@ -1030,7 +1119,10 @@ def ship_loop(
                 )
             if not (d / "VALIDATION.md").is_file():
                 return "ERROR: VALIDATION.md is missing — run ship_validate first"
-            ev_err = _evidence_error(root, d.name)
+            done_waves = {
+                n for n in waves if _wave(state, n)["status"] == "done"
+            }
+            ev_err = _evidence_error(root, d.name, required_waves=done_waves)
             if ev_err and not force:
                 return ev_err
             blocked = _blocking_gates(d, state, "finish", root)
@@ -1051,9 +1143,11 @@ def ship_loop(
     for d in dirs:
         state = _load_state(d)
         waves = _parse_waves(d)
+        mode = review or state.get("review") or "required"
         if state["status"] == "done":
             continue
         if action == "next":
+            state["review"] = mode
             if state["iterations"] >= budget:
                 _save_state(d, state)
                 return (
@@ -1069,13 +1163,14 @@ def ship_loop(
                 + (state["events"][-1] if state["events"] else "")
                 + "\n\nResolve it, then run `--action=resume`."
             )
-        verdict = _decide(root, d, state, waves, review)
+        verdict = _decide(root, d, state, waves, mode)
         if verdict == "FEATURE-DONE":
             state["status"] = "done"
+            state["review"] = mode
             _event(state, "feature validated and shipped")
             _save_state(d, state)
             continue
-        head = f"# Delivery loop — {d.name}\n\n{_summary(root, d, state, waves, budget, review)}\n"
+        head = f"# Delivery loop — {d.name}\n\n{_summary(root, d, state, waves, budget, mode)}\n"
         return head + "\n" + verdict
 
     return "\n".join([

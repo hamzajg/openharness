@@ -24,6 +24,7 @@ anything (D001, D009).
   ```
   Status: running | blocked | done
   Iterations: <n>
+  Review: required | advisory
   | Wave | Status | Branch | PR | Evidence | Updated |
   | 1 | done | feat/x-w1 | #12 | 4/4 tests, CI green | ... |
   ## Gates
@@ -34,6 +35,8 @@ anything (D001, D009).
   - <timestamp> complete wave 1 (#12): 4/4 tests, CI green
   - <timestamp> gate G1 met: file:docs/data-contract.md
   ```
+  `LOOP.state.json` carries the same fields plus `review`
+  (`required`/`advisory`); `ship_loop` is still the only writer of both.
 - `specs/<feature>/VALIDATION.md` — written by `ship_validate`; required by
   `finish`. It holds acceptance evidence and an optional post-release outcome
   follow-up, which is not a finish gate.
@@ -63,7 +66,10 @@ contract, sandbox access, seed data, a security/legal review.
 Status lives in `LOOP.md`: `pending` · `met` · `waived` · `failed`.
 - `met` requires `--evidence`; `file:` checks are verified by the oracle
   (the file must exist), `command:` checks are run by the agent and the
-  output recorded — the oracle never executes repo-provided commands.
+  output recorded — the oracle never executes repo-provided commands. A
+  `file:` check for `DECISION-REVIEW.md` additionally requires a filled
+  `VERDICT:` line, not the challenge template's `ACCEPT | REVISE | ...`
+  alternation.
 - `waived` requires `--waived-by` and `--note`; only a human can waive.
 - Overdue gates keep blocking: a pending `Before: spec` gate still blocks
   wave 1 if artifacts were filled out of order.
@@ -93,7 +99,9 @@ Two checkpoints:
 `ship_loop` defaults to `--review=required`: it refuses to plan waves and
 to start wave 1 without a filled `SPEC-AUDIT.md`, and refuses to finish
 without a filled `DELIVERY-AUDIT.md`. `--review=advisory` never enforces
-the audit. A `BLOCK` verdict stops the loop. `PASS` and
+the audit. The mode is persisted as `Review:`/`review` once a mutating
+action records it, so a later call cannot silently drop enforcement; pass
+`--review` again to change it. A `BLOCK` verdict stops the loop. `PASS` and
 accepted `CONCERNS` continue. The template line
 `AUDIT: PASS | CONCERNS | BLOCK` is not a filled verdict.
 
@@ -116,16 +124,19 @@ command makes, not a property of the reviewer.
 | `reset [--wave=N] [--force]` | Reset one wave, or the whole loop (needs `--force`). |
 | `finish` | Mark a validated feature done (requires `VALIDATION.md`, all waves done). |
 
-All actions accept `--review=advisory|required`. Enforcement happens on
+All actions accept `--review=advisory|required`; the recorded mode wins on
+later calls unless `--review` is passed again. Enforcement happens on
 `next` (before `plan`, before wave 1, and before `finish`) and on `finish`;
 other actions report the audit status in the summary.
 
 Phases map to ship-product: no specs → frame; missing artifacts → spec;
-no `WAVES.md` → plan; pending wave → wave N; all waves done → validate;
-`VALIDATION.md` present → acceptance validated. `done` does not mean PRs are
-merged or the feature deployed. Each phase is gated by any blocking
-`GATES.md` entry due at or before it; the oracle prints a `GATE:` directive
-instead of the next action until the gate is met or waived.
+no `WAVES.md` → plan; `WAVES.md` with unresolved `## Warnings` → fix the
+backlog/scenario tags and re-run `wave_plan`; pending wave → wave N; all
+waves done → validate; `VALIDATION.md` present → acceptance validated.
+`done` does not mean PRs are merged or the feature deployed. Each phase is
+gated by any blocking `GATES.md` entry due at or before it; the oracle
+prints a `GATE:` directive instead of the next action until the gate is met
+or waived.
 
 ## Outcomes and delivery flow
 

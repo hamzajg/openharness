@@ -604,3 +604,87 @@ def test_review_rejects_unknown_mode(tmp_path):
     _unplanned(tmp_path)
     out = _run(tmp_path, review="strict")
     assert out.startswith("ERROR") and "advisory|required" in out
+
+
+# ---------- review mode persistence / artifact quality ----------
+
+def test_review_mode_persists_in_loop_state(tmp_path):
+    import json
+    d = _unplanned(tmp_path)
+    out = _run(tmp_path, review="advisory")
+    assert "plan waves" in out
+    data = json.loads((d / "LOOP.state.json").read_text())
+    assert data["review"] == "advisory"
+    assert "Review: advisory" in (d / "LOOP.md").read_text()
+
+    # A later call without --review keeps the recorded advisory mode.
+    out = _run(tmp_path)
+    assert "plan waves" in out and "audit the spec" not in out
+
+    out = _run(tmp_path, review="required")
+    assert "audit the spec" in out
+    data = json.loads((d / "LOOP.state.json").read_text())
+    assert data["review"] == "required"
+
+
+def test_decision_review_gate_requires_a_filled_verdict(tmp_path):
+    spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
+    d = tmp_path / "specs" / "cart-checkout"
+    review = d / "DECISION-REVIEW.md"
+    review.write_text("# Review\n\nVERDICT: ACCEPT | REVISE | REVISIT | SPLIT\n")
+    out = _run(
+        tmp_path, action="gate", gate="G1", status="met",
+        evidence="file:specs/cart-checkout/DECISION-REVIEW.md",
+    )
+    assert out.startswith("ERROR") and "filled VERDICT" in out
+
+    review.write_text("# Review\n\nVERDICT: ACCEPT\nSTEELMAN: simplest reversible path\n")
+    out = _run(
+        tmp_path, action="gate", gate="G1", status="met",
+        evidence="file:specs/cart-checkout/DECISION-REVIEW.md",
+    )
+    assert "Gate G1 met" in out
+
+    # If the artifact is later overwritten back to the template, the gate is stale.
+    review.write_text("# Review\n\nVERDICT: ACCEPT | REVISE | REVISIT | SPLIT\n")
+    out = _run(tmp_path)
+    assert "GATE:" in out and "G1" in out and "stale" in out
+
+
+def test_wave_plan_warnings_block_wave_start(tmp_path):
+    d = _spec(tmp_path)
+    waves = (d / "WAVES.md").read_text()
+    (d / "WAVES.md").write_text(
+        waves.replace(
+            "## Wave 1 — iteration 1",
+            "## Warnings\n\n- US2 lands in wave 2 but its scenarios are tagged @w9 — retag EXAMPLES.feature\n\n## Wave 1 — iteration 1",
+            1,
+        )
+    )
+    out = _run(tmp_path)
+    assert "fix wave-plan warnings" in out
+    assert "@w9" in out
+    assert "implement wave 1" not in out
+
+    (d / "WAVES.md").write_text(waves)
+    assert "implement wave 1" in _run(tmp_path)
+
+
+def test_finish_requires_evidence_for_every_done_wave(tmp_path):
+    d = _spec(tmp_path)
+    _all_waves_done(tmp_path)
+    (d / "VALIDATION.md").write_text("# Validation\n")
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+
+    evidence_dir = tmp_path / ".openharness" / "evidence" / "cart-checkout"
+    for bundle in list(evidence_dir.iterdir()):
+        if bundle.name == "run-w2":
+            shutil.rmtree(bundle)
+    out = _run(tmp_path, action="finish")
+    assert out.startswith("ERROR") and "waves 2" in out
+
+    feature_bundle = evidence.new_bundle(
+        tmp_path, "cart-checkout", wave=0, head="abc1234", run="run-feature"
+    )
+    (feature_bundle / "index.html").write_text("<html/>")
+    assert "marked done" in _run(tmp_path, action="finish")
