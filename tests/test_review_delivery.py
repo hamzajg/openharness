@@ -1130,3 +1130,21 @@ def test_term_present_in_scope_in_is_not_flagged(tmp_path):
     ))
     out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
     assert "[terminology-capability]" not in out
+
+
+def test_plural_in_scope_word_excludes_singular_out_term(tmp_path):
+    """'passwords' under Scope (in) must exclude 'password' from out terms."""
+    _spec_only(tmp_path)
+    spec = tmp_path / "specs" / "cart" / "SPEC.md"
+    spec.write_text(spec.read_text().replace(
+        "- `src/cart` — cart domain, storage, and HTTP surface.",
+        "- `src/cart` — cart domain, password hashing, storage, HTTP surface.",
+    ).replace(
+        "Payments and inventory reservation.",
+        "Payments and inventory reservation; password reset is deferred.",
+    ))
+    feat = tmp_path / "specs" / "cart" / "EXAMPLES.feature"
+    feat.write_text(feat.read_text().replace(
+        "Then it appears", "Then it appears and asks for a password"))
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    assert "[terminology-capability]" not in out
