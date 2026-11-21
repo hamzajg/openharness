@@ -1,6 +1,8 @@
+import json
 import re
 import shutil
 import subprocess
+import sys
 import textwrap
 from pathlib import Path
 
@@ -88,6 +90,18 @@ def _bundle(root: Path, feature: str) -> None:
             root, feature, wave=wave, head="abc1234", run=f"run-w{wave}"
         )
         (b / "index.html").write_text("<html>walkthrough</html>")
+        _tdd_steps(b)
+
+
+def _tdd_steps(bundle: Path) -> None:
+    """The ordered red -> green -> refactor runs ship_loop requires (ADR 0008)."""
+    py = f'"{sys.executable}"'
+    evidence.record_step(
+        bundle, title="RED", tdd="red", expected_failure=True,
+        cmd=f"{py} -c \"import sys; sys.exit(1)\"",
+    )
+    evidence.record_step(bundle, title="GREEN", tdd="green", cmd=f"{py} -c \"pass\"")
+    evidence.record_step(bundle, title="REFACTOR", tdd="refactor", cmd=f"{py} -c \"pass\"")
 
 
 def _run(root: Path, **kw) -> str:
@@ -341,6 +355,20 @@ def test_complete_requires_verified_evidence_bundle(tmp_path):
     assert "Recorded wave 1 done" in _run(tmp_path, action="complete", wave=1, note="ok")
 
 
+def test_complete_requires_tdd_steps_in_the_bundle(tmp_path):
+    """ADR 0008: a verified bundle without red->green->refactor is not proof."""
+    _spec(tmp_path)
+    run = tmp_path / ".openharness" / "evidence" / "cart-checkout" / "run-w1"
+    manifest_path = run / "evidence.json"
+    manifest = json.loads(manifest_path.read_text())
+    for s in manifest["steps"]:
+        s.pop("tdd", None)
+    manifest_path.write_text(json.dumps(manifest))
+    _run(tmp_path, action="start", wave=1)
+    out = _run(tmp_path, action="complete", wave=1, note="ok")
+    assert out.startswith("ERROR") and "TDD proof incomplete" in out
+
+
 def test_complete_rejects_a_bundle_from_another_wave(tmp_path):
     """Wave 1 must not be proven by wave 2's bundle (ADR 0007)."""
     _spec(tmp_path)
@@ -361,6 +389,7 @@ def test_complete_accepts_a_bundle_under_the_tracked_root(tmp_path):
         tmp_path, "cart-checkout", wave=1, head="abc1234", run="run-w1", tracked=True
     )
     (b / "index.html").write_text("<html/>")
+    _tdd_steps(b)
     _run(tmp_path, action="start", wave=1)
     assert "Recorded wave 1 done" in _run(tmp_path, action="complete", wave=1, note="ok")
 
@@ -387,6 +416,7 @@ def test_complete_rejects_a_bundle_bound_to_another_commit(tmp_path):
         tmp_path, "cart-checkout", wave=1, head=head, run="run-w1-head"
     )
     (b / "index.html").write_text("<html/>")
+    _tdd_steps(b)
     assert "Recorded wave 1 done" in _run(tmp_path, action="complete", wave=1, note="ok")
 
 
@@ -718,6 +748,7 @@ def test_finish_requires_evidence_for_every_done_wave(tmp_path):
         tmp_path, "cart-checkout", wave=0, head="abc1234", run="run-feature"
     )
     (feature_bundle / "index.html").write_text("<html/>")
+    _tdd_steps(feature_bundle)
     assert "marked done" in _run(tmp_path, action="finish")
 
 

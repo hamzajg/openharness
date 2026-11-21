@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from openharness import evidence as evidence_bundles
 from openharness.skill import skill
 
 _SKIP_DIRS = {
@@ -900,6 +901,36 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
                 "blocker", "done-with-pending-waves", "LOOP.md",
                 "feature status is done while waves are not done",
             ))
+
+        # TDD proof lives in the wave's evidence bundle: an ordered
+        # red -> green -> refactor step sequence (ship_loop enforces it
+        # at complete; here it is reported, not re-blocked).
+        tdd: dict[int, dict] = {}
+        for row in evidence_bundles.list_bundles(root, feature=spec_dir.name):
+            w = row.get("wave")
+            if isinstance(w, int) and w > 0 and w not in tdd:
+                try:
+                    tdd[w] = evidence_bundles.tdd_proof(
+                        evidence_bundles.load(row["bundle"])
+                    )
+                except evidence_bundles.EvidenceError:
+                    continue
+        for n in waves:
+            if loop["waves"].get(n, {}).get("status") != "done":
+                continue
+            proof = tdd.get(n)
+            if proof is None:
+                findings.append(Finding(
+                    "concern", "tdd-missing", "LOOP.md",
+                    f"wave {n} is done but no evidence bundle records "
+                    "TDD red→green→refactor steps",
+                ))
+            elif not proof["ok"]:
+                findings.append(Finding(
+                    "concern", "tdd-missing", "LOOP.md",
+                    f"wave {n} TDD proof incomplete: "
+                    + "; ".join(proof["problems"][:2]),
+                ))
 
         for gid, g in gates.items():
             if g["before"] and g["before"] not in (

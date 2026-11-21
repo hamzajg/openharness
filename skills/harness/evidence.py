@@ -54,6 +54,7 @@ def harness_evidence(
     note: str = "",
     timeout: int = 0,
     expected_failure: bool = False,
+    tdd: str = "",
     allow_old: bool = False,
     by: str = "",
     fragment: str = "",
@@ -103,6 +104,10 @@ def harness_evidence(
       note: Free-text note recorded on a `step`.
       timeout: Seconds before a `step` is killed; 0 means no limit.
       expected_failure: A non-zero exit is expected for this `step`.
+      tdd: TDD phase for this `step`: red (expected-failure test run),
+        green (tests pass after implementation), or refactor (suite
+        re-run after cleanup). ship_loop requires an ordered
+        red -> green -> refactor sequence to complete a wave.
       allow_old: Attach a file older than the step (records why in the note).
       by: Who captured a manual artifact.
       fragment: Path to a JSON fragment (steps.json) to fold into the manifest.
@@ -181,6 +186,7 @@ def harness_evidence(
                 cwd=cwd,
                 timeout=timeout,
                 expected_failure=expected_failure,
+                tdd=tdd,
                 step_id=step,
                 note=note,
             )

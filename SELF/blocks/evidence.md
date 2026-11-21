@@ -37,7 +37,7 @@ tracks is an error, and a tracked-root bundle git does not yet track draws an
 |---|---|
 | `list` | Bundles under both roots, newest first, with verdict, counts, commit. |
 | `new` | Create a bundle and manifest (feature required; `--wave`, `--head`). |
-| `step` | Run a command; record real exit code, wall time, cwd, redacted log. |
+| `step` | Run a command; record real exit code, wall time, cwd, redacted log. Optional `--tdd=red|green|refactor` marks the TDD phase the run belongs to. |
 | `attach` | Copy a file under `raw/<step>/` (hash, MIME, mtime guard), or fold a `steps.json` fragment in with `--fragment`. |
 | `render` | Write `index.html` + `SUMMARY.md` from the manifest. |
 | `verify` | Schema, hashes, artifacts, commit binding, secrets, tracking. Exit 2 on failure. |
@@ -72,14 +72,24 @@ otherwise it is inferred — image → `screenshot`, video → `video`, `.har` �
 Binary media is not scanned for secrets and is reported that way rather than
 implicitly clean.
 
+## TDD steps
+A step may carry `tdd: red|green|refactor`. `tdd_proof(manifest)` requires
+one step per phase: `red` a failed command marked `expected_failure`,
+`green` and `refactor` passing, ordered by `started_at` red ≤ green ≤
+refactor. `ship_loop --action=complete`/`finish` rejects a wave bundle
+without it (ADR 0008); `--force` bypasses like every other precondition.
+The ordering proves the runs happened in sequence — whether the red log
+shows the real scenario failure is the wave-reviewer's semantic check.
+
 ## Loop wiring
 `ship_loop --action=complete --wave=N` and `--action=finish` refuse until a
-bundle loads, records that wave, passes `verify` and is bound to the
-checked-out commit; both roots count. `--force` bypasses the gate like every
-other loop precondition. Still open (P3 of `docs/plans/evidence-v2.md`):
-`review_delivery` does not read bundles yet, so the independent audit can
-still accept a wave whose evidence is unverified free text, and no Playwright
-fixture ships in this repo (target projects generate one).
+bundle loads, records that wave, passes `verify`, proves TDD
+(`tdd_proof`), and is bound to the checked-out commit; both roots count.
+`--force` bypasses the gate like every other loop precondition.
+`review_delivery` reports per-wave TDD status as `tdd-missing` concerns —
+it surfaces the gap without re-blocking legacy waves. Still open
+(P3 of `docs/plans/evidence-v2.md`): no Playwright fixture ships in this
+repo (target projects generate one).
 
 ## Invariants
 - A bundle is proof of one run, not a product artifact: scratch by default,

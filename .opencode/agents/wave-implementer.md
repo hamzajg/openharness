@@ -73,23 +73,54 @@ If an input is missing, ask for it. Do not change code first.
      orchestrator to resolve or re-plan. Never silently omit its changes.
    - Never commit to the default branch.
 
-4. **Write failing tests first.**
-   - For each scenario the wave names, add a failing check.
-   - The check must cite the scenario name (test name, docstring, or
+4. **RED — failing tests first, recorded.**
+   - For each scenario the wave names, write the test first. The test
+     must cite the scenario name (test name, docstring, or
      describe/it text).
-   - Run it. Confirm that it fails for the correct reason.
-   - A wave without a failing-first check is not a wave.
+   - Create the wave's evidence bundle, then record the failing run:
 
-5. **Implement the smallest correct change.**
-   - Match the repo's conventions and patterns.
-   - No new frameworks. No drive-by refactors. No scope creep.
+     ```
+     python -m openharness run harness_evidence --action=new --repo=<repo> \
+       --feature=<feature> --wave=<n>
+     python -m openharness run harness_evidence --action=step \
+       --tdd=red --expected-failure --title="RED: <scenarios>" \
+       -- <test command>
+     ```
 
-6. **Verify for real.**
-   - Run the repo's build and test commands (from `AGENTS.md`, the CI
-     config, or the manifests).
-   - Fix until green.
-   - Report the exact commands and the counts. Never claim green without
-     running the commands.
+   - Confirm the run fails for the right reason — the scenario assertion
+     fails, not an import or collection error. `ship_loop
+     --action=complete` rejects a wave whose bundle lacks this recorded
+     red run; a wave without failing-first tests is not a wave.
+
+5. **GREEN — smallest correct change.**
+   - Implement the minimal change that makes the red tests pass.
+   - Match the repo's conventions and patterns. No new frameworks. No
+     drive-by refactors. No scope creep.
+   - Record the passing run:
+
+     ```
+     python -m openharness run harness_evidence --action=step \
+       --tdd=green --title="GREEN: <scenarios>" -- <test command>
+     ```
+
+6. **REFACTOR — clean up, then prove green again.**
+   - Review the diff against KISS, DRY and SOLID. Apply only improvements
+     that keep every test green; when nothing needs changing, say so in
+     the step title — the re-run is still required.
+   - Re-run the wave's tests and record:
+
+     ```
+     python -m openharness run harness_evidence --action=step \
+       --tdd=refactor --title="REFACTOR: <what changed or 'none needed'>" \
+       -- <test command>
+     ```
+
+   - Run the repo's full build and test commands (from `AGENTS.md`, the
+     CI config, or the manifests). Fix until green. Report the exact
+     commands and the counts. Never claim green without running the
+     commands.
+   - Render and verify the bundle before finishing:
+     `--action=render` then `--action=verify`.
 
 7. **Commit.**
    - Use conventional messages (`feat:`, `fix:`, `test:`, `chore:`).
@@ -106,6 +137,8 @@ If an input is missing, ask for it. Do not change code first.
    - The PR body must include:
      - spec path and wave number (`Wave N of M`)
      - the scenarios this wave proves
+     - TDD evidence: RED failing output, GREEN passing output, REFACTOR
+       re-run (commands + results)
      - test evidence (commands + results)
      - `Stacked on #<n>` and the merge order when the base is another PR
      - known gaps or follow-ups
