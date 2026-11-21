@@ -29,6 +29,8 @@ _SKIP_DIRS = {
 _MAX_FILE = 512 * 1024
 
 _AC_ROW_RE = re.compile(r"^\|\s*\d+\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|\s*$", re.M)
+_NUMBERED_AC_RE = re.compile(r"^\s*(\d+)[.)]\s+(.+?)\s*$", re.M)
+_AC_SECTION_RE = re.compile(r"^##\s+Acceptance criteria\s*$", re.M | re.I)
 _TAG_RE = re.compile(r"@w(\d+)")
 _ITEM_RE = re.compile(r"^##\s+(?:B|US)(\d+)\s*[—-]\s*(.+)$", re.M)
 _WAVE_ITEM_RE = re.compile(r"^##\s+Wave\s+(\d+)", re.M)
@@ -81,21 +83,49 @@ def _cell(text: str, limit: int = 60) -> str:
     return cut + "…"
 
 
+def _link_refs(refs: str, scenarios: list):
+    """Resolve @wN tags and verbatim scenario names in a reference cell."""
+    waves = {int(w) for w in _TAG_RE.findall(refs)}
+    cell = refs.lower()
+    linked = {s["name"] for s in scenarios if s["name"].lower() in cell}
+    for s in scenarios:
+        if s["name"] in linked:
+            waves |= s["waves"]
+    return waves, linked
+
+
+def _acceptance_block(spec_text: str) -> tuple[str, bool]:
+    """Return (block, has_section) for `## Acceptance criteria`."""
+    m = _AC_SECTION_RE.search(spec_text)
+    if not m:
+        return spec_text, False
+    rest = spec_text[m.end():]
+    nxt = re.search(r"^##\s+", rest, re.M)
+    return (rest[:nxt.start()] if nxt else rest), True
+
+
 def _ac_rows(spec_text: str, scenarios: list):
-    """Parse the SPEC.md AC table. The Scenario(s) cell may hold @wN tags
-    and/or scenario names written verbatim — names are resolved against
-    EXAMPLES.feature (case-insensitive substring)."""
+    """Parse SPEC.md acceptance criteria.
+
+    Supports the scaffold's table (`| # | Criterion | Scenario(s) |`) and a
+    numbered list under `## Acceptance criteria`; numbered items carry refs
+    inline as `@wN` tags and/or verbatim scenario names.
+    """
+    block, has_section = _acceptance_block(spec_text)
     rows = []
-    for m in _AC_ROW_RE.finditer(spec_text):
+    for m in _AC_ROW_RE.finditer(block):
         criterion, scen_refs = m.group(1).strip(), m.group(2)
         if criterion.lower() in ("criterion", "---") or set(criterion) <= {"-", ":"}:
             continue
-        waves = {int(w) for w in _TAG_RE.findall(scen_refs)}
-        cell = scen_refs.lower()
-        linked = {s["name"] for s in scenarios if s["name"].lower() in cell}
-        for s in scenarios:
-            if s["name"] in linked:
-                waves |= s["waves"]
+        waves, linked = _link_refs(scen_refs, scenarios)
+        rows.append({"criterion": criterion, "waves": waves, "scenarios": linked})
+    if rows or not has_section:
+        return rows
+    for m in _NUMBERED_AC_RE.finditer(block):
+        criterion = m.group(2).strip()
+        if not criterion or criterion.lower() in ("criterion", "acceptance criteria"):
+            continue
+        waves, linked = _link_refs(criterion, scenarios)
         rows.append({"criterion": criterion, "waves": waves, "scenarios": linked})
     return rows
 

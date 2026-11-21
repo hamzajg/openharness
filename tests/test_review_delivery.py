@@ -814,6 +814,54 @@ def test_scope_not_checked_without_in_scope_paths(tmp_path):
     assert "[scope-no-paths]" in out
 
 
+# ---------- numbered acceptance criteria / fewer false positives ----------
+
+def test_numbered_acceptance_criteria_with_inline_refs_are_parsed(tmp_path):
+    d = _spec_only(tmp_path)
+    spec = (d / "SPEC.md").read_text()
+    head = spec.split("## Acceptance criteria", 1)[0]
+    (d / "SPEC.md").write_text(head + textwrap.dedent("""\
+        ## Acceptance criteria
+
+        1. Adding an item shows it in the cart (@w1)
+        2. Checkout creates an order (@w2)
+        """))
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    assert "Acceptance criteria: 2" in out
+    assert "[no-acceptance-criteria]" not in out
+    assert "[ac-no-scenario]" not in out
+
+
+def test_numbered_acceptance_criteria_still_need_scenario_refs(tmp_path):
+    d = _spec_only(tmp_path)
+    spec = (d / "SPEC.md").read_text()
+    head = spec.split("## Acceptance criteria", 1)[0]
+    (d / "SPEC.md").write_text(head + "## Acceptance criteria\n\n1. It works\n")
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    assert "[ac-no-scenario]" in out and "AC 1" in out
+
+
+def test_quoted_domain_values_are_not_unfinished_code(tmp_path):
+    d = _delivery(tmp_path)
+    _write(tmp_path, "src/cart/store.py", textwrap.dedent("""\
+        const TASK_STATUSES = ['backlog', 'todo', 'done'];
+        const fixture = { status: 'todo' };
+        const input = { placeholder: "New name" };
+        export function add(item) { return item; }
+        """))
+    out = _audit(tmp_path, phase="delivery", changed="src/cart/store.py")
+    assert "[unfinished-code]" not in out
+
+
+def test_tracked_evidence_bundles_are_exempt_from_scope_drift(tmp_path):
+    d = _delivery(tmp_path)
+    out = _audit(
+        tmp_path, phase="delivery",
+        changed="src/cart/store.py evidence/cart/run-1/index.html evidence/cart/run-1/evidence.json",
+    )
+    assert "scope-drift" not in out
+
+
 # ---------- writing ----------
 
 def test_write_creates_audit_files_and_refuses_overwrite(tmp_path):

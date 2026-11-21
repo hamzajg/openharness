@@ -104,10 +104,12 @@ LOOP IMPACT: none | <what must change before finish>
   here.
 - **Delivery phase:** run after `ship_validate` writes `VALIDATION.md`, before
   `ship_loop --action=finish`.
-- **Enforcement:** `/ship-loop` passes `--review=required`. The oracle then
-  requires `SPEC-AUDIT.md` before `plan` and `DELIVERY-AUDIT.md` before
-  `finish`. A `BLOCK` verdict stops the loop. `ship_loop` defaults to
-  `advisory` so existing loops keep working; enforcement is opt-in.
+- **Enforcement:** `/ship-loop` runs with `--review=required` (the oracle
+  default). The oracle then requires `SPEC-AUDIT.md` before `plan` and
+  `DELIVERY-AUDIT.md` before `finish`, and records the mode in
+  `LOOP.state.json`. A `BLOCK` verdict stops the loop. Standalone
+  `/review-delivery` remains advisory; `--review=advisory` is the explicit
+  loop opt-out.
 - **Not a gate.** The audit is a review artifact, not a `GATES.md` gate. It
   never marks a gate, never merges, and never edits product code.
 - **Independence:** the auditor is not the implementer. If the same session

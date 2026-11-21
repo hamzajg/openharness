@@ -47,7 +47,9 @@ _SPEC_MD = """# Spec: {title}
 ## Acceptance criteria
 
 <!-- Scenario(s): use scenario names verbatim from EXAMPLES.feature and/or
-     @w<N> tags — ship_validate resolves both for traceability. -->
+     @w<N> tags — ship_validate resolves both for traceability. A numbered
+     list is allowed under this heading, but every item must still name its
+     scenario(s) or @w<N> tag inline. -->
 
 | # | Criterion | Scenario(s) |
 |---|-----------|-------------|
@@ -150,9 +152,9 @@ _GATES_MD = """# Gates: {title}
 - Check: file:specs/{slug}/DECISION-REVIEW.md
 - Why: Every wave inherits the feature's architecture choices (persistence
   model, consistency, module boundaries, stateless vs stateful). The
-  challenger review — alternatives, tradeoffs, testability — must exist
-  before wave planning locks the design in. A human may waive this gate
-  for genuinely trivial features.
+  challenger review — alternatives, tradeoffs, testability, and a filled
+  VERDICT — must exist before wave planning locks the design in. A human may
+  waive this gate for genuinely trivial features.
 """
 
 
@@ -223,7 +225,7 @@ def spec_scaffold(repo_path: str = ".", feature: str = "", output_dir: str = "sp
     for s in skipped:
         out.append(f"- kept existing `{s}`")
     out.append("")
-    out.append("Next: fill SPEC.md (problem/users/scope/AC table), write real")
+    out.append("Next: fill SPEC.md (problem/users/scope/acceptance criteria), write real")
     out.append("Gherkin scenarios in EXAMPLES.feature with @w<N> tags, add")
     out.append("backlog items to BACKLOG.md, define preconditions in GATES.md,")
     out.append("then run `wave_plan`.")

@@ -354,3 +354,21 @@ def test_ship_validate_counts_groovy_specs(tmp_path):
            "def 'Referral keeps posted details'() {\n    expect: true\n}\n")
     out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
     assert "DemoSpec.groovy" in out
+
+
+def test_ship_validate_parses_numbered_acceptance_criteria(tmp_path):
+    from skills.product.ship_validate import ship_validate
+    repo = tmp_path / "repo"
+    d = repo / "specs" / "demo"
+    d.mkdir(parents=True)
+    (d / "SPEC.md").write_text(
+        "# Spec: Demo\n\n## Acceptance criteria\n\n1. Create base works (@w1)\n2. Export it works (@w2)\n"
+    )
+    (d / "EXAMPLES.feature").write_text(
+        "Feature: Demo\n\n  @w1 @happy-path\n  Scenario: Create base\n    Given x\n\n  @w2\n  Scenario: Export it\n    Given x\n"
+    )
+    (d / "WAVES.md").write_text("# Waves\n\n## Wave 1 — iteration 1\n\n| Item |\n\n## Wave 2 — iteration 2\n\n| Item |\n")
+    _write(repo, "tests/test_demo.py", "def test_create_base():\n    # Create base\n    assert True\n")
+    out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    assert "| 1 | Create base works (@w1) | Create base | 1 | test_demo.py |" in out
+    assert "| 2 | Export it works (@w2) | Export it | 2 |" in out

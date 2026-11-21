@@ -114,9 +114,10 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - **D013:** specs and deliveries get an independent audit at two checkpoints
   (`SPEC-AUDIT.md` before planning, `DELIVERY-AUDIT.md` before `finish`).
   `review_delivery` builds a deterministic evidence brief; `delivery-auditor`
-  re-verifies code and tests and fills `PASS`/`CONCERNS`/`BLOCK`. Advisory by
-  default; `/ship-loop` enforces it with `--review=required`. It never marks
-  a gate, merges, or edits product code.
+  re-verifies code and tests and fills `PASS`/`CONCERNS`/`BLOCK`. Standalone
+  `/review-delivery` is advisory; `/ship-loop` enforces it with
+  `--review=required` (the oracle default) and records the mode in loop
+  state. It never marks a gate, merges, or edits product code.
 
 ## Landmines
 
