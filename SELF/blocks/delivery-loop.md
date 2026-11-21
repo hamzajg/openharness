@@ -71,9 +71,11 @@ Status lives in `LOOP.md`: `pending` · `met` · `waived` · `failed`.
 - `met` requires `--evidence`; `file:` checks are verified by the oracle
   (the file must exist), `command:` checks are run by the agent and the
   output recorded — the oracle never executes repo-provided commands. A
-  `file:` check for `DECISION-REVIEW.md` additionally requires a filled
-  `VERDICT:` line, not the challenge template's `ACCEPT | REVISE | ...`
-  alternation.
+  `file:` check for `DECISION-REVIEW.md` additionally requires a completed
+  verdict block — a single-value `VERDICT:` plus substantive `STEELMAN:`,
+  `SMALLEST NEXT STEP:` and `REVISIT TRIGGER:` entries — not the
+  challenge template's `ACCEPT | REVISE | ...` alternation or `<...>`
+  placeholders.
 - `waived` requires `--waived-by` and `--note`; only a human can waive.
 - Overdue gates keep blocking: a pending `Before: spec` gate still blocks
   wave 1 if artifacts were filled out of order.

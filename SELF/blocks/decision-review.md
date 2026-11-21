@@ -13,8 +13,10 @@ before it becomes expensive. Its verdict is advisory and never a gate
 blocking `Before: plan` gate (`G1 — Design decisions challenged`,
 `Check: file:specs/<feature>/DECISION-REVIEW.md`) so the review must exist
 before wave planning; the verdict still does not block. The `file:` gate
-requires a filled `VERDICT:` line — the deterministic template's
-`VERDICT: ACCEPT | REVISE | REVISIT | SPLIT` alternation does not count.
+requires a completed verdict block — a single-value `VERDICT:` plus
+substantive `STEELMAN:`, `SMALLEST NEXT STEP:` and `REVISIT TRIGGER:`
+entries — the deterministic template's `VERDICT: ACCEPT | REVISE |
+REVISIT | SPLIT` alternation and `<...>` placeholders do not count.
 
 Two halves:
 
