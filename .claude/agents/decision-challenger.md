@@ -74,6 +74,12 @@ If the source is missing, ask. Do not invent a decision.
    - **Problem and forces / decision record:** dominant constraint,
      recorded alternatives, consequences, owner and status, revisit
      trigger.
+   - **Terminology and copy honesty:** user-facing strings (nav labels,
+     buttons, headings, empty states, error messages) must not promise
+     capabilities the spec/API does not provide — e.g. "Account", "Log
+     in", "Sign up", "Password" when identity is anonymous or auth is
+     out of scope. A mismatch between copy and shipped capability is a
+     design defect, not a wording nit.
 
 6. **Score with evidence.**
    - Fill the brief's scorecard (1–5) only where you have evidence:

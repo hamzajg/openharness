@@ -57,6 +57,11 @@ If the spec dir or phase is missing, ask. Do not guess.
      the AC `UNVERIFIED`, not `PASS`.
    - Walk the demo script's happy path in the code. Does the path exist end to
      end, with real wiring?
+   - Check user-facing copy against shipped capability: labels, buttons,
+     headings, and empty states must not imply features that do not exist
+     (e.g. an "Account" section or "Log in" flow when there is no auth).
+     Grep the changed UI sources for auth/account/payment wording and
+     confirm each promise is real.
    - Check changed public contracts (routes, CLI flags, config keys, schema,
      events) against what the spec and README claim.
 
