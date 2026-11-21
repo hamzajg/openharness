@@ -319,16 +319,32 @@ def _parse_gates(spec_dir: Path) -> dict[str, dict]:
 
 
 def _filled_decision_review(path: Path) -> bool:
-    """True when DECISION-REVIEW.md has a verdict, not the template alternation."""
-    for line in _read(path).splitlines():
-        m = re.match(
-            r"^\s*VERDICT:\s*(?:ACCEPT|REVISE|REVISIT|SPLIT)\b",
-            line,
-            re.I,
+    """True when DECISION-REVIEW.md has a completed verdict block.
+
+    Requires a single-value VERDICT plus substantive STEELMAN,
+    SMALLEST NEXT STEP and REVISIT TRIGGER entries — the template's
+    `ACCEPT | REVISE | ...` alternation and `<...>` placeholders do not
+    count. The verdict stays advisory; this only proves the challenger
+    actually ran.
+    """
+    text = _read(path)
+    verdict = re.search(
+        r"^\s*VERDICT:\s*(?:ACCEPT|REVISE|REVISIT|SPLIT)\b([^\n|]*)$",
+        text,
+        re.M | re.I,
+    )
+    if not verdict:
+        return False
+    for field in ("STEELMAN", "SMALLEST NEXT STEP", "REVISIT TRIGGER"):
+        m = re.search(
+            rf"^\s*{re.escape(field)}:\s*(.+?)\s*$", text, re.M | re.I
         )
-        if m and "|" not in line:
-            return True
-    return False
+        if not m:
+            return False
+        value = m.group(1).strip()
+        if "|" in value or re.fullmatch(r"<[^>]*>", value):
+            return False
+    return True
 
 
 def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
@@ -1145,9 +1161,10 @@ def ship_loop(
                         return f"ERROR: evidence file `{rel}` does not exist — create it first"
                     if path.name == "DECISION-REVIEW.md" and not _filled_decision_review(path):
                         return (
-                            "ERROR: DECISION-REVIEW.md has no filled VERDICT — "
-                            "run /challenge-decision and have decision-challenger "
-                            "complete the scorecard/verdict first"
+                            "ERROR: DECISION-REVIEW.md has no completed verdict "
+                            "block — run /challenge-decision and have "
+                            "decision-challenger fill VERDICT, STEELMAN, "
+                            "SMALLEST NEXT STEP and REVISIT TRIGGER first"
                         )
                 row.update({"status": "met", "evidence": _clean(evidence), "updated": _now()})
                 _event(state, f"gate {gid} met: {_clean(evidence)}")

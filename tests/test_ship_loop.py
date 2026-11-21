@@ -38,6 +38,15 @@ FEATURE = textwrap.dedent("""\
         Then an order exists
     """)
 
+DECISION_REVIEW = textwrap.dedent("""\
+    # Decision review
+
+    VERDICT: ACCEPT
+    STEELMAN: keep the single cart aggregate; it is small and reversible
+    SMALLEST NEXT STEP: extract the pricing rule behind a port
+    REVISIT TRIGGER: if checkout latency exceeds 300ms p95 for a week
+    """)
+
 
 def _write(root: Path, rel: str, content: str) -> Path:
     p = root / rel
@@ -56,7 +65,7 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
     # Loop defaults are enforced now: satisfy the scaffold's G1
     # design-challenge gate and the required spec audit so wave-mechanics
     # tests exercise the loop, not the policy gates.
-    (d / "DECISION-REVIEW.md").write_text("# Decision review\n\nVERDICT: ACCEPT\n")
+    (d / "DECISION-REVIEW.md").write_text(DECISION_REVIEW)
     ship_loop.invoke(
         repo_path=str(root), spec_dir=str(d), action="gate", gate="G1",
         status="met",
@@ -110,7 +119,7 @@ def test_scaffolded_without_waves_asks_for_plan(tmp_path):
     out = _run(tmp_path)
     assert "GATE:" in out and "G1" in out
     assert "DECISION-REVIEW.md" in out
-    (d / "DECISION-REVIEW.md").write_text("# Review\n\nVERDICT: ACCEPT\n")
+    (d / "DECISION-REVIEW.md").write_text(DECISION_REVIEW)
     _run(tmp_path, action="gate", gate="G1", status="met",
          evidence="file:specs/cart-checkout/DECISION-REVIEW.md")
     out = _run(tmp_path)
@@ -650,9 +659,17 @@ def test_decision_review_gate_requires_a_filled_verdict(tmp_path):
         tmp_path, action="gate", gate="G1", status="met",
         evidence="file:specs/cart-checkout/DECISION-REVIEW.md",
     )
-    assert out.startswith("ERROR") and "filled VERDICT" in out
+    assert out.startswith("ERROR") and "completed verdict block" in out
 
-    review.write_text("# Review\n\nVERDICT: ACCEPT\nSTEELMAN: simplest reversible path\n")
+    # A verdict alone is not enough — the block must be fully filled.
+    review.write_text("# Review\n\nVERDICT: ACCEPT\n")
+    out = _run(
+        tmp_path, action="gate", gate="G1", status="met",
+        evidence="file:specs/cart-checkout/DECISION-REVIEW.md",
+    )
+    assert out.startswith("ERROR") and "completed verdict block" in out
+
+    review.write_text(DECISION_REVIEW)
     out = _run(
         tmp_path, action="gate", gate="G1", status="met",
         evidence="file:specs/cart-checkout/DECISION-REVIEW.md",
