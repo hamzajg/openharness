@@ -115,6 +115,26 @@ _GAP_NOISE_RE = re.compile(
     r"disregarded|acceptable per spec)\b",
     re.I,
 )
+# Terminology vs product truth: user-facing copy must not promise
+# capabilities the spec disclaims. Rules are (disclaimer, claim) regex
+# pairs; when any spec artifact disclaims a capability, claim wording in
+# scenario/backlog text or shipped UI copy is reported as a concern.
+_AUTH_DISCLAIMER_RE = re.compile(
+    r"\b(?:no auth|no real auth|without auth|not authenticated|"
+    r"unauthenticated|anonymous)\b",
+    re.I,
+)
+_AUTH_CLAIM_RE = re.compile(
+    r"\b(?:accounts?|log ?in|login|sign ?in|sign ?up|passwords?|"
+    r"register(?:s|ed|ing|ation)?|credentials?|"
+    r"authenticat\w*|authori[sz]ation)\b",
+    re.I,
+)
+_OUT_OF_SCOPE_HEADING_RE = re.compile(
+    r"out of scope|non-goal|excluded|future|won'?t have", re.I,
+)
+_COPY_EXTS = {".tsx", ".jsx", ".html", ".vue", ".svelte"}
+_HEADING_RE = re.compile(r"^#{1,6}\s")
 _HALLUCINATION_RE = re.compile(
     r"\b(?:TODO|FIXME|XXX|HACK|NOT\s+IMPLEMENTED|NOT\s+YET\s+IMPLEMENTED|"
     r"COMING\s+SOON)\b",
@@ -652,6 +672,19 @@ def _out_of_scope_exempt(path: str) -> bool:
 
 # ------------------------------------------------------------------ audit
 
+def _copy_fragments(line: str) -> list[str]:
+    """User-visible text on a source line: quoted strings and JSX text."""
+    frags = [m.group(0) for m in _QUOTED_RE.finditer(line)]
+    frags.extend(re.findall(r">([^<>{}]+)<", line))
+    return frags
+
+
+def _auth_claim_unnegated(text: str) -> bool:
+    return bool(_AUTH_CLAIM_RE.search(text)) and not (
+        _AUTH_DISCLAIMER_RE.search(text) or _NEGATED_RE.search(text)
+    )
+
+
 def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> tuple[str, list[Finding]]:
     findings: list[Finding] = []
     artifacts = {
@@ -792,6 +825,25 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
                 findings.append(Finding(
                     "blocker", "unresolved-spec", f"{name}:{i}",
                     f"unresolved marker: {line.strip()[:110]}",
+                ))
+
+    # --- terminology vs product truth ---------------------------------
+    # When the spec disclaims a capability (first rule: auth), wording
+    # that promises it — in scenarios/stories or shipped UI copy — is a
+    # concern for the auditor, not proof of intent.
+    auth_disclaimed = bool(_AUTH_DISCLAIMER_RE.search(spec_text))
+    if auth_disclaimed:
+        for name in ("EXAMPLES.feature", "BACKLOG.md"):
+            out_of_scope = False
+            for i, line in enumerate(artifacts[name].splitlines(), 1):
+                if _HEADING_RE.match(line):
+                    out_of_scope = bool(_OUT_OF_SCOPE_HEADING_RE.search(line))
+                if out_of_scope or not _auth_claim_unnegated(line):
+                    continue
+                findings.append(Finding(
+                    "concern", "terminology-capability", f"{name}:{i}",
+                    "wording implies auth, which the spec disclaims: "
+                    f"{line.strip()[:90]}",
                 ))
 
     # --- value contract (D017): advisory here, enforced by the G0 gate --
@@ -1087,6 +1139,26 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
                         f"shipped code contains an unfinished marker: {line.strip()[:100]}",
                     ))
                     break
+
+        if auth_disclaimed:
+            for path in changed_files:
+                p = root / path
+                if p.suffix.lower() not in _COPY_EXTS or not p.is_file():
+                    continue
+                for i, line in enumerate(_read(p).splitlines(), 1):
+                    hit = next(
+                        (f for f in _copy_fragments(line)
+                         if _auth_claim_unnegated(f)),
+                        None,
+                    )
+                    if hit is not None:
+                        findings.append(Finding(
+                            "concern", "terminology-capability",
+                            f"{path}:{i}",
+                            "user-facing copy implies auth, which the "
+                            f"spec disclaims: `{hit.strip()[:80]}`",
+                        ))
+                        break
 
     # --- assemble ------------------------------------------------------
     findings = _trim(findings)
