@@ -118,6 +118,7 @@ command makes, not a property of the reviewer.
 |---|---|
 | `next` | Increment the iteration counter and print the next directive, `DONE`, `BLOCKED`, or `STOP`. |
 | `status` | Same decision without incrementing (orientation). |
+| `compliance` | Read-only corpus report: per feature, review mode, audit verdicts, proven ACs, evidence coverage, and a `done-compliant` / `done-legacy` / `done-attention` verdict. |
 | `start --wave=N` | Mark wave N in progress, record branch, reset `blocked`. |
 | `complete --wave=N --note=... [--pr=#n]` | Mark wave N done with evidence; prints the next directive. |
 | `gate --gate=G1 --status=met --evidence=...` | Record a precondition as met (evidence required; `file:` checks verified). |
@@ -126,12 +127,18 @@ command makes, not a property of the reviewer.
 | `block --note=...` | Stop the loop; the note is what a human must decide. |
 | `resume` | Clear `blocked`. |
 | `reset [--wave=N] [--force]` | Reset one wave, or the whole loop (needs `--force`). |
-| `finish` | Mark a validated feature done (requires `VALIDATION.md`, all waves done). |
+| `finish` | Mark a validated feature done (requires `VALIDATION.md` with proven ACs, all waves done, finish gates met, verified evidence bundles). |
 
 All actions accept `--review=advisory|required`; the recorded mode wins on
 later calls unless `--review` is passed again. Enforcement happens on
 `next` (before `plan`, before wave 1, and before `finish`) and on `finish`;
 other actions report the audit status in the summary.
+
+`compliance` is the corpus-level audit: a `done` feature with
+`review=advisory`, unrecorded review mode, missing/unverified audit
+verdicts, unproven ACs, or missing wave bundles is reported
+`done-legacy`/`done-attention` — visible as unverified rather than silently
+counted as compliant. It writes nothing.
 
 Phases map to ship-product: no specs → frame; missing artifacts → spec;
 no `WAVES.md` → plan; `WAVES.md` with unresolved `## Warnings` → fix the

@@ -770,3 +770,49 @@ def test_finish_rejects_validation_without_rows(tmp_path):
     out = _run(tmp_path)
     assert "prove acceptance criteria" in out
     assert "no traceability rows" in out
+
+
+# ---------- compliance snapshot ----------
+
+def test_compliance_marks_required_done_compliant(tmp_path):
+    d = _spec(tmp_path)
+    _all_waves_done(tmp_path)
+    _validation(d)
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+    _run(tmp_path, action="finish")
+
+    out = _run(tmp_path, action="compliance")
+    assert "done-compliant" in out
+    assert "| `cart-checkout` | done | required | pass | pass |" in out
+
+
+def test_compliance_marks_advisory_done_legacy(tmp_path):
+    d = _spec(tmp_path)
+    _all_waves_done(tmp_path)
+    _validation(d)
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+    out = _run(tmp_path, action="finish", review="advisory")
+    assert "marked done" in out
+
+    out = _run(tmp_path, action="compliance")
+    assert "done-legacy" in out
+    assert "| `cart-checkout` | done | advisory |" in out
+
+
+def test_compliance_marks_unproven_done_attention(tmp_path):
+    d = _spec(tmp_path)
+    _all_waves_done(tmp_path)
+    _weak_validation(d)
+    (d / "DELIVERY-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
+    _run(tmp_path, action="finish", force=True)
+
+    out = _run(tmp_path, action="compliance")
+    assert "done-attention" in out
+    assert "0/2 proven" in out
+
+
+def test_compliance_reports_running_feature(tmp_path):
+    _spec(tmp_path)
+    out = _run(tmp_path, action="compliance")
+    assert "| `cart-checkout` | running |" in out
+    assert "Summary:" in out

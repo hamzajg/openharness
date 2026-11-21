@@ -898,6 +898,70 @@ def _summary(
     )
 
 
+def _compliance_report(root: Path, dirs: list[Path]) -> str:
+    """Read-only snapshot: does each loop satisfy the current contract?
+
+    `done-compliant` means review=required with filled non-BLOCK audits,
+    proven ACs and verifying evidence. `done-legacy` means the feature
+    finished before enforcement (advisory/unrecorded review or missing
+    audit verdicts) — treat as unverified, not compliant. `done-attention`
+    means required-mode artifacts exist but something fails today.
+    """
+    lines = [
+        "# Loop compliance",
+        "",
+        "Facts from LOOP.* state and spec artifacts; nothing was written.",
+        "`done-legacy` = finished before audit/evidence enforcement —",
+        "unverified, not compliant. `done-attention` = required-mode loop",
+        "with a current failure (unproven ACs, missing bundle, BLOCK).",
+        "",
+        "| Feature | Status | Review | Spec audit | Delivery audit | ACs | Evidence | Verdict |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    counts = {"done-compliant": 0, "done-legacy": 0, "done-attention": 0,
+              "running": 0, "blocked": 0}
+    for d in dirs:
+        state = _load_state(d)
+        waves = _parse_waves(d)
+        review_mode = state.get("review") or "—"
+        spec_audit = _audit_status(d, "SPEC-AUDIT.md")
+        del_audit = _audit_status(d, "DELIVERY-AUDIT.md")
+        val = d / "VALIDATION.md"
+        if val.is_file():
+            rows, unproven = _unproven_acs(d)
+            acs = f"{rows - len(unproven)}/{rows} proven"
+            acs_bad = rows == 0 or bool(unproven)
+        else:
+            acs, acs_bad = "missing", True
+        done_waves = {n for n in waves if _wave(state, n)["status"] == "done"}
+        ev_err = (_evidence_error(root, d.name, required_waves=done_waves)
+                  if done_waves else "")
+        evidence = "ok" if not ev_err else "missing"
+
+        status = state["status"]
+        if status != "done":
+            verdict = status
+        elif review_mode != "required":
+            verdict = "done-legacy"
+        elif spec_audit in ("missing", "unverified") or del_audit in ("missing", "unverified"):
+            verdict = "done-legacy"
+        elif (spec_audit == "block" or del_audit == "block" or acs_bad
+              or evidence == "missing"):
+            verdict = "done-attention"
+        else:
+            verdict = "done-compliant"
+        counts[verdict] = counts.get(verdict, 0) + 1
+        lines.append(
+            f"| `{d.name}` | {status} | {review_mode} | {spec_audit} | "
+            f"{del_audit} | {acs} | {evidence} | **{verdict}** |"
+        )
+    lines += [
+        "",
+        "Summary: " + " · ".join(f"{k}: {v}" for k, v in counts.items() if v),
+    ]
+    return "\n".join(lines)
+
+
 # --------------------------------------------------------------------- skill
 
 @skill
@@ -966,12 +1030,12 @@ def ship_loop(
     if not root.is_dir():
         return f"ERROR: {repo_path} is not a directory"
     if action not in (
-        "next", "status", "start", "complete", "gate",
+        "next", "status", "compliance", "start", "complete", "gate",
         "block", "resume", "reset", "finish", "reconcile", "check",
     ):
         return (
             f"ERROR: unknown action {action!r} "
-            "(next|status|start|complete|gate|block|resume|reset|finish|reconcile)"
+            "(next|status|compliance|start|complete|gate|block|resume|reset|finish|reconcile)"
         )
 
     dirs = _feature_dirs(root)
@@ -985,6 +1049,11 @@ def ship_loop(
         dirs = [d]
     elif not dirs:
         return _phase_guidance(root)
+
+    if action == "compliance":
+        # Read-only corpus audit: which done loops actually satisfy the
+        # current review/evidence contract vs which predate it.
+        return _compliance_report(root, dirs)
 
     if action != "next" and action != "status":
         d = dirs[0] if explicit else next(

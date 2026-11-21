@@ -87,6 +87,7 @@ disk.
 | Human resolved it | `--action=resume` |
 | Validation is walked | `--action=finish` (needs `VALIDATION.md` with proven ACs — strong test evidence or `## Manual verification` entries — all waves done, finish gates met, verified evidence bundles) |
 | Wave went wrong | `--action=reset --wave=N` (or `--force` for a full reset) |
+| Corpus audit | `--action=compliance` — read-only per-feature report: review mode, audit verdicts, proven ACs, evidence, `done-compliant`/`done-legacy`/`done-attention` |
 
 Evidence is mandatory. `--note` must name the tests that ran and their
 result. A "done" without evidence is a false record.
