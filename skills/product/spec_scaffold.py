@@ -29,11 +29,23 @@ _SPEC_MD = """# Spec: {title}
 
 {users}
 
+## Value contract
+
+Required before wave planning (D017). Fill every field. Keep the target
+measurable — a number, a unit, and a review window.
+
+- Problem: (severity, frequency; what hurts today)
+- Users: (who bears the cost, who benefits)
+- Baseline / current cost: (observable starting point: time, money, effort, or risk)
+- Target outcome indicator: (metric + numeric target + review window, e.g. p95 below 300ms in 30 days)
+- Economic hypothesis: (why the value justifies build, operate, adopt, and migrate cost over 3 years)
+- Owner / date: (who reviews the signal and when)
+
 ## Outcome hypothesis
 
 - Expected user outcome: (what user behavior or problem should change?)
 - Opportunity evidence: (source; if unknown, state that this is an assumption)
-- Signal: (observable measure and baseline if known; do not invent targets)
+- Signal: (observable measure and baseline if known; do not invent baselines; target lives in the Value contract)
 - Follow-up owner/date: (who will review the signal and when?)
 
 ## Scope (in)
@@ -132,6 +144,17 @@ _GATES_MD = """# Gates: {title}
 > `command:<exact command>` (the agent runs it and records the output as
 > evidence — the oracle never executes it).
 
+## G0 — Value contract filled
+- Before: plan
+- Type: artifact
+- Owner: agent
+- Resolver: agent
+- Blocking: yes
+- Check: file:specs/{slug}/SPEC.md
+- Why: D017 — value is the outcome, not the output. Problem, users, baseline,
+  measurable target, economic hypothesis and review owner must be on record
+  before wave planning commits the features.
+
 <!-- Example (indented so it is not parsed):
   ## G1 — Domain glossary agreed
   - Before: spec
@@ -161,6 +184,40 @@ _GATES_MD = """# Gates: {title}
 def _slug(feature: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", feature.strip().lower()).strip("-")
     return slug or "feature"
+
+
+_VALUE_SECTION_RE = re.compile(r"^##\s+Value contract\s*$([\s\S]*?)(?=^## |\Z)", re.M)
+_UNFILLED_VALUE_RE = re.compile(r"^\(.*\)$|^<[^>]*>$|\b(?:TBD|TODO|FIXME)\b", re.I)
+VALUE_CONTRACT_FIELDS = (
+    "Problem", "Users", "Baseline / current cost", "Target outcome indicator",
+    "Economic hypothesis", "Owner / date",
+)
+
+
+def value_contract_status(text: str) -> tuple[bool, list[str]]:
+    """(filled, problems) for SPEC.md's `## Value contract` (D017).
+
+    Deliberately shallow: every field must be present, substantive, free of
+    template guidance or unresolved markers, and the target must contain a
+    number. This proves the contract is measurable enough to plan from — not
+    that the numbers are wise. Judgment stays with the agent.
+    """
+    match = _VALUE_SECTION_RE.search(text)
+    if not match:
+        return False, ["## Value contract"]
+    block = match.group(1)
+    problems, values = [], {}
+    for field in VALUE_CONTRACT_FIELDS:
+        fm = re.search(rf"^-\s*{re.escape(field)}\s*:\s*(.+?)\s*$", block, re.M | re.I)
+        value = fm.group(1).strip() if fm else ""
+        if not value or _UNFILLED_VALUE_RE.search(value):
+            problems.append(field)
+        else:
+            values[field] = value
+    target = values.get("Target outcome indicator", "")
+    if target and not re.search(r"\d", target):
+        problems.append("Target outcome indicator (add a numeric target)")
+    return not problems, problems
 
 
 @skill

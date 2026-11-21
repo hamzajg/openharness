@@ -61,10 +61,16 @@ Otherwise stop and report that you need a target repo.
 4. **Write `SPEC.md`.**
    - Problem.
    - Target users.
+   - Value contract (required before planning, D017): fill all six fields in
+     `## Value contract` — problem severity, who bears the cost, observable
+     baseline/current cost, numeric target indicator with review window,
+     lifecycle-cost hypothesis, and owner/date. Scaffold gate G0 refuses
+     wave planning while any field is a placeholder.
    - Scope in and out.
    - Outcome hypothesis: expected user outcome, opportunity evidence,
      observable signal (and baseline if known), and a follow-up owner/date.
-     Do not invent research, numeric targets, or baselines; mark unknowns.
+     Do not invent research or baselines; the numeric target is the explicit
+     value-contract claim. Mark unknowns.
    - Acceptance-criteria table. Map each criterion to scenario tags.
    - Decisions (ADR-style) — record EVERY one-way-door or high-impact
      choice (persistence model, consistency guarantees, module/service

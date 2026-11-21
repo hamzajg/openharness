@@ -168,6 +168,18 @@ When the oracle prints `GATE:`:
 If a gate is wrong, fix `GATES.md`. Do not mark it `met` silently. If a
 check fails, record `--status=failed` with the failure.
 
+## Fill the value contract before planning (required)
+
+`spec_scaffold` writes a blocking gate — `G0 — Value contract filled`
+(`Before: plan`, `Check: file:specs/<feature>/SPEC.md`) — into every
+feature's `GATES.md`. Before `wave_plan`, fill all six fields of
+`SPEC.md` → `## Value contract` (problem, users, baseline/current cost,
+numeric target outcome indicator, economic hypothesis, owner/date) and
+record the gate `met`. A placeholder or a target without a number is
+not filled; a later regression makes the gate `stale`. This is D017:
+the value gap must be stated before features are committed. Measured
+outcomes stay post-release learning (D009), not a finish gate.
+
 ## Challenge design decisions (required by default)
 
 `spec_scaffold` writes a blocking gate — `G1 — Design decisions
@@ -270,9 +282,14 @@ branch. Never commit secrets or `.env` files. One logical change per PR.
 
 ## Outcomes, execution boundaries, and flow evidence
 
-- In `SPEC.md`, record an outcome hypothesis, the evidence or assumption
-  behind it, an observable signal, and an owner/review date when known.
-  Never invent user research, baselines, or numeric targets.
+- In `SPEC.md`, fill the D017 `## Value contract` before planning: problem,
+  users, baseline/current cost, numeric target with review window, economic
+  hypothesis, and owner/date. Gate G0 blocks `wave_plan` until it is filled;
+  the value/economics lens and audit finding are advisory.
+- Also record an outcome hypothesis, the evidence or assumption behind it,
+  an observable signal, and an owner/review date when known. Never invent
+  user research or baselines; the numeric target is the explicit
+  value-contract claim.
 - The harness protocol does not sandbox agents. Read the target repo's
   `AGENTS.md` and layered `.openharness/ENV.md`; follow host permission
   prompts and least-privilege settings. Do not broaden filesystem, network,

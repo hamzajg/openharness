@@ -579,6 +579,13 @@ _LENSES = [
         "Which constraints are fixed (budget, deadline, team, contracts) and which are assumed?",
         "Who owns this decision, and who must live with the consequences?",
     ], "The dominant force is named, and \"do nothing\" is treated as a real option."),
+    ("Value & economics", [
+        "What is the value gap: who bears the current cost, and how painful or frequent is it?",
+        "Which outcome indicator and baseline prove the gap closed, and over what review window?",
+        "What is the full-lifecycle cost (build, operate, adopt, migrate, support) and what benefit justifies it?",
+        "Will users actually choose this? What adoption signal would show they do?",
+        "What is the simplest intervention that produces the same outcome — including not building it?",
+    ], "The value gap, a numeric target, a lifecycle cost hypothesis and an adoption signal are explicit; 'do nothing' is a real option."),
     ("Alternatives & tradeoffs", [
         "What are at least two credible alternatives, including the simplest thing that could work?",
         "For each: what does it make easy, what does it make hard, and what does it cost to reverse?",

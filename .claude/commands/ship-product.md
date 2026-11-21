@@ -106,6 +106,13 @@ Fill `specs/<feature>/SPEC.md`:
 
 - Problem.
 - Users.
+- Value contract (required before planning, D017): problem severity, users
+  who bear the cost, baseline/current cost, target outcome indicator with
+  a numeric target and review window, economic hypothesis covering build,
+  operate, adopt and migrate cost, and an owner/date. `spec_scaffold`
+  emits gate `G0 — Value contract filled`; `ship_loop` refuses wave
+  planning until the fields are filled and the gate is recorded `met`.
+  A placeholder or a target without a number is not filled.
 - Outcome hypothesis: expected user outcome, opportunity evidence, an
   observable signal (and baseline if known), and a follow-up owner/date.
   Mark unknowns explicitly; do not make up evidence or targets.

@@ -205,3 +205,27 @@ not ritual. Holding 300 after those three permanent additions would reward
 deleting useful behavior or hiding code in another bucket. An explicit ceiling
 plus a CI gate keeps the pressure honest and visible instead of letting the
 dashboard warn while every PR merges.
+
+### D017 — Outcomes over output; the value contract precedes planning
+
+Rule: A spec carries a one-page, parseable `## Value contract` before any
+wave is planned: problem, users, baseline/current cost, target outcome
+indicator (numeric target + window), economic hypothesis (lifecycle cost vs
+benefit, including adoption), and owner/date. `spec_scaffold` emits the
+section and a blocking `G0 — Value contract filled` gate (`Before: plan`,
+`Check: file:specs/<feature>/SPEC.md`); `ship_loop` refuses to mark that
+gate met while any field is a template placeholder or the target has no
+number, and treats a later regression as a stale gate. `review_delivery`
+reports a missing/unmeasurable contract as `CONCERNS`, never `BLOCK`.
+`challenge_decision` gains a value/economics lens — still advisory, never a
+gate (D011). `VALIDATION.md` may record baseline, target, adoption and TCO
+observations after release, but `done` still means acceptance-validated
+(D009), not measured in production.
+
+Because: When AI makes code cheap, output stops being evidence of value. A
+feature can ship on time, pass every test and still solve a problem nobody
+has. Asking for the value gap *before* planning forces the expensive question
+while it is still cheap to change direction; leaving outcome measurement
+after release keeps the oracle honest about what it can know. The contract is
+a short spec field and an existing gate mechanism — no scoring engine, no ROI
+calculator, no business dashboard, no new runtime module (ADR 0009).
