@@ -15,7 +15,7 @@ allowed-tools: [Bash, Read, Grep, Edit, Write]
 ## Target repo
 
 - If the cwd is inside `sources/<repo>`, that repo is the target.
-- Otherwise, ask the user which managed repo to use. See REPOS.md. Do not
+- Otherwise, ask the user which managed repo to use. See the active registry (REPOS.md or .openharness/REPOS.local.md). Do not
   guess.
 - Put all spec artifacts inside the target repo under `specs/`. They are
   product content. Commit them through PRs.
@@ -106,6 +106,13 @@ Fill `specs/<feature>/SPEC.md`:
 
 - Problem.
 - Users.
+- Value contract (required before planning, D017): problem severity, users
+  who bear the cost, baseline/current cost, target outcome indicator with
+  a numeric target and review window, economic hypothesis covering build,
+  operate, adopt and migrate cost, and an owner/date. `spec_scaffold`
+  emits gate `G0 — Value contract filled`; `ship_loop` refuses wave
+  planning until the fields are filled and the gate is recorded `met`.
+  A placeholder or a target without a number is not filled.
 - Outcome hypothesis: expected user outcome, opportunity evidence, an
   observable signal (and baseline if known), and a follow-up owner/date.
   Mark unknowns explicitly; do not make up evidence or targets.

@@ -405,6 +405,10 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
             "Optional; this is a post-release learning record, not a finish gate.",
             "- Status: not yet measured",
             "- Owner and review date: (record when known)",
+            "- Baseline / current: (record before release; do not invent)",
+            "- Target outcome indicator: (from SPEC.md's value contract)",
+            "- Adoption signal: (are users actually choosing it?)",
+            "- Cost / TCO note: (operating and adoption cost observed)",
             "- Signal and observed result: (record after release; do not invent)",
             "- Learning or next action: (record after review)",
         ]

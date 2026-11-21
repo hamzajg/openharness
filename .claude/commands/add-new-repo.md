@@ -1,5 +1,5 @@
 ---
-description: Add a new managed repo to REPOS.md, clone it, optionally scaffold repo-level ENV.md
+description: Add a new managed repo to the local registry, clone it, optionally scaffold repo-level ENV.md
 allowed-tools: [Bash, Read, Grep, Edit, Write]
 ---
 # /add-new-repo — Register and clone a new repository
@@ -11,14 +11,14 @@ allowed-tools: [Bash, Read, Grep, Edit, Write]
 ## Target repo
 If the session cwd is inside sources/<repo>, that repo is the default
 target. Otherwise ask the user which managed repo to operate on
-(see REPOS.md). Never guess.
+(see the active registry: REPOS.md or .openharness/REPOS.local.md). Never guess.
 
 ## Layered ENV
 If sources/<repo>/.openharness/ENV.md exists, prefer it over the global
 .openharness/ENV.md for that repo. Compare with the live env probe
 output and surface any drift; do not silently choose.
 
-Read REPOS.md and .openharness/ENV.md.
+Read the active registry (REPOS.md or .openharness/REPOS.local.md) and .openharness/ENV.md.
 
 ## Workflow
 
@@ -29,7 +29,7 @@ Read REPOS.md and .openharness/ENV.md.
    - Stage: `greenfield` | `legacy-migration` | `modernization`
    - Role / constraints / landmines (free-form notes)
 
-2. Append a row to the REPOS.md table. Append a per-repo note section `### <name>` under `## Per-repo notes`. Update the frontmatter `repos: [...]` list.
+2. Append a row to the active registry. If `.openharness/REPOS.local.md` does not exist, copy the table from the agnostic `REPOS.md` template into it first. Append a per-repo note section `### <name>` under `## Per-repo notes`. Update the frontmatter `repos: [...]` list.
 
 3. Clone it immediately by running:
    ```

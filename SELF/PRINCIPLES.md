@@ -49,8 +49,8 @@ Rule: No vendor instrumentation, no message injection, no SDK hooks. The harness
 Because: Vendor APIs change. Logs are stable. Tail is 20 lines of stdlib, not 2000 lines of vendor SDK.
 
 ### D007 — Target repos live in sources/ (gitignored); REPOS.md is source of truth
-Rule: sources/ is reconstructable via `python -m openharness pull`. Auth relies on the user's existing git credentials only.
-Because: Keeps the harness repo clean. One table → one place to edit. No token management surface.
+Rule: sources/ is reconstructable via `python -m openharness pull`. Auth relies on the user's existing git credentials only. The tracked REPOS.md is an agnostic template; `/init` writes the concrete list to `.openharness/REPOS.local.md` (gitignored by default), which becomes the active registry when present. Only one registry is active at a time — never a merge of both.
+Because: Keeps the harness repo clean and shareable as a framework. One table → one place to edit. No token management surface.
 
 ### D008 — Central mode only
 Rule: The harness is the workspace root. Harness files are never copied into target repos. Agent CLIs discover commands because sessions run inside the harness tree.
@@ -109,7 +109,7 @@ and the harness never schedules it.
 Rule: D003's single 300-LOC core budget is superseded by two buckets.
 **Core** — the agent-facing runtime (`__main__.py`, `skill.py`,
 `registry.py`, `frontmatter.py`, `env.py`, `knowledge/rag.py`) — stays
-≤ 300 LOC. **Platform** — workspace + observation plumbing (`repos.py`,
+≤ 300 LOC (ceiling revised to 330 by D016). **Platform** — workspace + observation plumbing (`repos.py`,
 `metrics.py`, `observers/*`, `serve.py`, `serve_api.py`) — gets ≤ 1100
 LOC. D003's separate ~900 serve+observers+UI budget is absorbed into
 platform. Both budgets are enforced on every commit exactly as D003
@@ -186,3 +186,46 @@ hashed, timestamped command runs are the only place order can be proven
 without brittle git archaeology, so the cycle lives there (ADR 0008). The
 refactor step stays mandatory because "nothing to refactor" is itself a
 claim that deserves a green re-run, not an absence of evidence.
+
+### D016 — Core budget ceiling follows the permanent guard surface
+
+Rule: D012's core bucket ceiling is raised from 300 to 330 LOC; platform stays
+at 1100. The permanent additions since D012 are the pre-import Python-version
+guard (module-level `X | Y` annotations crash old interpreters before any
+message can be shown), the `SkillError` contract that makes refusals loud
+rather than silent, and the `--` passthrough for evidence command steps.
+Seven lines were removed from the CLI dispatcher before raising the ceiling.
+`tests/test_budgets.py` reads the same counters as `GET /api/evolution` and
+fails CI if either bucket exceeds its ceiling; deleting code still comes
+before any further raise, which needs a new decision that says what it
+supersedes.
+
+Because: The budget's purpose is KISS pressure on the agent-facing contract,
+not ritual. Holding 300 after those three permanent additions would reward
+deleting useful behavior or hiding code in another bucket. An explicit ceiling
+plus a CI gate keeps the pressure honest and visible instead of letting the
+dashboard warn while every PR merges.
+
+### D017 — Outcomes over output; the value contract precedes planning
+
+Rule: A spec carries a one-page, parseable `## Value contract` before any
+wave is planned: problem, users, baseline/current cost, target outcome
+indicator (numeric target + window), economic hypothesis (lifecycle cost vs
+benefit, including adoption), and owner/date. `spec_scaffold` emits the
+section and a blocking `G0 — Value contract filled` gate (`Before: plan`,
+`Check: file:specs/<feature>/SPEC.md`); `ship_loop` refuses to mark that
+gate met while any field is a template placeholder or the target has no
+number, and treats a later regression as a stale gate. `review_delivery`
+reports a missing/unmeasurable contract as `CONCERNS`, never `BLOCK`.
+`challenge_decision` gains a value/economics lens — still advisory, never a
+gate (D011). `VALIDATION.md` may record baseline, target, adoption and TCO
+observations after release, but `done` still means acceptance-validated
+(D009), not measured in production.
+
+Because: When AI makes code cheap, output stops being evidence of value. A
+feature can ship on time, pass every test and still solve a problem nobody
+has. Asking for the value gap *before* planning forces the expensive question
+while it is still cheap to change direction; leaving outcome measurement
+after release keeps the oracle honest about what it can know. The contract is
+a short spec field and an existing gate mechanism — no scoring engine, no ROI
+calculator, no business dashboard, no new runtime module (ADR 0009).

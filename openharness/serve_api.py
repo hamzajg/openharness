@@ -216,6 +216,9 @@ _CORE_FILES = [
     "env.py", "knowledge/rag.py",
 ]
 _PLATFORM_FILES = ["repos.py", "metrics.py", "serve.py", "serve_api.py"]
+# D003/D012 budgets, as revised by D016. Checked by tests/test_budgets.py.
+CORE_BUDGET = 330
+PLATFORM_BUDGET = 1100
 _COMMIT_TYPES = {
     "feat": "feature", "fix": "fix", "evolve": "evolve",
     "docs": "docs", "chore": "chore", "refactor": "refactor",
@@ -301,8 +304,8 @@ def _harness_stats(root: Path) -> dict:
     except Exception:
         n_skills = len(list((root / "skills").rglob("*.py")))
     return {
-        "core_loc": core_loc, "core_budget": 300,
-        "platform_loc": platform_loc, "platform_budget": 1100,
+        "core_loc": core_loc, "core_budget": CORE_BUDGET,
+        "platform_loc": platform_loc, "platform_budget": PLATFORM_BUDGET,
         "skills_loc": skills_loc,
         "tests": tests,
         "skills": n_skills,

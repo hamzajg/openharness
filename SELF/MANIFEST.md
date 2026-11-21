@@ -10,7 +10,7 @@ blocks: [skill-system, rag, command-bridge, env-probe, repos, serve, evidence, d
 ## What OpenHarness Is (dual role)
 
 **Role A — Workspace Manager (the mothership).**
-The harness folder is the user's working root for an entire multi-repo product/ecosystem. Target repositories are registered in `REPOS.md` and cloned into `sources/` INSIDE the harness tree (gitignored). Users launch agent CLIs (claude, opencode) from the harness root or from `sources/<repo>` — the harness tree IS the workspace. `oh serve` runs here, monitoring all agent sessions across all managed repos.
+The harness folder is the user's working root for an entire multi-repo product/ecosystem. Target repositories are registered in the active registry — `.openharness/REPOS.local.md` (written by `/init`, gitignored) when present, otherwise the agnostic `REPOS.md` template — and cloned into `sources/` INSIDE the harness tree (gitignored). Users launch agent CLIs (claude, opencode) from the harness root or from `sources/<repo>` — the harness tree IS the workspace. `oh serve` runs here, monitoring all agent sessions across all managed repos.
 
 **Role B — Context Package (loaded into the agent, in place).**
 Because agent sessions run inside the harness tree, the harness's agent-facing assets are natively discoverable by the agent CLI:
@@ -21,7 +21,7 @@ Because agent sessions run inside the harness tree, the harness's agent-facing a
 - `.openharness/ENV.md` → ecosystem profile; optional repo-level `sources/<repo>/.openharness/ENV.md`
 - local RAG (`.openharness/chroma`) for project knowledge
 
-> **The agent CLI is ALWAYS the orchestrator.** The harness never launches agents, never schedules tasks. It provides context (markdown), skills (python), awareness (SELF/ + ENV.md), repo management (REPOS.md + pull), and observation (serve). Harness files are never copied into target repos — repos under `sources/` remain untouched, pristine checkouts. Agent CLIs discover commands via the harness root's `.claude/commands/` / `.opencode/command/` because sessions run inside the harness tree (CLI config dirs are found by walking up from cwd). **This is D008: central mode only.**
+> **The agent CLI is ALWAYS the orchestrator.** The harness never launches agents, never schedules tasks. It provides context (markdown), skills (python), awareness (SELF/ + ENV.md), repo management (active registry + pull), and observation (serve). Harness files are never copied into target repos — repos under `sources/` remain untouched, pristine checkouts. Agent CLIs discover commands via the harness root's `.claude/commands/` / `.opencode/command/` because sessions run inside the harness tree (CLI config dirs are found by walking up from cwd). **This is D008: central mode only.**
 
 ## Interfaces
 
@@ -31,7 +31,7 @@ Because agent sessions run inside the harness tree, the harness's agent-facing a
 | `python -m openharness ask <query>` | RAG search, print chunks separated by `---` |
 | `python -m openharness ingest <path>` | Ingest all `.md` files under path into RAG |
 | `python -m openharness env` | JSON of probed env + drift vs `.openharness/ENV.md` |
-| `python -m openharness pull [name ...]` | Sync repos from REPOS.md into `sources/` |
+| `python -m openharness pull [name ...]` | Sync repos from the active registry into `sources/` |
 | `python -m openharness self [block]` | Print SELF/MANIFEST.md or SELF/blocks/<block>.md |
 | `python -m openharness serve [--host H] [--port P]` | Run uvicorn on `openharness.serve:app` (default 127.0.0.1:7337) |
 | `oh` (no args) | Print skill catalog (name + first line of docstring) |

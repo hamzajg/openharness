@@ -20,6 +20,15 @@ SPEC = textwrap.dedent("""\
     ## Users
     Shoppers and support agents.
 
+    ## Value contract
+
+    - Problem: 12% of carts are abandoned weekly; support answers 6h of repeat tickets.
+    - Users: shoppers lose work; support agents answer the same question.
+    - Baseline / current cost: 12% abandonment and 6h support per week.
+    - Target outcome indicator: abandonment below 4% within 30 days of release.
+    - Economic hypothesis: 8h/week saved outweighs build and three-year run cost.
+    - Owner / date: product owner, 2026-12-21.
+
     ## Scope (in)
     - `src/cart` — cart domain, storage, and HTTP surface.
 
@@ -157,6 +166,27 @@ def test_clean_spec_audit_has_no_blockers(tmp_path):
     assert "Findings: **0 blockers · 0 concerns" in out
     assert "## Verdict (agent fills after verifying the code)" in out
     assert "AUDIT: PASS | CONCERNS | BLOCK" in out
+
+
+def test_value_contract_missing_or_unmeasurable_is_a_concern(tmp_path):
+    d = _spec_only(tmp_path)
+    spec = d / "SPEC.md"
+    text = spec.read_text()
+    spec.write_text(text.replace(
+        "- Target outcome indicator: abandonment below 4% within 30 days of release.",
+        "- Target outcome indicator: (metric + numeric target + review window)",
+    ))
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    concerns = out.split("## Concerns", 1)[1].split("## Unverified", 1)[0]
+    assert "value-contract-missing" in concerns
+    assert "0 blockers" in out
+
+    spec.write_text(text.split("## Value contract", 1)[0] + "## Scope (in)\n"
+                    + text.split("## Scope (in)", 1)[1])
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    concerns = out.split("## Concerns", 1)[1].split("## Unverified", 1)[0]
+    assert "value-contract-missing" in concerns
+    assert "0 blockers" in out
 
 
 def test_clean_delivery_audit_has_no_findings(tmp_path):

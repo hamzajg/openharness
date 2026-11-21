@@ -5,7 +5,7 @@ OpenHarness plays **two roles at once** in a single git repository:
 ## Dual Role
 
 **Role A — Workspace Manager (the mothership).**
-The harness folder is your working root for an entire multi-repo product/ecosystem. Target repositories are registered in `REPOS.md` and cloned into `sources/` (gitignored). Launch agent CLIs (claude, opencode) from the harness root or from `sources/<repo>` — the harness tree **is** the workspace. `oh serve` runs here, monitoring all agent sessions across all managed repos.
+The harness folder is your working root for an entire multi-repo product/ecosystem. Target repositories are registered in the active registry and cloned into `sources/` (gitignored). The shipped `REPOS.md` is an agnostic template: `/init` writes your concrete list to `.openharness/REPOS.local.md` (gitignored by default), which takes precedence while it exists. Launch agent CLIs (claude, opencode) from the harness root or from `sources/<repo>` — the harness tree **is** the workspace. `oh serve` runs here, monitoring all agent sessions across all managed repos.
 
 **Role B — Context Package (loaded into the agent, in place).**
 Because agent sessions run inside the harness tree, the harness's agent-facing assets are natively discoverable:
@@ -16,7 +16,7 @@ Because agent sessions run inside the harness tree, the harness's agent-facing a
 - `.openharness/ENV.md` → ecosystem profile; optional repo-level `sources/<repo>/.openharness/ENV.md`
 - Local RAG (`.openharness/chroma`) for project knowledge
 
-> **The agent CLI is ALWAYS the orchestrator.** The harness never launches agents, never schedules tasks. It provides context (markdown), skills (python), awareness (SELF/ + ENV.md), repo management (REPOS.md + pull), and observation (serve).
+> **The agent CLI is ALWAYS the orchestrator.** The harness never launches agents, never schedules tasks. It provides context (markdown), skills (python), awareness (SELF/ + ENV.md), repo management (active registry + pull), and observation (serve).
 
 ## Mental Model
 
@@ -45,7 +45,7 @@ pip install -e .
 cd openharness/web && npm ci && npm run build   # build UI
 oh serve                                        # terminal 1
 opencode                                        # terminal 2 (or claude)
-> /init   # register repos, build REPOS.md + ENV.md
+> /init   # write .openharness/REPOS.local.md + ENV.md from your setup
 > /pull   # clone repos into sources/
 ```
 
@@ -61,10 +61,10 @@ feature:
 
 | Command | Shape |
 |---|---|
-| `/ship-product` | Phased, human-in-the-loop: discover → frame → spec/outcome hypothesis → examples → waves → implement → validate. One feature at a time. |
+| `/ship-product` | Phased, human-in-the-loop: discover → frame → spec/value contract → examples → waves → implement → validate. One feature at a time. |
 | `/ship-loop` | Autonomous loop over the same pipeline: the oracle picks the next action, subagents execute it, every wave is one PR. Stacks on open predecessor PRs; `done` means acceptance-validated, not necessarily merged or deployed. Runs with `--review=required`: a spec audit gates planning and a delivery audit gates `finish`. |
 | `/review-delivery` | Independent audit of one feature's spec or delivery: a deterministic brief checks claims against the repo, then `delivery-auditor` re-verifies the code and tests and returns `PASS`/`CONCERNS`/`BLOCK`. |
-| `/challenge-decision` | Advisory design review: steelman a decision, generate alternatives, weigh tradeoffs, apply DDD/architecture/testability/craftsmanship lenses. The verdict never blocks — but inside `/ship-loop` the review artifact is a required gate (`G1`) before wave planning. |
+| `/challenge-decision` | Advisory design review: steelman a decision, generate alternatives, weigh tradeoffs, apply value/DDD/architecture/testability/craftsmanship lenses. The verdict never blocks — but inside `/ship-loop` the review artifact is a required gate (`G1`) before wave planning. |
 
 ```
 /ship-loop --repo=sources/portal-api --merge=review --max=25
@@ -88,7 +88,9 @@ security/legal review. Declare them in `specs/<feature>/GATES.md`
 past a phase while a blocking gate is `pending`/`failed`, and only a named
 human can waive one. Status and evidence live in `LOOP.md`.
 
-**Product learning.** Feature specs record an outcome hypothesis, its
+**Product learning.** Feature specs record a `## Value contract` before
+planning (problem, users, baseline/current cost, numeric target with review
+window, economic hypothesis, owner/date), plus an outcome hypothesis, its
 evidence or assumption, an observable signal, and a follow-up owner/date
 when known. Post-release results can be recorded in `VALIDATION.md`; this
 follow-up does not block acceptance validation. Close-out distinguishes

@@ -2,7 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from openharness.repos import entries, prune, status, sync
+from openharness.repos import entries, prune, registry_path, status, sync
 
 
 def _make_local_repo(tmp_path: Path, name: str) -> Path:
@@ -41,6 +41,40 @@ def test_entries_parses_table(tmp_path):
         assert "proj" in e
         assert e["proj"]["url"] == f"file://{repo}"
         assert e["proj"]["branch"] == "main"
+    finally:
+        os.chdir(cwd)
+
+
+def test_local_registry_overrides_template(tmp_path):
+    work = tmp_path / "work"
+    work.mkdir()
+    _write_repos_md(work, [("templated", "file:///template", "main", "legacy-migration")])
+    (work / ".openharness").mkdir()
+    (work / ".openharness" / "REPOS.local.md").write_text(
+        "---\nrepos: [local]\n---\n# Managed Repositories (local)\n\n"
+        "| name | url | branch | stage |\n|---|---|---|---|\n"
+        "| local | file:///local | main | greenfield |\n"
+    )
+    cwd = Path.cwd()
+    os.chdir(work)
+    try:
+        assert registry_path().name == "REPOS.local.md"
+        assert list(entries()) == ["local"]
+        # An explicit path still wins: useful for tools that inspect the template.
+        assert list(entries("REPOS.md")) == ["templated"]
+    finally:
+        os.chdir(cwd)
+
+
+def test_registry_falls_back_to_template(tmp_path):
+    work = tmp_path / "work"
+    work.mkdir()
+    _write_repos_md(work, [("templated", "file:///template", "main", "legacy-migration")])
+    cwd = Path.cwd()
+    os.chdir(work)
+    try:
+        assert registry_path().name == "REPOS.md"
+        assert list(entries()) == ["templated"]
     finally:
         os.chdir(cwd)
 

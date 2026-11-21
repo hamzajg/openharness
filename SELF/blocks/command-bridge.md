@@ -19,7 +19,7 @@ Turns skills and harness workflows into **slash commands** discoverable natively
   !`python -m openharness self`
   !`python -m openharness env`
   ```
-  Then read `REPOS.md` and `.openharness/ENV.md`. If a repo-level `sources/<repo>/.openharness/ENV.md` exists, it overrides the global profile for that repo. If cwd is inside `sources/<repo>`, that repo is the default target; otherwise ask the user which repo.
+  Then read the active registry (`REPOS.md` or `.openharness/REPOS.local.md`) and `.openharness/ENV.md`. If a repo-level `sources/<repo>/.openharness/ENV.md` exists, it overrides the global profile for that repo. If cwd is inside `sources/<repo>`, that repo is the default target; otherwise ask the user which repo.
 - **No vendor SDK imports** anywhere to build these. Files are plain Markdown. (Agent-agnostic D002.)
 
 ## How to Extend

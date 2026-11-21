@@ -2,10 +2,19 @@ import re, subprocess as _sp
 from pathlib import Path
 
 _ROW = re.compile(r"^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$")
+LOCAL_REGISTRY = ".openharness/REPOS.local.md"
+
+
+def registry_path(path=None) -> Path:
+    """The active registry: local override if present, else the agnostic template."""
+    if path:
+        return Path(path)
+    local = Path.cwd() / LOCAL_REGISTRY
+    return local if local.exists() else Path.cwd() / "REPOS.md"
 
 
 def entries(path=None) -> dict:
-    p = Path(path or (Path.cwd()/"REPOS.md"))
+    p = registry_path(path)
     out: dict = {}
     if not p.exists(): return out
     for ln in p.read_text().splitlines():
@@ -139,7 +148,7 @@ def sync(*names, repos_path=None):
     G = lambda *a: _sp.run(list(a), capture_output=True, text=True, check=True)
     for n in targets:
         e = all_e.get(n)
-        if not e: print(f"!! {n}: not found in REPOS.md"); continue
+        if not e: print(f"!! {n}: not found in active registry (REPOS.md / {LOCAL_REGISTRY})"); continue
         d = src/n
         try:
             if d.exists():
