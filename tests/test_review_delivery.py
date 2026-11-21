@@ -1148,3 +1148,23 @@ def test_plural_in_scope_word_excludes_singular_out_term(tmp_path):
         "Then it appears", "Then it appears and asks for a password"))
     out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
     assert "[terminology-capability]" not in out
+
+
+def test_auth_feature_spec_does_not_flag_its_own_auth_scenarios(tmp_path):
+    """A spec that ADDS auth must not flag its own login scenarios."""
+    _spec_only(tmp_path)
+    spec = tmp_path / "specs" / "cart" / "SPEC.md"
+    spec.write_text(spec.read_text().replace(
+        "- `src/cart` — cart domain, storage, and HTTP surface.",
+        "- `src/cart` — cart domain, storage, HTTP surface, and the "
+        "new /auth/login + /auth/register endpoints.",
+    ).replace(
+        "Payments and inventory reservation.",
+        "Payments and inventory reservation; today there is no auth "
+        "and no authentication anywhere.",
+    ))
+    feat = tmp_path / "specs" / "cart" / "EXAMPLES.feature"
+    feat.write_text(feat.read_text().replace(
+        "Scenario: add an item", "Scenario: sign in to add an item"))
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    assert "[terminology-capability]" not in out

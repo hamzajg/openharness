@@ -127,7 +127,7 @@ _GAP_NOISE_RE = re.compile(
 # Both report a concern for the auditor, never a blocker.
 _AUTH_DISCLAIMER_RE = re.compile(
     r"\b(?:no auth|no real auth|without auth|not authenticated|"
-    r"unauthenticated|anonymous)\b",
+    r"unauthenticated|no authentication|without authentication)\b",
     re.I,
 )
 _AUTH_CLAIM_RE = re.compile(
@@ -742,28 +742,36 @@ def _deplural(word: str) -> str:
 
 
 def _capability_terms(spec_text: str) -> set[str]:
-    """Capability nouns declared out of scope, minus in-scope words.
+    """Capability nouns the spec mentions *only* as out of scope.
 
-    Terms come from SPEC.md `## Scope (out)` / `## Non-goals` /
-    `## Out of scope` sections; anything also named under `## Scope (in)`
-    (plural-tolerant) or matching a stopword is dropped to keep the
-    signal precise.
+    Terms come from `## Scope (out)` / `## Non-goals` / `## Out of scope`
+    sections. A candidate is dropped when the same word (deplural-
+    tolerant) appears anywhere else in SPEC.md — problem, users, scope
+    (in), acceptance criteria, decisions — because a concept the spec
+    discusses as part of the feature is not a deferred capability. This
+    keeps persona words ("candidate", "expert"), in-scope mechanics
+    ("password", "token", "login") and decision-discussed edge cases
+    ("anonymous") from firing on every scenario line, while genuinely
+    deferred vocabulary ("oauth", "password reset", "admin") still
+    flags copy that promises it.
     """
-    in_text = out_text = ""
+    out_words: list[str] = []
+    elsewhere: list[str] = []
+    pos = 0
     for m in _SCOPE_SECTION_RE.finditer(spec_text):
+        elsewhere.append(spec_text[pos:m.start()])
         heading = m.group(1).strip().lower()
         is_out = "out" in heading or heading.startswith(
             ("non-goal", "out of scope")
         )
-        if is_out:
-            out_text += m.group(2)
-        else:
-            in_text += m.group(2)
-    in_norms = {_deplural(w) for w in _WORD_RE.findall(in_text)}
+        (out_words if is_out else elsewhere).append(m.group(2))
+        pos = m.end()
+    elsewhere.append(spec_text[pos:])
+    elsewhere_norms = {_deplural(w) for w in _WORD_RE.findall(" ".join(elsewhere))}
     return {
         w.lower()
-        for w in _WORD_RE.findall(out_text)
-        if _deplural(w) not in in_norms
+        for w in _WORD_RE.findall(" ".join(out_words))
+        if _deplural(w) not in elsewhere_norms
         and w.lower() not in _CAPABILITY_STOPWORDS
     }
 
@@ -935,7 +943,21 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
     # auth-phrase rule catches multi-word auth wording the term pass
     # cannot see. Concerns for the auditor, never blockers.
     cap_re = _capability_pattern(_capability_terms(spec_text))
-    auth_disclaimed = bool(_AUTH_DISCLAIMER_RE.search(spec_text))
+    # The auth-phrase supplement only applies when auth is genuinely
+    # disclaimed — a spec that *adds* auth (auth words under Scope (in))
+    # must not have its own scenarios flagged as auth violations.
+    scope_in_text = ""
+    for m in _SCOPE_SECTION_RE.finditer(spec_text):
+        h = m.group(1).strip().lower()
+        if "out" not in h and not h.startswith(("non-goal", "out of scope")):
+            scope_in_text += m.group(2)
+    auth_in_scope = bool(
+        re.search(r"\b(?:auth|login|token|register|account|password)\w*\b",
+                  scope_in_text, re.I)
+    )
+    auth_disclaimed = (
+        bool(_AUTH_DISCLAIMER_RE.search(spec_text)) and not auth_in_scope
+    )
 
     def _capability_hits(text: str) -> list[str]:
         if _NEGATED_RE.search(text):
@@ -953,12 +975,20 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
     if cap_re or auth_disclaimed:
         for name in ("EXAMPLES.feature", "BACKLOG.md"):
             deferred = False
+            in_fence = False
             for i, line in enumerate(artifacts[name].splitlines(), 1):
+                if line.lstrip().startswith("```"):
+                    in_fence = not in_fence
+                    continue
+                if in_fence:
+                    continue
                 if _HEADING_RE.match(line):
                     deferred = bool(_OUT_OF_SCOPE_HEADING_RE.search(line))
                 if deferred or _NEGATED_RE.search(line):
                     continue
-                hits = _capability_hits(line)
+                # Template placeholders like `<role>` are format docs,
+                # not shipped wording.
+                hits = _capability_hits(re.sub(r"<[^>]+>", " ", line))
                 if hits:
                     findings.append(Finding(
                         "concern", "terminology-capability", f"{name}:{i}",
