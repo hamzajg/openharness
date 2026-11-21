@@ -1237,11 +1237,30 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
     parts.append(
         '<p class="footer">Regenerate with '
         f'<code>python -m openharness run harness_evidence --action=render '
-        f'--bundle={e(str(bundle))}</code> · verify with <code>--action=verify</code>'
+        f'--bundle={e(_display_bundle(bundle))}</code> · verify with <code>--action=verify</code>'
         " · this page is generated, never edited by hand.</p>"
     )
     parts.append("</main></body></html>")
     return "\n".join(parts) + "\n"
+
+
+def _display_bundle(bundle: Path) -> str:
+    """A bundle path fit for the page: repo-relative, else `~/…`, else as given.
+
+    ADR 0004 keeps absolute host paths out of evidence; this footer is a command
+    a reader re-runs, so it must not embed one.
+    """
+    resolved = bundle.resolve()
+    repo = _guess_repo(bundle)
+    if repo is not None:
+        try:
+            return resolved.relative_to(Path(repo).resolve()).as_posix()
+        except ValueError:
+            pass
+    try:
+        return "~/" + resolved.relative_to(Path.home()).as_posix()
+    except ValueError:
+        return bundle.as_posix()
 
 
 def _rel_src(art: dict) -> str:
