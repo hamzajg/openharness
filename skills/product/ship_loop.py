@@ -46,6 +46,14 @@ _GATE_STATE_RE = re.compile(
 _WAVE_STATUSES = ("pending", "in-progress", "done")
 _FEATURE_STATUSES = ("running", "blocked", "done")
 _GATE_STATUSES = ("pending", "met", "waived", "failed")
+_VALIDATION_ROW_RE = re.compile(
+    r"^\|\s*(\d+)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|"
+    r"\s*([^|]*?)\s*\|\s*$",
+    re.M,
+)
+_MANUAL_SECTION_RE = re.compile(r"^##\s+Manual verification\s*$", re.M | re.I)
+_MANUAL_AC_RE = re.compile(r"^\s*-\s*AC\s*(\d+)\b\s*[—:–-]?\s*(.+?)\s*$")
+_PLACEHOLDER_EV_RE = re.compile(r"^(?:|—|-|–|\.)$", re.I)
 _GATE_PHASES = ("spec", "plan", "validate", "finish")
 _GATE_TYPES = ("decision", "artifact", "external", "technical", "quality", "data")
 _AGENT_GATE_TYPES = ("artifact", "technical", "data")
@@ -685,6 +693,46 @@ def _evidence_error(
     ]
     return "\n".join(lines)
 
+
+def _manual_acs(text: str) -> set[int]:
+    """AC numbers with a substantive `## Manual verification` entry."""
+    m = _MANUAL_SECTION_RE.search(text)
+    if not m:
+        return set()
+    rest = text[m.end():]
+    nxt = re.search(r"^##\s+", rest, re.M)
+    block = rest[:nxt.start()] if nxt else rest
+    out = set()
+    for line in block.splitlines():
+        am = _MANUAL_AC_RE.match(line)
+        # The entry must say what was run and observed — a bare "AC 3"
+        # marker is not verification.
+        if am and len(am.group(2)) >= 10:
+            out.add(int(am.group(1)))
+    return out
+
+
+def _unproven_acs(spec_dir: Path) -> tuple[int, list[int]]:
+    """(row count, unproven AC numbers) from VALIDATION.md.
+
+    An AC row is proven by strong test evidence (a file name, not the
+    `(weak)` token-match marker or a `—` placeholder). Rows without it are
+    unproven unless `## Manual verification` records the AC.
+    """
+    text = _read(spec_dir / "VALIDATION.md")
+    manual = _manual_acs(text)
+    rows = 0
+    unproven = []
+    for m in _VALIDATION_ROW_RE.finditer(text):
+        rows += 1
+        ev = m.group(5).strip()
+        placeholder = not ev or bool(_PLACEHOLDER_EV_RE.match(ev))
+        weak = ev.lower().startswith("(weak)")
+        if (placeholder or weak) and int(m.group(1)) not in manual:
+            unproven.append(int(m.group(1)))
+    return rows, unproven
+
+
 def _decide(
     root: Path, spec_dir: Path, state: dict, waves: dict,
     review: str = "required",
@@ -781,6 +829,31 @@ def _decide(
     blocked = _blocking_gates(spec_dir, state, "finish", root)
     if blocked:
         return _gate_directive(root, spec_dir, "finish", blocked)
+
+    rows, unproven = _unproven_acs(spec_dir)
+    if rows == 0 or unproven:
+        detail = (
+            "no traceability rows parsed — re-run ship_validate"
+            if rows == 0
+            else f"unproven: {', '.join(f'AC{n}' for n in unproven)}"
+        )
+        return "\n".join([
+            f"NEXT: prove acceptance criteria for {spec_dir.name}",
+            "",
+            f"VALIDATION.md — {detail}.",
+            "Weak token matches and '—' are not proof. Add scenario-named",
+            "test evidence (re-run `ship_validate`) or record each AC under",
+            "`## Manual verification` with the command run and result.",
+        ])
+
+    done_waves = {n for n in waves if _wave(state, n)["status"] == "done"}
+    ev_err = _evidence_error(root, spec_dir.name, required_waves=done_waves)
+    if ev_err:
+        return "\n".join([
+            f"NEXT: record finish evidence for {spec_dir.name}",
+            "",
+            ev_err,
+        ])
     if review == "required":
         status = _audit_status(spec_dir, "DELIVERY-AUDIT.md")
         if status in ("missing", "unverified"):
@@ -1119,15 +1192,32 @@ def ship_loop(
                 )
             if not (d / "VALIDATION.md").is_file():
                 return "ERROR: VALIDATION.md is missing — run ship_validate first"
+            blocked = _blocking_gates(d, state, "finish", root)
+            if blocked:
+                return _gate_directive(root, d, "finish", blocked)
+            rows, unproven = _unproven_acs(d)
+            if rows == 0 and not force:
+                return (
+                    "ERROR: VALIDATION.md has no traceability rows — "
+                    "re-run ship_validate after SPEC.md/EXAMPLES.feature exist"
+                )
+            if unproven and not force:
+                return (
+                    "ERROR: acceptance criteria "
+                    + ", ".join(f"AC{n}" for n in unproven)
+                    + " of VALIDATION.md have no strong test evidence — "
+                    "weak token matches and '—' are not proof.\n"
+                    "Fix: cite the scenario-named test in Test evidence "
+                    "(re-run ship_validate), or record each AC under "
+                    "`## Manual verification` with the command run and "
+                    "observed result, then retry."
+                )
             done_waves = {
                 n for n in waves if _wave(state, n)["status"] == "done"
             }
             ev_err = _evidence_error(root, d.name, required_waves=done_waves)
             if ev_err and not force:
                 return ev_err
-            blocked = _blocking_gates(d, state, "finish", root)
-            if blocked:
-                return _gate_directive(root, d, "finish", blocked)
             if review == "required":
                 audit = _audit_status(d, "DELIVERY-AUDIT.md")
                 if audit in ("missing", "unverified"):

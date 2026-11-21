@@ -6,7 +6,10 @@ writes VALIDATION.md containing:
   test evidence found in the repo (scenario names searched in test files).
 - Coverage stats: scenarios with/without detected test evidence.
 - Demo script: the happy-path scenarios ordered as a manual walkthrough.
-- Gaps: scenarios with no evidence, unplanned waves, missing artifacts.
+- Gaps: scenarios with no/weak-only evidence, unplanned waves, missing
+  artifacts.
+- Manual verification: preserves hand-recorded per-AC proof across reruns;
+  `ship_loop finish` accepts it for ACs without strong test evidence.
 - Outcome follow-up: preserves optional post-release learning across reruns.
 
 Evidence matching: literal scenario-name hits are strong; a token-overlap
@@ -36,6 +39,15 @@ _ITEM_RE = re.compile(r"^##\s+(?:B|US)(\d+)\s*[—-]\s*(.+)$", re.M)
 _WAVE_ITEM_RE = re.compile(r"^##\s+Wave\s+(\d+)", re.M)
 _OUTCOME_SECTION_RE = re.compile(
     r"^## Outcome follow-up\s*$([\s\S]*?)(?=^## |\Z)", re.M
+)
+_MANUAL_SECTION_RE = re.compile(
+    r"^## Manual verification\s*$([\s\S]*?)(?=^## |\Z)", re.M
+)
+_MANUAL_AC_RE = re.compile(r"^\s*-\s*AC\s*(\d+)\b\s*[—:–-]?\s*(.+?)\s*$")
+_BUILD_CMD_RE = re.compile(
+    r"\b(?:sh\s+\S+|npm\s+\w+|pnpm\s+\w+|yarn\s+\w+|pytest|gradlew|"
+    r"mvn|dotnet\s+\w+|go\s+test|cargo\s+test|make\s+\w+)\b",
+    re.I,
 )
 
 
@@ -202,6 +214,8 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
     previous_validation = validation_f.read_text(errors="ignore") if validation_f.is_file() else ""
     outcome_match = _OUTCOME_SECTION_RE.search(previous_validation)
     outcome_followup = outcome_match.group(1).strip() if outcome_match else ""
+    manual_match = _MANUAL_SECTION_RE.search(previous_validation)
+    manual_verification = manual_match.group(1).strip() if manual_match else ""
 
     test_texts = {}
     for p in _test_files(root):
@@ -273,6 +287,42 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
                    if not evidence[s["name"]]["strong"] and not evidence[s["name"]]["weak"]]
     if no_evidence:
         gaps.append(f"{len(no_evidence)} scenario(s) lack detected test evidence — verify manually or add checks")
+    if weak_only:
+        gaps.append(
+            f"{weak_only} scenario(s) have only weak token-match evidence — "
+            "not proof; add scenario-named tests or record manual verification"
+        )
+    manual = {
+        int(am.group(1))
+        for line in manual_verification.splitlines()
+        for am in [_MANUAL_AC_RE.match(line)]
+        if am and len(am.group(2)) >= 10
+    }
+    unlinked, unproven = [], []
+    for i, ac in enumerate(acs, 1):
+        if _BUILD_CMD_RE.search(ac["criterion"]):
+            continue
+        if not ac["waves"] and not ac["scenarios"]:
+            unlinked.append(i)
+            continue
+        names = set(ac["scenarios"])
+        for w in ac["waves"]:
+            names.update(scen_by_wave.get(w, []))
+        if i not in manual and not any(
+            evidence.get(n, {}).get("strong") for n in names
+        ):
+            unproven.append(i)
+    if unlinked:
+        gaps.append(
+            "AC(s) " + ", ".join(f"AC{n}" for n in unlinked)
+            + " have no scenario or @w<N> reference — traceability incomplete"
+        )
+    if unproven:
+        gaps.append(
+            "AC(s) " + ", ".join(f"AC{n}" for n in unproven)
+            + " lack strong test evidence — add tests or record "
+            "## Manual verification"
+        )
     out.append("## Gaps")
     out.append("")
     for g in gaps or ["none — spec is fully traced"]:
@@ -280,7 +330,19 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
     out.append("")
     out.append("Note: 'no evidence' means neither the scenario name nor a")
     out.append("token match was found in test files — verify by hand before")
-    out.append("treating it as a real gap. '~' marks weak token-match evidence.")
+    out.append("treating it as a real gap. '~' marks weak token-match evidence,")
+    out.append("which is not proof: ship_loop finish requires strong test")
+    out.append("evidence or a `## Manual verification` entry per AC.")
+    out += ["", "## Manual verification", ""]
+    if manual_verification:
+        out.append(manual_verification)
+    else:
+        out += [
+            "<!-- For ACs without strong automated evidence, one bullet per",
+            "     AC: `- AC <n> — <command/check run> → <observed result>`.",
+            "     Preserved across ship_validate reruns; the delivery auditor",
+            "     still verifies each claim. -->",
+        ]
     out += ["", "## Outcome follow-up", ""]
     if outcome_followup:
         out.append(outcome_followup)

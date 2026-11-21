@@ -303,6 +303,28 @@ def test_ship_validate_preserves_outcome_followup_on_rerun(tmp_path):
     assert "not yet measured" not in out
 
 
+def test_ship_validate_preserves_manual_verification_on_rerun(tmp_path):
+    from skills.product.ship_validate import ship_validate
+    repo = tmp_path / "repo"
+    d = repo / "specs" / "demo"
+    d.mkdir(parents=True)
+    (d / "SPEC.md").write_text("# Spec: Demo\n")
+    (d / "EXAMPLES.feature").write_text("Feature: Demo\n")
+    (d / "WAVES.md").write_text("# Waves\n")
+    validation = d / "VALIDATION.md"
+
+    ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    assert "## Manual verification" in validation.read_text()
+    text = validation.read_text().replace(
+        "## Manual verification\n",
+        "## Manual verification\n\n- AC 1 — ran the demo flow → order created\n",
+    )
+    validation.write_text(text)
+
+    out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    assert "- AC 1 — ran the demo flow → order created" in out
+
+
 def test_ship_validate_resolves_scenario_names_in_ac(tmp_path):
     from skills.product.ship_validate import ship_validate
     repo = tmp_path / "repo"

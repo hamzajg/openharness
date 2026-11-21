@@ -84,7 +84,7 @@ disk.
 | Human waived a gate | `--action=gate --gate=G1 --status=waived --waived-by="<name>" --note="<reason>"` |
 | Human must decide something | `--action=block --note="<exactly what must be decided>"` |
 | Human resolved it | `--action=resume` |
-| Validation is walked | `--action=finish` (needs `VALIDATION.md`, all waves done, finish gates met) |
+| Validation is walked | `--action=finish` (needs `VALIDATION.md` with proven ACs — strong test evidence or `## Manual verification` entries — all waves done, finish gates met, verified evidence bundles) |
 | Wave went wrong | `--action=reset --wave=N` (or `--force` for a full reset) |
 
 Evidence is mandatory. `--note` must name the tests that ran and their
@@ -313,7 +313,9 @@ Give **delivery-verifier** the spec dir. It must:
 1. Run `ship_validate`.
 2. Walk the demo script by hand.
 3. Verify that each acceptance criterion has scenario + wave + test
-   evidence.
+   evidence. Weak token matches and `—` are not proof: add scenario-named
+   tests, or record each unproven AC under `## Manual verification` in
+   `VALIDATION.md` with the command run and observed result.
 4. Refresh `specs/PRODUCT.md` with `product_map`.
 5. Update `README.md` and `AGENTS.md` for what shipped.
 6. Verify that each `Before: validate` and `Before: finish` gate is `met`
