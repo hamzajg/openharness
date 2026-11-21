@@ -19,7 +19,7 @@ Arguments (`$ARGUMENTS`), all optional:
 
 | Arg | Default | Meaning |
 |---|---|---|
-| `--repo=sources/<repo>` | cwd inside `sources/` | Target repo. Must be in REPOS.md. |
+| `--repo=sources/<repo>` | cwd inside `sources/` | Target repo. Must be registered in the active registry (REPOS.md or .openharness/REPOS.local.md). |
 | `--feature=<name>` | first feature | `specs/<name>/`. |
 | `--spec=<path>` | — | Explicit spec dir, when `--feature` is ambiguous. |
 | `--phase=spec\|delivery\|all` | `delivery` | Which audit to run. |

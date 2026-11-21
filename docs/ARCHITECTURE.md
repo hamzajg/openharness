@@ -1,15 +1,16 @@
 # Architecture — openharness
 
 Current-state map. Descriptive, not aspirational; normative decisions live
-in `SELF/PRINCIPLES.md` (D001–D015). See `docs/adr/` for the baseline record.
+in `SELF/PRINCIPLES.md` (D001–D016). See `docs/adr/` for the baseline record.
 
 ## Dual role
 
 OpenHarness is simultaneously:
 
-1. **Workspace manager** — `REPOS.md` (YAML-frontmatter registry) declares
-   target repos; `openharness/repos.py` clones them into `sources/`
-   (gitignored, reconstructable via `pull`). Launch agent CLIs from the
+1. **Workspace manager** — the active registry declares target repos:
+   `.openharness/REPOS.local.md` (written by `/init`, gitignored) when present,
+   otherwise the shipped, agnostic `REPOS.md` template. `openharness/repos.py`
+   clones them into `sources/` (gitignored, reconstructable via `pull`). Launch agent CLIs from the
    harness root or a `sources/<repo>` — the harness tree *is* the workspace.
 2. **Context package** — agent-facing assets discoverable in place:
    `.claude/commands/`, `.opencode/commands/` (legacy `command/`),
@@ -22,7 +23,7 @@ OpenHarness is simultaneously:
 | Piece | File(s) | Role |
 |---|---|---|
 | CLI | `openharness/__main__.py` | `oh` verbs: serve, pull, run, catalog |
-| Repo mgmt | `repos.py`, `registry.py` | REPOS.md parse, clone/pull, skill catalog |
+| Repo mgmt | `repos.py`, `registry.py` | active registry parse, clone/pull, skill catalog |
 | Specs | `frontmatter.py`, `env.py`, `skill.py` | md+frontmatter parsing, ENV.md, skill runner |
 | Observer | `serve.py`, `serve_api.py` | HTTP API + SSE streams (:7337): agent sessions, ship-loop state |
 | Agent adapters | `observers/{base,claude,opencode}.py` | tail agent session JSONL — read-only, thin |
@@ -67,14 +68,14 @@ OpenHarness is simultaneously:
 
 ## State
 
-All state is files on disk: `REPOS.md`, `sources/` clones,
+All state is files on disk: the active registry (`REPOS.md` or local override), `sources/` clones,
 `.openharness/ENV.md`, `.openharness/chroma` RAG index, agent session logs.
 No database, no cloud.
 
 ## Key decisions
 
 See `SELF/PRINCIPLES.md` — D001 (no orchestration), D002 (md specs / py
-execution), D003/D012 (LOC budgets: core ≤300, platform ≤1100), D005 (UI is observer), D006 (log-tail
+execution), D003/D012/D016 (LOC budgets: core ≤330, platform ≤1100, CI-enforced), D005 (UI is observer), D006 (log-tail
 observation only), D007 (REPOS.md + sources/), D008 (no copying into target
 repos), D009 (agent-executed delivery loops, state in `specs/`), D010
 (declared gates guard phase transitions), D011 (optional advisory decision

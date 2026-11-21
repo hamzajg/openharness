@@ -25,12 +25,13 @@ def init_profile(
     landmines: str = "",
     output_dir: str = ".",
 ) -> str:
-    """Write draft REPOS.md and .openharness/ENV.md from user interview answers.
+    """Write the local repo registry and .openharness/ENV.md from interview answers.
 
     Used by /init slash command. Comma-separated strings are split into
-    lists; writes REPOS.md with one table row per comma-separated repo
-    triple ("name:url:branch|stage"), ENV.md with frontmatter + section
-    stubs. Prints paths written.
+    lists; writes .openharness/REPOS.local.md (gitignored, environment-specific)
+    with one table row per comma-separated repo triple
+    ("name:url:branch|stage"), ENV.md with frontmatter + section stubs.
+    The tracked REPOS.md stays an agnostic template. Prints paths written.
 
     Params:
       product: Product/ecosystem name.
@@ -101,7 +102,10 @@ branch_prefix: "{branch_prefix or 'feat/'}"
     repos_text = f"""---
 {repos_fm}
 ---
-# Managed Repositories
+# Managed Repositories (local)
+
+Environment-specific registry written by /init. The shipped REPOS.md is an
+agnostic template; this local file is the active one while it exists.
 
 | name         | url                                      | branch | stage            |
 |--------------|------------------------------------------|--------|------------------|
@@ -110,7 +114,7 @@ branch_prefix: "{branch_prefix or 'feat/'}"
 ## Per-repo notes
 {chr(10).join(repo_notes) if repo_notes else ''}
 """
-    repos_path = out / "REPOS.md"
+    repos_path = out / ".openharness" / "REPOS.local.md"
     repos_path.write_text(repos_text)
 
     return f"Wrote:\n  - {repos_path}\n  - {env_path}"

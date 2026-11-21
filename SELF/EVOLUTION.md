@@ -5,7 +5,7 @@ type: rules
 # Rules for Agents Modifying the Harness
 
 ## Before You Change Anything
-1. **Read `SELF/PRINCIPLES.md` first.** Every decision D001–D014 is binding precedent.
+1. **Read `SELF/PRINCIPLES.md` first.** Every decision D001–D016 is binding precedent.
 2. Never violate a standing decision. If you must, **append D00N+1** with rationale that **explicitly supersedes** it. Reference the old decision by number.
 
 ## Block Spec Contract
@@ -17,12 +17,13 @@ type: rules
 6. Every command file that does engineering work **must** start with the awareness preamble (self + env outputs) and resolve the managed repo it operates on.
 
 ## LOC Budget (D003, split by D012)
-7. Respect the two budgets. Core = `__main__.py`, `skill.py`, `registry.py`,
-   `frontmatter.py`, `env.py`, `knowledge/rag.py` → ≤ 300 LOC. Platform =
-   `repos.py`, `metrics.py`, `observers/*`, `serve.py`, `serve_api.py` →
-   ≤ 1100 LOC. Check via `GET /api/evolution` (`stats.core_loc`,
-   `stats.platform_loc`) or count manually.
-8. If you blow a budget, **delete something first**. Rewrite two functions as one. Remove an abstraction. Default to less.
+7. Respect the two budgets (D012, ceiling revised by D016). Core =
+   `__main__.py`, `skill.py`, `registry.py`, `frontmatter.py`, `env.py`,
+   `knowledge/rag.py` → ≤ 330 LOC. Platform = `repos.py`, `metrics.py`,
+   `observers/*`, `serve.py`, `serve_api.py` → ≤ 1100 LOC. Check via
+   `GET /api/evolution` (`stats.core_loc`, `stats.platform_loc`) or count
+   manually. `tests/test_budgets.py` checks both in CI.
+8. If you blow a budget, **delete something first**. Rewrite two functions as one. Remove an abstraction. Default to less. Raising a ceiling needs a new decision that explicitly supersedes the old one (D016).
 
 ## Tests
 9. `pytest` **must pass** before proposing the change.

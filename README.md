@@ -5,7 +5,7 @@ OpenHarness plays **two roles at once** in a single git repository:
 ## Dual Role
 
 **Role A — Workspace Manager (the mothership).**
-The harness folder is your working root for an entire multi-repo product/ecosystem. Target repositories are registered in `REPOS.md` and cloned into `sources/` (gitignored). Launch agent CLIs (claude, opencode) from the harness root or from `sources/<repo>` — the harness tree **is** the workspace. `oh serve` runs here, monitoring all agent sessions across all managed repos.
+The harness folder is your working root for an entire multi-repo product/ecosystem. Target repositories are registered in the active registry and cloned into `sources/` (gitignored). The shipped `REPOS.md` is an agnostic template: `/init` writes your concrete list to `.openharness/REPOS.local.md` (gitignored by default), which takes precedence while it exists. Launch agent CLIs (claude, opencode) from the harness root or from `sources/<repo>` — the harness tree **is** the workspace. `oh serve` runs here, monitoring all agent sessions across all managed repos.
 
 **Role B — Context Package (loaded into the agent, in place).**
 Because agent sessions run inside the harness tree, the harness's agent-facing assets are natively discoverable:
@@ -16,7 +16,7 @@ Because agent sessions run inside the harness tree, the harness's agent-facing a
 - `.openharness/ENV.md` → ecosystem profile; optional repo-level `sources/<repo>/.openharness/ENV.md`
 - Local RAG (`.openharness/chroma`) for project knowledge
 
-> **The agent CLI is ALWAYS the orchestrator.** The harness never launches agents, never schedules tasks. It provides context (markdown), skills (python), awareness (SELF/ + ENV.md), repo management (REPOS.md + pull), and observation (serve).
+> **The agent CLI is ALWAYS the orchestrator.** The harness never launches agents, never schedules tasks. It provides context (markdown), skills (python), awareness (SELF/ + ENV.md), repo management (active registry + pull), and observation (serve).
 
 ## Mental Model
 
@@ -45,7 +45,7 @@ pip install -e .
 cd openharness/web && npm ci && npm run build   # build UI
 oh serve                                        # terminal 1
 opencode                                        # terminal 2 (or claude)
-> /init   # register repos, build REPOS.md + ENV.md
+> /init   # write .openharness/REPOS.local.md + ENV.md from your setup
 > /pull   # clone repos into sources/
 ```
 

@@ -3,24 +3,20 @@ import shlex
 import sys
 from pathlib import Path
 
-#: Oldest interpreter this package runs on (pyproject: requires-python >= 3.13).
-#: Below this, module-level `X | Y` annotations raise TypeError on import, so
-#: the check must run before any project module is imported.
 MIN_PYTHON = (3, 13)
 
 
 def python_version_error(version_info=None):
-    """Actionable message when the running interpreter is too old, else None."""
-    v = sys.version_info if version_info is None else version_info
-    if tuple(v[:2]) >= MIN_PYTHON:
+    """Actionable message when the interpreter is too old, else None.
+
+    Runs before project imports: module-level `X | Y` annotations crash first.
+    """
+    v = tuple((sys.version_info if version_info is None else version_info)[:3])
+    if v[:2] >= MIN_PYTHON:
         return None
-    found = ".".join(str(x) for x in tuple(v)[:3])
-    needed = f"{MIN_PYTHON[0]}.{MIN_PYTHON[1]}"
-    return (
-        f"openharness requires Python {needed}+ (pyproject: "
-        f'requires-python = ">={needed}"), but this is Python {found}. '
-        f"Re-run with a newer interpreter, e.g. `python{needed} -m openharness ...`."
-    )
+    need = ".".join(map(str, MIN_PYTHON))
+    return (f"openharness requires Python {need}+ (pyproject: requires-python >= {need}), "
+            f'but this is Python {".".join(map(str, v))}. Re-run with python{need}.')
 
 
 def main():
@@ -95,14 +91,13 @@ def main():
             if not info.get("exists"):
                 print(f"{name:30s} not cloned")
                 continue
-            br = info.get("branch", "?")
-            def_br = info.get("default_branch", "?")
-            dirty = " [DIRTY]" if info.get("dirty") else ""
-            diverge = ""
-            if info.get("ahead", 0) > 0 or info.get("behind", 0) > 0:
-                diverge = f" (+{info.get('ahead', 0)}/-{info.get('behind', 0)})"
-            mismatch = f" (expected {def_br})" if def_br and br != def_br else ""
-            print(f"{name:30s} {br}{mismatch}{diverge}{dirty}")
+            br, def_br = info.get("branch", "?"), info.get("default_branch")
+            bits = [br]
+            if def_br and def_br != br: bits.append(f"(expected {def_br})")
+            if info.get("ahead", 0) or info.get("behind", 0):
+                bits.append(f"(+{info.get('ahead', 0)}/-{info.get('behind', 0)})")
+            if info.get("dirty"): bits.append("[DIRTY]")
+            print(f"{name:30s} {' '.join(bits)}")
         return
     if v == "prune":
         from . import repos
@@ -114,10 +109,8 @@ def main():
                 print(f"{name:30s} {rec['skipped']}")
                 continue
             parts = []
-            if rec["local"]:
-                parts.append(f"local -{len(rec['local'])}: {', '.join(rec['local'])}")
-            if rec["remote"]:
-                parts.append(f"remote -{len(rec['remote'])}: {', '.join(rec['remote'])}")
+            if rec["local"]: parts.append(f"local -{len(rec['local'])}: {', '.join(rec['local'])}")
+            if rec["remote"]: parts.append(f"remote -{len(rec['remote'])}: {', '.join(rec['remote'])}")
             print(f"{name:30s} {'; '.join(parts) if parts else 'nothing to prune'}")
         return
     if v == "self":

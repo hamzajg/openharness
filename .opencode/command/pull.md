@@ -1,5 +1,5 @@
 ---
-description: Clone or pull all repos listed in REPOS.md into sources/
+description: Clone or pull all repos in the active registry into sources/
 ---
 # /pull — Sync managed repositories
 
@@ -12,14 +12,14 @@ Run via Bash and read output:
 ## Target repo
 If the session cwd is inside sources/<repo>, that repo is the default
 target. Otherwise ask the user which managed repo to operate on
-(see REPOS.md). Never guess.
+(see the active registry: REPOS.md or .openharness/REPOS.local.md). Never guess.
 
 ## Layered ENV
 If sources/<repo>/.openharness/ENV.md exists, prefer it over the global
 .openharness/ENV.md for that repo. Compare with the live env probe
 output and surface any drift; do not silently choose.
 
-Read REPOS.md and .openharness/ENV.md.
+Read the active registry (REPOS.md or .openharness/REPOS.local.md) and .openharness/ENV.md.
 
 ## Workflow
 

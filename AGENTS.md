@@ -34,7 +34,7 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
 
 - `openharness/` — runtime package:
   - `__main__.py` — CLI entry (`oh` commands).
-  - `repos.py` — REPOS.md parsing, `sources/` clone/pull management.
+  - `repos.py` — active-registry parsing (local override or shipped template), `sources/` clone/pull management.
   - `registry.py`, `skill.py`, `frontmatter.py`, `env.py` — skill catalog,
     YAML-frontmatter spec parsing (~15 LOC, no PyYAML), ENV.md handling.
   - `evidence.py` — evidence bundles: per-run manifest, hashes, generated
@@ -67,15 +67,18 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   `delivery-verifier`), the independent audit (`delivery-auditor`), and the
   review (`decision-challenger`).
 - `SELF/` — the harness's own specs/principles (`PRINCIPLES.md`, decision
-  log D001–D015, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
-- `REPOS.md` — YAML-frontmatter registry of managed repos (source of truth).
+  log D001–D016, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
+- `REPOS.md` — shipped, agnostic registry template. `/init` writes the concrete
+  repo list to `.openharness/REPOS.local.md` (gitignored by default); that file
+  is the active registry when present, otherwise the template is used (D007).
 - `tests/` — unittest-style pytest files per module.
 
 ### Dual-role model
 
 ```
 harness root = workspace root
-  REPOS.md ──► sources/<repo>/   (clones, gitignored)
+  active registry ──► sources/<repo>/   (clones, gitignored)
+  .openharness/REPOS.local.md (local) or REPOS.md (agnostic template)
   .claude/commands, .opencode/commands, .claude/agents, .opencode/agents,
   skills/, SELF/, ENV.md
        │  discovered natively by agent CLIs running inside the tree
@@ -92,8 +95,9 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - **Agent-agnostic (D006):** no vendor SDK imports in runtime code; agent
   differences live in markdown commands + thin observer tailers.
 - **Local-first:** no cloud deps; RAG runs locally.
-- **Complexity budgets (D003, split by D012):** core runtime ≤ 300 LOC;
-  platform (repos/metrics/observers/serve) ≤ 1100 LOC. Check via
+- **Complexity budgets (D003, split by D012, ceiling revised by D016):** core
+  runtime ≤ 330 LOC; platform (repos/metrics/observers/serve) ≤ 1100 LOC.
+  Enforced in CI by `tests/test_budgets.py`; also visible via
   `GET /api/evolution` stats. Respects KISS — don't grow casually.
 - **D008:** harness files are never copied into target repos.
 - **D009:** delivery loops are agent-executed, not harness-scheduled. The
@@ -122,17 +126,20 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   evidence bundle must record an ordered `tdd: red` (expected failure) →
   `green` → `refactor` step sequence or `complete`/`finish` rejects it
   (ADR 0008). Refactor is a required green re-run, not an impression.
+- **D016:** the core LOC ceiling is 330 (up from 300) to accommodate the
+  permanent interpreter guard, `SkillError`, and evidence `--` passthrough.
+  Delete code before growing it again; a further raise needs a new decision.
 
 ## Landmines
 
 - Tests run with `--no-deps` in CI deliberately — the suite must stay
   stdlib-only; don't add imports that require chromadb etc. to tested
   modules without guarding them.
-- `sources/` is gitignored — never commit clones; `REPOS.md` is the
-  registry.
+- `sources/` is gitignored — never commit clones. Keep environment-specific
+  repos in `.openharness/REPOS.local.md`; leave the tracked `REPOS.md` agnostic.
 - `oh serve` observes session JSONL files the agent CLIs already write —
   don't add instrumentation hooks into agents.
-- Decision log D001–D015 in `SELF/PRINCIPLES.md` is normative — read it
+- Decision log D001–D016 in `SELF/PRINCIPLES.md` is normative — read it
   before structural changes.
 - The web UI must call the same verbs as the CLI (D005) — no business
   logic in TSX.
@@ -169,7 +176,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - Verify before claiming: run `pytest` (with `--no-deps` install path) and
   report the real result.
 - Keep changes minimal and consistent with surrounding code. Respect the
-  D001–D015 decision log.
+  D001–D016 decision log.
 - For product work, prefer `/ship-loop` (autonomous) or `/ship-product`
   (phased); both keep specs and loop state in the target repo under
   `specs/` and ship one wave per PR.
