@@ -134,8 +134,12 @@ If an input is missing, ask for it. Do not change code first.
      In Playwright repos, generate the fixture once
      (`--action=fixture --repo=<repo>`), run the wave's spec with
      `EVIDENCE_RUN_DIR` set, and fold each emitted `steps-<spec>.json`
-     with `--action=attach --fragment=<run>/steps-<spec>.json`. Otherwise
-     attach screenshots, short recordings and a summarized log directly.
+     with `--action=attach --fragment=<run>/steps-<spec>.json`. For
+     native/device waves, `--action=capture --device=android|ios
+     --media=all` shells to `adb`/`xcrun simctl` for screenshots,
+     recordings and logs (missing tools fail with an install hint).
+     Otherwise attach screenshots, short recordings and a summarized log
+     directly.
      The bundle stays in the local scratch root (never `--tracked`), and
      the PR body links both run ids.
 

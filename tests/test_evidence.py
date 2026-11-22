@@ -1559,3 +1559,115 @@ def test_fixture_rejects_escaping_out_dir(tmp_path):
     run = _cli("--action=fixture", f"--repo={tmp_path}", "--out_dir=../x")
     assert run.returncode != 0
     assert "relative path" in run.stderr
+
+
+# ----------------------------------------------------------------- capture
+
+ADB_SH = """\
+[ "$1" = "-s" ] && shift 2
+case "$1" in
+  exec-out) printf 'PNGDATA' ;;
+  shell)
+    case "$2" in screenrecord|rm) : ;; esac ;;
+  pull)
+    for last; do :; done
+    printf 'MP4DATA' > "$last" ;;
+  logcat) printf 'logcat-line\\n' ;;
+esac
+exit 0
+"""
+
+XCRUN_SH = """\
+if [ "$1" = "simctl" ] && [ "$2" = "io" ]; then
+  for last; do :; done
+  if [ "$4" = "recordVideo" ]; then
+    printf 'MOVDATA' > "$last"
+    trap 'exit 0' INT TERM
+    sleep 300
+  fi
+  printf 'PNGDATA' > "$last"
+  exit 0
+fi
+if [ "$1" = "simctl" ] && [ "$2" = "spawn" ]; then printf 'ios-log\\n'; exit 0; fi
+exit 1
+"""
+
+
+def _fake_tool(tmp_path: Path, name: str, body: str, monkeypatch) -> None:
+    bindir = tmp_path / "fakebin"
+    bindir.mkdir(exist_ok=True)
+    tool = bindir / name
+    tool.write_text("#!/bin/sh\n" + body)
+    tool.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
+
+
+def _walkthrough(tmp_path: Path) -> Path:
+    return evidence.new_bundle(
+        tmp_path, "cart", wave=1, head=HEAD, run="wt-1", kind="walkthrough"
+    )
+
+
+def test_capture_android_screenshot_attaches_media(tmp_path, monkeypatch):
+    _fake_tool(tmp_path, "adb", ADB_SH, monkeypatch)
+    bundle = _walkthrough(tmp_path)
+
+    out = harness_evidence.invoke(
+        action="capture", repo=str(tmp_path), bundle=str(bundle),
+        device="android", media="screenshot",
+    )
+
+    assert "Captured 1 artifact" in out
+    arts = evidence.load(bundle)["steps"][-1]["artifacts"]
+    assert arts[0]["role"] == "screenshot"
+    assert "android screenshot" in arts[0]["caption"]
+
+
+def test_capture_android_all_media(tmp_path, monkeypatch):
+    _fake_tool(tmp_path, "adb", ADB_SH, monkeypatch)
+    bundle = _walkthrough(tmp_path)
+
+    out = harness_evidence.invoke(
+        action="capture", repo=str(tmp_path), bundle=str(bundle),
+        device="android", media="all",
+    )
+
+    assert "Captured 3 artifact" in out
+    arts = evidence.load(bundle)["steps"][-1]["artifacts"]
+    assert [a["role"] for a in arts] == ["screenshot", "video", "attachment"]
+
+
+def test_capture_ios_screenshot(tmp_path, monkeypatch):
+    _fake_tool(tmp_path, "xcrun", XCRUN_SH, monkeypatch)
+    bundle = _walkthrough(tmp_path)
+
+    out = harness_evidence.invoke(
+        action="capture", repo=str(tmp_path), bundle=str(bundle),
+        device="ios", media="screenshot",
+    )
+
+    assert "Captured 1 artifact" in out
+    arts = evidence.load(bundle)["steps"][-1]["artifacts"]
+    assert arts[0]["role"] == "screenshot"
+    assert "ios simulator" in arts[0]["caption"]
+
+
+def test_capture_requires_device_and_media(tmp_path):
+    with pytest.raises(SkillError, match="--device"):
+        harness_evidence.invoke(action="capture", repo=str(tmp_path))
+    with pytest.raises(SkillError, match="media"):
+        harness_evidence.invoke(
+            action="capture", repo=str(tmp_path), device="android",
+            media="bogus",
+        )
+
+
+def test_capture_fails_loudly_without_device_tool(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", str(tmp_path / "empty-bin"))
+    bundle = _walkthrough(tmp_path)
+
+    with pytest.raises(SkillError, match="adb not found"):
+        harness_evidence.invoke(
+            action="capture", repo=str(tmp_path), bundle=str(bundle),
+            device="android",
+        )

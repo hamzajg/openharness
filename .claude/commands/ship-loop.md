@@ -137,7 +137,10 @@ them.
    Playwright repos: generate the fixture once with
    `--action=fixture --repo=<repo>`, run the wave's spec with
    `EVIDENCE_RUN_DIR` set, then fold each `steps-<spec>.json` with
-   `--action=attach --fragment=<run>/steps-<spec>.json`.
+   `--action=attach --fragment=<run>/steps-<spec>.json`. Native/device
+   waves: `--action=capture --device=android|ios --media=all` grabs
+   screenshots, recordings and logs via `adb`/`xcrun simctl` and attaches
+   them (missing tools fail with an install hint).
 5. `SUMMARY.md` can be pasted into the PR body or the LOOP evidence
    column.
 

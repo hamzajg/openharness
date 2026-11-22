@@ -2,7 +2,7 @@
 name: evidence
 type: block
 location: openharness/evidence.py, skills/harness/evidence.py, docs/adr/0007-evidence-bundles.md, docs/plans/evidence.md
-interfaces: [harness_evidence.invoke, harness_evidence --action=list|new|step|attach|fixture|render|verify, evidence.new_bundle, evidence.record_step, evidence.record_attach, evidence.fragment_artifact, evidence.verify, evidence.list_bundles]
+interfaces: [harness_evidence.invoke, harness_evidence --action=list|new|step|attach|fixture|capture|render|verify, evidence.new_bundle, evidence.record_step, evidence.record_attach, evidence.fragment_artifact, evidence.verify, evidence.list_bundles]
 ---
 # Block: evidence
 
@@ -19,9 +19,11 @@ and log summaries; `new` refuses `--kind=walkthrough --tracked`, and
 evidence — they carry no `tdd:` steps, so `tdd_proof` cannot pass on them. The loop used to record `pytest 12 passed; CI green` in `LOOP.md`
 — true or not, it could not be seen, and it was gone by the next session.
 
-The harness does not drive browsers or devices (D001). Playwright, `adb`,
-`xcrun`, an agent's preview tools, or a human produce files; this block starts
-at the manifest and records what it was handed.
+The harness does not drive browsers or devices interactively (D001).
+Playwright fixtures, agents' preview tools, or a human produce files; for
+devices, `capture` only shells out to the platform tool (`adb`,
+`xcrun simctl`) to grab a screenshot, recording or log dump and hands the
+files to `attach` like any other producer.
 
 ## Layout
 ```
@@ -46,6 +48,7 @@ tracks is an error, and a tracked-root bundle git does not yet track draws an
 | `step` | Run a command; record real exit code, wall time, cwd, redacted log. Optional `--tdd=red|green|refactor` marks the TDD phase the run belongs to. |
 | `attach` | Copy a file under `raw/<step>/` (hash, MIME, mtime guard), or fold a `steps.json` fragment in with `--fragment`. Fragment artifacts are manifest-ready (`path`+`mime`+`sha256`+`bytes`) or source files (`path` only — attach copies and hashes them). |
 | `fixture` | Write `evidence.fixture.ts` (Playwright walkthrough producer) into the repo; it emits `steps-<spec>.json` fragments for `attach`. |
+| `capture` | Grab device media and attach it: `--device=android` shells to `adb` (screencap / screenrecord / logcat), `--device=ios` to `xcrun simctl` on the booted simulator; `--media=screenshot|video|log|all`. Missing tools fail with an install hint. |
 | `render` | Write `index.html` + `SUMMARY.md` from the manifest. |
 | `verify` | Schema, hashes, artifacts, commit binding, secrets, tracking. Exit 2 on failure. |
 
