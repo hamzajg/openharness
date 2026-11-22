@@ -87,6 +87,20 @@ If the PR or branch is missing, inspect `specs/<feature>/LOOP.md` and
      - the green and refactor steps run the wave's tests and pass; the
        refactor step changed no observable behavior (no weakened or
        deleted assertions).
+   - Check the domain and experience contracts when the spec has them
+     (D019):
+     - `DOMAIN.md` terms are used consistently — code, scenario names and
+       UI copy use the glossary words, not synonyms or framework names.
+     - Declared invariants are protected at the aggregate/boundary, not
+       enforced by callers or scattered across handlers.
+     - Bounded-context ownership is respected: this wave's changes stay
+       inside its declared context; cross-context calls go through the
+       declared integration style, not shared tables or new sync deps.
+     - `## Experience` edge states named for this wave are actually
+       implemented (empty/error/loading states, not just the happy path).
+     - `simple`-tier DOMAIN.md still names its owning context — flag a
+       wave that introduces unnamed domain concepts under a `simple`
+       tier as a concern.
 
 4. **Check for regressions and unnecessary scope.**
    - Look for changed behavior outside the wave's scope.

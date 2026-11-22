@@ -18,8 +18,14 @@ anything (D001, D009).
 - `specs/<feature>/WAVES.md` — the plan. Written by `wave_plan`, never by the loop.
 - `specs/<feature>/SPEC.md` — includes a parseable `## Value contract`
   (problem, users, baseline/current cost, numeric target indicator, economic
-  hypothesis, owner/date), plus the expected user outcome, evidence or
-  assumption, an observable signal, and a follow-up owner/date when known.
+  hypothesis, owner/date), a `## Experience` contract (primary journey, edge
+  states, UX bar, accessibility — or `N/A — <reason>`), plus the expected
+  user outcome, evidence or assumption, an observable signal, and a
+  follow-up owner/date when known.
+- `specs/<feature>/DOMAIN.md` — the domain contract (D019): declared tier
+  (`simple | standard | domain-heavy`), ubiquitous-language glossary,
+  bounded contexts and translation points, aggregates/invariants,
+  transaction boundary, integration style, external translations.
 - `specs/<feature>/GATES.md` — preconditions for phase transitions (definitions
   only). Written by the agent (product-framer); `ship_loop` parses it.
 - `specs/<feature>/LOOP.md` — the execution record. **Only `ship_loop` writes it.**
@@ -66,7 +72,7 @@ contract, sandbox access, seed data, a security/legal review.
 | `Owner` | role responsible for satisfying it |
 | `Resolver` | `human` (a person must decide/provide) · `agent` (agent can satisfy) |
 | `Blocking` | `yes` · `no` (advisory: reported, never blocks) |
-| `Check` | `manual` · `file:<repo-relative-path>` · `command:<exact command>` |
+| `Check` | `manual` · `file:<repo-relative-path>` · `section:<path>#<heading>` · `command:<exact command>` |
 | `Why` | which AC / business rule depends on it |
 
 Status lives in `LOOP.md`: `pending` · `met` · `waived` · `failed`.
@@ -80,7 +86,10 @@ Status lives in `LOOP.md`: `pending` · `met` · `waived` · `failed`.
   placeholders. A `file:` check for `SPEC.md` additionally requires a
   filled `## Value contract` (D017): all six fields substantive and a
   numeric target; template guidance or a vague target makes the gate
-  `stale`.
+  `stale`. A `file:` check for `DOMAIN.md` requires a declared tier and a
+  non-placeholder line in every section (D019); a `section:` check
+  requires the named `##` heading filled — `## Experience` accepts
+  `N/A — <reason>` but rejects a bare `N/A`.
 - `waived` requires `--waived-by` and `--note`; only a human can waive.
 - Overdue gates keep blocking: a pending `Before: spec` gate still blocks
   wave 1 if artifacts were filled out of order.
@@ -163,7 +172,11 @@ or waived.
 - `SPEC.md` records the D017 value contract *before planning*: the value gap,
   who pays for it today, a numeric target with a window, a lifecycle-cost
   hypothesis, and an owner/date. It also records an outcome hypothesis and a
-  signal without inventing baselines. After release, `VALIDATION.md` may
+  signal without inventing baselines. `DOMAIN.md` (D019) records the domain
+  contract at the same checkpoint: tier, ubiquitous language, bounded
+  contexts, aggregates/invariants and integration style; `SPEC.md`'s
+  `## Experience` records the user journey, edge states and UX bar (or a
+  reasoned `N/A`). G2/G3 block planning until both are filled. After release, `VALIDATION.md` may
   record the observed result, adoption, cost/TCO notes, source, owner/date,
   and learning. A pending follow-up is not an acceptance gap or a finish
   blocker (D009).

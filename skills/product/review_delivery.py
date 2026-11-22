@@ -29,7 +29,11 @@ from pathlib import Path
 
 from openharness import evidence as evidence_bundles
 from openharness.skill import skill
-from skills.product.spec_scaffold import value_contract_status
+from skills.product.spec_scaffold import (
+    domain_status,
+    experience_status,
+    value_contract_status,
+)
 
 _SKIP_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
@@ -662,6 +666,7 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
         "LOOP.md": _read(spec_dir / "LOOP.md"),
         "GATES.md": _read(spec_dir / "GATES.md"),
         "VALIDATION.md": _read(spec_dir / "VALIDATION.md"),
+        "DOMAIN.md": _read(spec_dir / "DOMAIN.md"),
     }
 
     required = ["SPEC.md", "EXAMPLES.feature", "BACKLOG.md"]
@@ -802,6 +807,34 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
             f"specs/{spec_dir.name}/SPEC.md",
             "value contract is missing or unmeasurable: "
             + ", ".join(vc_problems[:4])
+            + " (advisory — the Before: plan gate enforces it)",
+        ))
+
+    # --- domain model + experience (D019): advisory here, gates enforce --
+    if not (spec_dir / "DOMAIN.md").is_file():
+        findings.append(Finding(
+            "concern", "domain-model-missing",
+            f"specs/{spec_dir.name}/DOMAIN.md",
+            "no DOMAIN.md — ubiquitous language, bounded contexts and "
+            "invariants are undeclared (advisory — the Before: plan gate "
+            "enforces it for new specs)",
+        ))
+    else:
+        d_ok, d_problems = domain_status(artifacts["DOMAIN.md"])
+        if not d_ok:
+            findings.append(Finding(
+                "concern", "domain-model-incomplete",
+                f"specs/{spec_dir.name}/DOMAIN.md",
+                "domain model is a template or missing sections: "
+                + ", ".join(d_problems[:4]),
+            ))
+    e_ok, e_problems = experience_status(spec_text) if spec_text else (True, [])
+    if spec_text and not e_ok:
+        findings.append(Finding(
+            "concern", "experience-missing",
+            f"specs/{spec_dir.name}/SPEC.md",
+            "## Experience is missing or unfilled: "
+            + ", ".join(e_problems[:4])
             + " (advisory — the Before: plan gate enforces it)",
         ))
 

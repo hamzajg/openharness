@@ -180,6 +180,27 @@ not filled; a later regression makes the gate `stale`. This is D017:
 the value gap must be stated before features are committed. Measured
 outcomes stay post-release learning (D009), not a finish gate.
 
+## Domain model + experience before planning (required)
+
+`spec_scaffold` also writes two more blocking `Before: plan` gates
+(D019): `G2 — Domain model captured`
+(`Check: file:specs/<feature>/DOMAIN.md`) and `G3 — Experience contract
+filled` (`Check: section:specs/<feature>/SPEC.md#Experience`).
+
+- `DOMAIN.md` must declare its tier (`simple | standard |
+domain-heavy`), a ubiquitous-language glossary, bounded contexts with
+  translation points, aggregates/invariants, the transaction boundary,
+  integration style, and external translations. `simple` is honest
+  thinness — it still names the owning context and states "no new domain
+  concepts" explicitly.
+- `## Experience` in SPEC.md needs the primary journey, edge states, a
+  concrete UX bar and accessibility notes — or `N/A — <reason>` for a
+  feature with no user-facing surface. A bare `N/A` is rejected.
+
+Both checks are shallow on purpose: they prove the contract exists and is
+not a template. Whether a `domain-heavy` model is real is the spec
+audit's and wave reviewer's judgment, not the oracle's.
+
 ## Challenge design decisions (required by default)
 
 `spec_scaffold` writes a blocking gate — `G1 — Design decisions

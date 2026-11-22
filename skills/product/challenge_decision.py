@@ -250,6 +250,7 @@ def _source(repo: Path, spec_dir: str, adr: str, decision: str):
     full = ""
     label = ""
     write_dir: Path | None = None
+    domain = ""
 
     if adr:
         path = Path(adr)
@@ -268,6 +269,8 @@ def _source(repo: Path, spec_dir: str, adr: str, decision: str):
         spec = d / "SPEC.md"
         if not spec.is_file():
             return None, "", None, f"ERROR: SPEC.md not found in {spec_dir}"
+        domain_path = d / "DOMAIN.md"
+        domain = _read(domain_path) if domain_path.is_file() else ""
         full = _read(spec)
         sections = _sections(full)
         decisions = _section(sections, "decisions", "decision log")
@@ -322,6 +325,7 @@ def _source(repo: Path, spec_dir: str, adr: str, decision: str):
         "alternatives": _alternatives(
             {"full": full, "sections": sections}, kind
         ),
+        "domain": domain if kind == "spec" else "",
     }
     return parts, label, write_dir, ""
 
@@ -666,6 +670,11 @@ def _brief(parts, label, types, checks, readiness, signals, style, paths, root, 
     if style:
         out.append(f"**Repo shape:** {style}")
     out.append("")
+    if parts.get("domain"):
+        out.append("## Domain contract on record (DOMAIN.md — verify against code)")
+        out.append("")
+        out.append(parts["domain"].strip()[:4000])
+        out.append("")
     if parts["alternatives"]:
         out.append("**Alternatives on record (verify they are credible, not strawmen):**")
         for alt in parts["alternatives"][:4]:

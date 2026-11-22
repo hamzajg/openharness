@@ -37,7 +37,9 @@ If an input is missing, ask for it. Do not change code first.
 ## Procedure
 
 1. **Read first.**
-   - Read `SPEC.md`, `EXAMPLES.feature`, `BACKLOG.md`, `WAVES.md`,
+   - Read `SPEC.md`, `DOMAIN.md` (when present — the ubiquitous language,
+     bounded contexts and invariants are binding vocabulary, D019),
+     `EXAMPLES.feature`, `BACKLOG.md`, `WAVES.md`,
      `GATES.md`, `LOOP.md`, `LOOP.state.json`, the repo's
      `README`/`AGENTS.md`, and the build manifests.
    - Run `git status` and `git branch --show-current`.

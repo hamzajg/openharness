@@ -29,6 +29,13 @@ SPEC = textwrap.dedent("""\
     - Economic hypothesis: 8h/week saved outweighs build and three-year run cost.
     - Owner / date: product owner, 2026-12-21.
 
+    ## Experience
+
+    - Primary journey: 1. add item 2. review cart 3. checkout
+    - Edge states: empty cart shows browse CTA; payment failure keeps the cart
+    - UX bar: single-page checkout, no mode switching
+    - Accessibility: keyboard navigable, labeled fields
+
     ## Scope (in)
     - `src/cart` — cart domain, storage, and HTTP surface.
 
@@ -95,10 +102,38 @@ def _write(root: Path, rel: str, content: str) -> Path:
     return p
 
 
+DOMAIN = textwrap.dedent("""\
+    # Domain model: Cart
+
+    **Tier:** standard
+
+    ## Ubiquitous language
+
+    - Cart: the shopper's pending purchase — used in add/checkout scenarios
+
+    ## Bounded contexts
+
+    - Storefront owns Cart and Order
+
+    ## Domain model
+
+    - Cart aggregate enforces the non-empty checkout invariant
+
+    ## Integration style
+
+    - Synchronous calls; cart state strongly consistent
+
+    ## External translations
+
+    - none — no external systems touched
+    """)
+
+
 def _spec_only(root: Path, name: str = "cart") -> Path:
     """Artifacts required for the spec audit, plus a source tree to resolve."""
     d = root / "specs" / name
     _write(root, f"specs/{name}/SPEC.md", SPEC)
+    _write(root, f"specs/{name}/DOMAIN.md", DOMAIN)
     _write(root, f"specs/{name}/EXAMPLES.feature", FEATURE)
     _write(root, f"specs/{name}/BACKLOG.md", BACKLOG)
     _write(root, "src/cart/store.py", "class CartStore:\n    def add(self, item):\n        return [item]\n")
@@ -186,6 +221,21 @@ def test_value_contract_missing_or_unmeasurable_is_a_concern(tmp_path):
     out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
     concerns = out.split("## Concerns", 1)[1].split("## Unverified", 1)[0]
     assert "value-contract-missing" in concerns
+    assert "0 blockers" in out
+
+
+def test_domain_and_experience_gaps_are_advisory_concerns(tmp_path):
+    d = _spec_only(tmp_path)
+    (d / "DOMAIN.md").unlink()
+    spec = d / "SPEC.md"
+    text = spec.read_text()
+    spec.write_text(re.sub(
+        r"^## Experience\s*$[\s\S]*?(?=^## )", "", text, count=1, flags=re.M,
+    ))
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    concerns = out.split("## Concerns", 1)[1].split("## Unverified", 1)[0]
+    assert "domain-model-missing" in concerns
+    assert "experience-missing" in concerns
     assert "0 blockers" in out
 
 
