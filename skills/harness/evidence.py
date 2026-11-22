@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import shutil
 import signal
 import subprocess
 import tempfile
 import time
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -158,6 +161,56 @@ def _capture_ios(
     return out
 
 
+# ------------------------------------------------------------- share / prune
+
+def _referenced_run_ids(repo: Path) -> set[str]:
+    """Run ids a loop still points at — wave `bundle` fields and
+    `evidence:<run-id>` gate tokens in LOOP.state.json / LOOP.md."""
+    ids: set[str] = set()
+    specs = repo / "specs"
+    if not specs.is_dir():
+        return ids
+    for state in specs.glob("*/LOOP.state.json"):
+        try:
+            data = json.loads(state.read_text())
+        except (OSError, ValueError):
+            continue
+        for row in (data.get("waves") or {}).values():
+            if isinstance(row, dict) and row.get("bundle"):
+                ids.add(str(row["bundle"]))
+        for row in (data.get("gates") or {}).values():
+            ev = str((row or {}).get("evidence") or "")
+            if ev.lower().startswith("evidence:"):
+                ids.add(ev.split(":", 1)[1].strip())
+    for loop in specs.glob("*/LOOP.md"):
+        try:
+            text = loop.read_text(errors="ignore")
+        except OSError:
+            continue
+        for m in re.finditer(r"evidence:(\S+)", text):
+            ids.add(m.group(1).rstrip(").,"))
+    return ids
+
+
+def _share_public(target: Path, repo: Path, feature: str) -> str:
+    report = evidence.verify(target, repo=repo)
+    if not report.ok:
+        raise SkillError(
+            "refusing --public: the bundle does not verify — "
+            + "; ".join(f.message for f in report.errors[:3])
+        )
+    dest = repo / "docs" / "evidence" / feature / target.name
+    if dest.exists():
+        raise SkillError(f"{dest} already exists — remove it or pick another run")
+    shutil.copytree(target, dest)
+    return (
+        f"Published {target.name} to {dest}\n"
+        "Warning: binary media (screenshots, recordings) is not "
+        "secret-scanned — review it before committing.\n"
+        "Next: `git add` the folder if it should travel with the repo."
+    )
+
+
 @skill
 def harness_evidence(
     action: str = "list",
@@ -194,6 +247,8 @@ def harness_evidence(
     media: str = "screenshot",
     seconds: int = 0,
     serial: str = "",
+    keep: int = 0,
+    public: bool = False,
 ) -> str:
     """Capture, render, verify or list evidence bundles (ADR 0007).
 
@@ -222,12 +277,18 @@ def harness_evidence(
               (device=android via adb, ios via xcrun simctl) and attach the
               files to the resolved bundle's step. The harness never drives
               the device itself — it shells to the platform tool.
+      share   Zip the resolved bundle to <run-id>.zip + .sha256 next to it;
+              --public instead copies a verified bundle to
+              docs/evidence/<feature>/<run-id>/ (opt-in; binary media is
+              not secret-scanned).
+      prune   Delete oldest scratch bundles beyond --keep=N per feature;
+              bundles referenced by a LOOP row or gate are never deleted.
       render  Write index.html + SUMMARY.md from evidence.json.
       verify  Check manifest, artifacts, hashes, commit, secrets, tracking.
               Raises (CLI exit 2) when anything is wrong.
 
     Params:
-      action: list|new|step|attach|fixture|capture|render|verify.
+      action: list|new|step|attach|fixture|capture|share|prune|render|verify.
       repo: Repository root (default cwd).
       bundle: Explicit bundle path; else the newest bundle for `feature`,
         else the newest bundle overall.
@@ -274,6 +335,9 @@ def harness_evidence(
       seconds: On `capture --media=video`, recording length (default 10).
       serial: On `capture --device=android`, adb `-s` serial when several
         devices are attached.
+      keep: On `prune`, newest runs per feature to keep (required, >= 1).
+      public: On `share`, copy the verified bundle to
+        `docs/evidence/<feature>/<run-id>/` instead of zipping it.
     """
     repo_path = Path(repo)
     action = (action or "list").strip().lower()
@@ -561,6 +625,65 @@ def harness_evidence(
             "Next: `--action=render`."
         )
 
+    if action == "share":
+        target = _resolve(repo_path, bundle, feature)
+        if public:
+            feat = target.parent.name
+            return _share_public(target, repo_path, feat)
+        if not target.is_dir():
+            raise SkillError(f"bundle not found: {target}")
+        zip_path = target.parent / f"{target.name}.zip"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for p in sorted(target.rglob("*")):
+                if p.is_file():
+                    zf.write(p, p.relative_to(target.parent).as_posix())
+        digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+        sha_path = Path(str(zip_path) + ".sha256")
+        sha_path.write_text(f"{digest}  {zip_path.name}\n")
+        return (
+            f"Shared {target.name}\n"
+            f"  zip: {zip_path}\n"
+            f"  sha256: {digest}\n"
+            f"  sums: {sha_path}"
+        )
+
+    if action == "prune":
+        if keep < 1:
+            raise SkillError("prune requires --keep=N with N >= 1")
+        root = evidence.bundle_root(repo_path)  # scratch root only
+        referenced = _referenced_run_ids(repo_path)
+        deleted: list[str] = []
+        kept_refs: list[str] = []
+        if root.is_dir():
+            for feature_dir in sorted(root.iterdir()):
+                if not feature_dir.is_dir():
+                    continue
+                runs = sorted(
+                    (d for d in feature_dir.iterdir() if d.is_dir()),
+                    key=lambda p: p.name,
+                    reverse=True,
+                )
+                for old in runs[keep:]:
+                    if old.name in referenced:
+                        kept_refs.append(old.name)
+                        continue
+                    shutil.rmtree(old)
+                    deleted.append(f"{feature_dir.name}/{old.name}")
+        lines = [f"Pruned {len(deleted)} bundle(s) (kept newest {keep} per feature)"]
+        lines += [f"  - {d}" for d in deleted[:20]]
+        if len(deleted) > 20:
+            lines.append(f"  … {len(deleted) - 20} more")
+        if kept_refs:
+            lines.append(
+                f"Skipped {len(kept_refs)} bundle(s) referenced by loop state: "
+                + ", ".join(sorted(set(kept_refs))[:10])
+            )
+        lines.append(
+            f"Tracked bundles under {evidence.bundle_root(repo_path, tracked=True)} "
+            "are never pruned."
+        )
+        return "\n".join(lines)
+
     if action in ("render", "verify"):
         target = _resolve(repo_path, bundle, feature)
         if action == "render":
@@ -599,5 +722,5 @@ def harness_evidence(
 
     raise SkillError(
         f"unknown action {action!r} "
-        "(list|new|step|attach|fixture|capture|render|verify)"
+        "(list|new|step|attach|fixture|capture|share|prune|render|verify)"
     )

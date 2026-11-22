@@ -340,10 +340,15 @@ log summaries for human review.
   log filter/copy, capture-tool chip, and an explicit linked-files list
   on `--inline` renders. Video chapters remain future work — the
   manifest records no step→video timing to build them from.
-- **B4 — sharing and retention.** `--action=share` zip + sha256,
-  `--action=prune --keep=N` (never deletes a bundle referenced by
-  LOOP.md), CI artifact template, opt-in `--public` sanitized copy with
-  human approval.
+- **B4 — sharing and retention** — ✅ shipped.
+  `--action=share` writes `<run-id>.zip` + `.sha256` beside the bundle;
+  `--public` copies a *verified* bundle to `docs/evidence/<feature>/
+  <run-id>/` with an explicit unscanned-binary warning. `--action=prune
+  --keep=N` deletes oldest scratch runs per feature and never touches a
+  bundle referenced by `LOOP.state.json`/`LOOP.md` (`bundle` fields and
+  `evidence:<run-id>` tokens) or anything under the tracked root. The CI
+  artifact template lives in "Sharing" above; `--public` copies remain
+  opt-in with human approval.
 
 ### Shipped-phase detail (was P2a/P2b)
 

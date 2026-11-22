@@ -2,7 +2,7 @@
 name: evidence
 type: block
 location: openharness/evidence.py, skills/harness/evidence.py, docs/adr/0007-evidence-bundles.md, docs/plans/evidence.md
-interfaces: [harness_evidence.invoke, harness_evidence --action=list|new|step|attach|fixture|capture|render|verify, evidence.new_bundle, evidence.record_step, evidence.record_attach, evidence.fragment_artifact, evidence.verify, evidence.list_bundles]
+interfaces: [harness_evidence.invoke, harness_evidence --action=list|new|step|attach|fixture|capture|share|prune|render|verify, evidence.new_bundle, evidence.record_step, evidence.record_attach, evidence.fragment_artifact, evidence.verify, evidence.list_bundles]
 ---
 # Block: evidence
 
@@ -49,6 +49,8 @@ tracks is an error, and a tracked-root bundle git does not yet track draws an
 | `attach` | Copy a file under `raw/<step>/` (hash, MIME, mtime guard), or fold a `steps.json` fragment in with `--fragment`. Fragment artifacts are manifest-ready (`path`+`mime`+`sha256`+`bytes`) or source files (`path` only — attach copies and hashes them). |
 | `fixture` | Write `evidence.fixture.ts` (Playwright walkthrough producer) into the repo; it emits `steps-<spec>.json` fragments for `attach`. |
 | `capture` | Grab device media and attach it: `--device=android` shells to `adb` (screencap / screenrecord / logcat), `--device=ios` to `xcrun simctl` on the booted simulator; `--media=screenshot|video|log|all`. Missing tools fail with an install hint. |
+| `share` | Zip the bundle to `<run-id>.zip` + `.sha256` beside it; `--public` copies a verified bundle to `docs/evidence/<feature>/<run-id>/` with an unscanned-binary warning. |
+| `prune` | Delete oldest scratch bundles beyond `--keep=N` per feature; bundles referenced by loop state (`bundle` fields, `evidence:<run-id>` tokens) and everything under the tracked root are never deleted. |
 | `render` | Write `index.html` + `SUMMARY.md` from the manifest. |
 | `verify` | Schema, hashes, artifacts, commit binding, secrets, tracking. Exit 2 on failure. |
 
