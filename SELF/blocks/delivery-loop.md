@@ -170,6 +170,10 @@ or waived.
 - Close-out reports acceptance, PR merge, and deployment state separately.
   Phase and PR review times may be reported only when supported by actual
   timestamps; they are for finding friction, not ranking teams.
+- Close-out leads with outcomes, not output (D018): the value contract's
+  target and whatever real evidence exists, plus the five dimensions the
+  release improves or puts at risk. Features, APIs and coverage are
+  supporting output; unmeasured outcomes stay unverified.
 
 ## Branching, execution, and merge policy
 
@@ -205,6 +209,9 @@ or waived.
 - D017's value contract is required before planning through blocking gate G0.
   The `Value & economics` challenge lens and the audit's
   `value-contract-missing` finding are advisory; neither is a gate.
+- D018's five-dimension frame (business/user value, economic viability,
+  UX/adoption, technical/operational quality, adaptability) shapes the spec,
+  decision review and audit, but adds no gate, score or dashboard.
 - Overdue gates keep blocking; advisory gates never do.
 - Events are append-only (last 200 kept).
 - Default merge policy is `review`: PRs stay open for a human.

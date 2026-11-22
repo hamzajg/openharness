@@ -67,7 +67,7 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   `delivery-verifier`), the independent audit (`delivery-auditor`), and the
   review (`decision-challenger`).
 - `SELF/` — the harness's own specs/principles (`PRINCIPLES.md`, decision
-  log D001–D017, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
+  log D001–D018, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
 - `REPOS.md` — shipped, agnostic registry template. `/init` writes the concrete
   repo list to `.openharness/REPOS.local.md` (gitignored by default); that file
   is the active registry when present, otherwise the template is used (D007).
@@ -137,6 +137,13 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   lens and audit finding are advisory; measured outcomes stay post-release
   learning (D009). No scoring engine, ROI calculator, or new runtime module
   (ADR 0009).
+- **D018:** good software is sustainable outcomes, not output. Judge work on
+  five dimensions — business/user value, economic viability, UX/adoption,
+  technical/operational quality, and adaptability/longevity — across product,
+  system and business quality. Reports lead with outcome evidence; features,
+  APIs and coverage are supporting output. The frame is advisory in
+  `product-framer`, `challenge_decision` and `delivery-auditor`; no score,
+  dashboard, gate or runtime module (ADR 0010).
 
 ## Landmines
 
@@ -147,7 +154,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   repos in `.openharness/REPOS.local.md`; leave the tracked `REPOS.md` agnostic.
 - `oh serve` observes session JSONL files the agent CLIs already write —
   don't add instrumentation hooks into agents.
-- Decision log D001–D017 in `SELF/PRINCIPLES.md` is normative — read it
+- Decision log D001–D018 in `SELF/PRINCIPLES.md` is normative — read it
   before structural changes.
 - The web UI must call the same verbs as the CLI (D005) — no business
   logic in TSX.
@@ -184,7 +191,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - Verify before claiming: run `pytest` (with `--no-deps` install path) and
   report the real result.
 - Keep changes minimal and consistent with surrounding code. Respect the
-  D001–D017 decision log.
+  D001–D018 decision log.
 - For product work, prefer `/ship-loop` (autonomous) or `/ship-product`
   (phased); both keep specs and loop state in the target repo under
   `specs/` and ship one wave per PR.

@@ -64,8 +64,9 @@ brief; `--force` to overwrite an existing review.
 
 ## Lenses
 1. Problem & forces
-2. Value & economics (D017): value gap, who bears the current cost, numeric
-   outcome target and window, lifecycle cost/benefit, adoption signal, and
+2. Value & economics (D017/D018): value gap, who bears the current cost,
+   numeric outcome target and window, lifecycle cost/benefit, adoption
+   signal, five-dimension quality tradeoffs (product, system, business), and
    "do nothing" as an option.
 3. Alternatives & tradeoffs
 4. Domain fit (DDD): bounded context, ubiquitous language, aggregates,

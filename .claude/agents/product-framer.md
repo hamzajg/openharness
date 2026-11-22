@@ -71,6 +71,12 @@ Otherwise stop and report that you need a target repo.
      observable signal (and baseline if known), and a follow-up owner/date.
      Do not invent research or baselines; the numeric target is the explicit
      value-contract claim. Mark unknowns.
+   - Five-dimension fit (D018): in the outcome hypothesis, name which of
+     business/user value, economic viability, UX/adoption, technical/
+     operational quality, and adaptability the feature improves, and which
+     it puts at risk. Prefer the simplest intervention that delivers the
+     outcome, including not building it. Keep it to a few lines; no
+     scorecard.
    - Acceptance-criteria table. Map each criterion to scenario tags.
    - Decisions (ADR-style) — record EVERY one-way-door or high-impact
      choice (persistence model, consistency guarantees, module/service

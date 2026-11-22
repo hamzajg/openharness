@@ -116,6 +116,9 @@ Fill `specs/<feature>/SPEC.md`:
 - Outcome hypothesis: expected user outcome, opportunity evidence, an
   observable signal (and baseline if known), and a follow-up owner/date.
   Mark unknowns explicitly; do not make up evidence or targets.
+- Five-dimension fit (D018): name which of business/user value, economic
+  viability, UX/adoption, technical/operational quality, and adaptability
+  the feature improves or puts at risk; prefer the simplest intervention.
 - Scope in and out.
 - Acceptance criteria table. Map each criterion to scenario tags.
 - Decisions section. Write ADR-style entries.

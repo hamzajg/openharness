@@ -68,6 +68,14 @@ If the spec dir or phase is missing, ask. Do not guess.
      honest. For every real mismatch, record `file:line`, the exact
      string, and the capability it implies as a CONCERN. Record a clean
      check as evidence, not silence.
+   - **Outcomes, not output (D018).** Read the delivery report and check
+     whether it leads with outcome evidence (time, error rate, adoption,
+     cost) or only with features, APIs, coverage and services. Restate the
+     value contract's target and baseline; mark unmeasured outcomes
+     `UNVERIFIED` rather than implying success. Consider the five dimensions
+     (business/user value, economic viability, UX/adoption, technical/
+     operational quality, adaptability) and name any the release makes
+     worse. A purely output-based report is a CONCERN, not a blocker.
    - Check changed public contracts (routes, CLI flags, config keys, schema,
      events) against what the spec and README claim.
 

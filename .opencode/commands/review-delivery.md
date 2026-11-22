@@ -69,6 +69,9 @@ Run these first and read the output:
    - compare changed public contracts with the spec and README;
    - do the mandatory copy-honesty check: Scope(out) vs scenario, backlog
      and changed UI copy, with `file:line` for each mismatch;
+   - judge outcomes over output (D018): outcome evidence vs feature/API/
+     coverage counts, five-dimension tradeoffs, and unverified post-release
+     claims recorded honestly;
    - record dismissed findings with a reason, and unverified items honestly;
    - fill the verdict block.
 

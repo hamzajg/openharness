@@ -584,8 +584,9 @@ _LENSES = [
         "Which outcome indicator and baseline prove the gap closed, and over what review window?",
         "What is the full-lifecycle cost (build, operate, adopt, migrate, support) and what benefit justifies it?",
         "Will users actually choose this? What adoption signal would show they do?",
+        "Which quality dimensions does this affect — product (user task), system (correctness, security, reliability, operability) and business (TCO, adoption, adaptability)? Name any it makes worse.",
         "What is the simplest intervention that produces the same outcome — including not building it?",
-    ], "The value gap, a numeric target, a lifecycle cost hypothesis and an adoption signal are explicit; 'do nothing' is a real option."),
+    ], "The value gap, a numeric target, a lifecycle cost hypothesis and an adoption signal are explicit; quality tradeoffs are named; 'do nothing' is a real option."),
     ("Alternatives & tradeoffs", [
         "What are at least two credible alternatives, including the simplest thing that could work?",
         "For each: what does it make easy, what does it make hard, and what does it cost to reverse?",

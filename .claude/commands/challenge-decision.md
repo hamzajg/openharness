@@ -101,10 +101,13 @@ LOOP IMPACT: none (advisory) | <if the decision changes, which spec/gate to upda
   review file exists. The verdict itself (`ACCEPT` / `REVISE` / `REVISIT` /
   `SPLIT`) stays advisory (D011): it informs the spec and backlog but never
   blocks a merge.
-- **Value & economics lens (D017).** The brief asks for the value gap, who
-  bears today's cost, a numeric target and window, build/operate/adopt
-  lifecycle cost, and an adoption signal. Like every lens, it is
-  advisory: score it with evidence, never turn it into a gate.
+- **Value, economics & sustainability lens (D017/D018).** The brief asks for
+  the value gap, who bears today's cost, a numeric target and window,
+  build/operate/adopt lifecycle cost, an adoption signal, and the five
+  dimensions' quality tradeoffs (business/user value, economic viability,
+  UX/adoption, technical/operational quality, adaptability). Like every
+  lens, it is advisory: score it with evidence, never turn it into a gate or
+  a score.
 - **Before planning waves** is the best moment for high-impact decisions: the
   cost of changing direction is still low.
 - **If the review says REVISIT or SPLIT**, record the decision change in
