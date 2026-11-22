@@ -1144,7 +1144,9 @@ def test_attach_from_invalid_status(tmp_path):
 
 
 def test_attach_from_invalid_artifact(tmp_path):
-    """A proving field is still mandatory; only `role` is inferred."""
+    """A manifest-ready artifact still needs every proving field; only
+    `role` is inferred. (An artifact without `sha256` is a source file
+    instead — see the source-mode tests below.)"""
     bundle = _capture_bundle(tmp_path)
     fragment = {
         "id": "s2",
@@ -1157,9 +1159,9 @@ def test_attach_from_invalid_artifact(tmp_path):
         "artifacts": [
             {
                 "path": "raw/s2/01-page.png",
-                "mime": "image/png",
+                "sha256": "0" * 64,
                 "bytes": 100,
-                # missing sha256
+                # missing mime
             }
         ],
     }
@@ -1352,3 +1354,164 @@ def test_render_shows_walkthrough_kind(tmp_path):
     html_text = paths["html"].read_text()
     assert "walkthrough" in html_text
     assert "walkthrough" in paths["summary"].read_text()
+
+
+# ------------------------------------------------------- fragment source mode
+
+def _source_fragment(tmp_path: Path, art_path: Path, **step_over) -> Path:
+    frag_dir = tmp_path / "run"
+    frag_dir.mkdir(exist_ok=True)
+    step = {
+        "id": "pw-s1",
+        "title": "Browser: create note",
+        "kind": "browser",
+        "status": "pass",
+        "started_at": "2026-11-17T18:00:00Z",
+        "duration_ms": 800,
+        "artifacts": [{"path": art_path.name, "caption": "note created"}],
+    }
+    step.update(step_over)
+    frag = frag_dir / "steps.json"
+    frag.write_text(json.dumps(step))
+    return frag
+
+
+def test_fragment_source_artifact_is_copied_and_hashed(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    frag_dir = tmp_path / "run"
+    frag_dir.mkdir()
+    shot = frag_dir / "shot.png"  # media lives next to steps.json
+    shot.write_bytes(PNG)
+    frag = _source_fragment(tmp_path, shot)
+
+    run = _cli(
+        "--action=attach", f"--repo={tmp_path}", f"--bundle={bundle}",
+        f"--fragment={frag}",
+    )
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    manifest = evidence.load(bundle)
+    art = manifest["steps"][-1]["artifacts"][0]
+    # copied under raw/<step>/ and hashed by the harness, not the producer
+    assert art["path"].startswith("raw/pw-s1/")
+    assert art["sha256"] == evidence.sha256(bundle / art["path"])
+    assert art["mime"] == "image/png"
+    assert art["role"] == "screenshot"
+    assert art["caption"] == "note created"
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+    assert report.ok, [f.message for f in report.errors]
+
+
+def test_fragment_source_artifact_missing_file_fails(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    frag = _source_fragment(tmp_path, tmp_path / "nope.png")
+
+    run = _cli(
+        "--action=attach", f"--repo={tmp_path}", f"--bundle={bundle}",
+        f"--fragment={frag}",
+    )
+
+    assert run.returncode != 0
+    assert "not found" in run.stderr or "does not exist" in run.stderr
+
+
+def test_fragment_source_artifact_stale_needs_allow_old(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    frag_dir = tmp_path / "run"
+    frag_dir.mkdir()
+    shot = frag_dir / "shot.png"
+    shot.write_bytes(PNG)
+    frag = _source_fragment(
+        tmp_path, shot, started_at="2099-01-01T00:00:00Z"
+    )
+
+    run = _cli(
+        "--action=attach", f"--repo={tmp_path}", f"--bundle={bundle}",
+        f"--fragment={frag}",
+    )
+    assert run.returncode != 0
+    assert "older than step" in run.stderr
+
+    run = _cli(
+        "--action=attach", f"--repo={tmp_path}", f"--bundle={bundle}",
+        f"--fragment={frag}", "--allow-old",
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+
+
+def test_fragment_mixed_artifact_forms(tmp_path):
+    bundle = _capture_bundle(tmp_path)
+    frag_dir = tmp_path / "run"
+    frag_dir.mkdir()
+    shot = frag_dir / "shot.png"
+    shot.write_bytes(PNG)
+    # manifest-ready artifact (bundle-relative, producer hash) + source file
+    step = {
+        "id": "pw-s2",
+        "title": "mixed",
+        "kind": "browser",
+        "status": "pass",
+        "started_at": "2026-11-17T18:00:00Z",
+        "artifacts": [
+            {
+                "path": "raw/pw-s2/already.png",
+                "mime": "image/png",
+                "sha256": evidence.sha256(shot),
+                "bytes": len(PNG),
+            },
+            {"path": shot.name, "caption": "from source"},
+        ],
+    }
+    frag = frag_dir / "steps.json"
+    frag.write_text(json.dumps(step))
+    # place the manifest-ready file where the fragment claims it lives
+    ready = bundle / "raw" / "pw-s2" / "already.png"
+    ready.parent.mkdir(parents=True, exist_ok=True)
+    ready.write_bytes(PNG)
+
+    run = _cli(
+        "--action=attach", f"--repo={tmp_path}", f"--bundle={bundle}",
+        f"--fragment={frag}",
+    )
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    arts = evidence.load(bundle)["steps"][-1]["artifacts"]
+    assert arts[0]["path"] == "raw/pw-s2/already.png"
+    assert arts[1]["path"].startswith("raw/pw-s2/shot")
+
+
+# ------------------------------------------------------------------- fixture
+
+def test_fixture_writes_playwright_fixture(tmp_path):
+    run = _cli("--action=fixture", f"--repo={tmp_path}")
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    target = tmp_path / "e2e" / "evidence.fixture.ts"
+    assert target.is_file()
+    text = target.read_text()
+    assert "EVIDENCE_RUN_DIR" in text
+    assert "steps-" in text
+    assert "--kind=walkthrough" in run.stdout
+
+
+def test_fixture_refuses_overwrite_without_force(tmp_path):
+    _cli("--action=fixture", f"--repo={tmp_path}")
+    run = _cli("--action=fixture", f"--repo={tmp_path}")
+    assert run.returncode != 0
+    assert "already exists" in run.stderr
+
+    run = _cli("--action=fixture", f"--repo={tmp_path}", "--force")
+    assert run.returncode == 0, run.stdout + run.stderr
+
+
+def test_fixture_warns_without_playwright(tmp_path):
+    (tmp_path / "package.json").write_text('{"devDependencies": {}}')
+    run = _cli("--action=fixture", f"--repo={tmp_path}")
+    assert run.returncode == 0
+    assert "@playwright/test" in run.stdout
+
+
+def test_fixture_rejects_escaping_out_dir(tmp_path):
+    run = _cli("--action=fixture", f"--repo={tmp_path}", "--out_dir=../x")
+    assert run.returncode != 0
+    assert "relative path" in run.stderr

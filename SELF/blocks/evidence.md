@@ -2,7 +2,7 @@
 name: evidence
 type: block
 location: openharness/evidence.py, skills/harness/evidence.py, docs/adr/0007-evidence-bundles.md, docs/plans/evidence-v2.md
-interfaces: [harness_evidence.invoke, harness_evidence --action=list|new|step|attach|render|verify, evidence.new_bundle, evidence.record_step, evidence.record_attach, evidence.verify, evidence.list_bundles]
+interfaces: [harness_evidence.invoke, harness_evidence --action=list|new|step|attach|fixture|render|verify, evidence.new_bundle, evidence.record_step, evidence.record_attach, evidence.fragment_artifact, evidence.verify, evidence.list_bundles]
 ---
 # Block: evidence
 
@@ -44,7 +44,8 @@ tracks is an error, and a tracked-root bundle git does not yet track draws an
 | `list` | Bundles under both roots, newest first, with verdict, counts, commit. |
 | `new` | Create a bundle and manifest (feature required; `--wave`, `--head`, `--tracked`, `--kind=proof|walkthrough`). |
 | `step` | Run a command; record real exit code, wall time, cwd, redacted log. Optional `--tdd=red|green|refactor` marks the TDD phase the run belongs to. |
-| `attach` | Copy a file under `raw/<step>/` (hash, MIME, mtime guard), or fold a `steps.json` fragment in with `--fragment`. |
+| `attach` | Copy a file under `raw/<step>/` (hash, MIME, mtime guard), or fold a `steps.json` fragment in with `--fragment`. Fragment artifacts are manifest-ready (`path`+`mime`+`sha256`+`bytes`) or source files (`path` only — attach copies and hashes them). |
+| `fixture` | Write `evidence.fixture.ts` (Playwright walkthrough producer) into the repo; it emits `steps-<spec>.json` fragments for `attach`. |
 | `render` | Write `index.html` + `SUMMARY.md` from the manifest. |
 | `verify` | Schema, hashes, artifacts, commit binding, secrets, tracking. Exit 2 on failure. |
 

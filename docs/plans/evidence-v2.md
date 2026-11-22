@@ -149,7 +149,9 @@ turns "I clicked around" into "AC5 was exercised by step s3".
 | Source | How it is produced | Artifacts | Default |
 |---|---|---|---|
 | Command | harness runs it (`--action=step`) | log, exit code, duration, cwd | always |
-| Browser (Playwright) | generated fixture writes `steps.json` + files; `attach --from` folds them in | PNG, WebM, trace.zip, console, HAR | screenshots every UI wave; video/trace on failure or long flow |
+| Browser (Playwright) | generated fixture writes `steps.json` + files; `attach --fragment` folds them in | PNG, WebM, trace.zip, console, HAR | screenshots every UI wave; video/trace on failure or long flow |
+| Browser (Electron/desktop) | same fragment contract, adapted launch | PNG, WebM | desktop waves |
+| Mobile (native) | future producer (Appium/Maestro) emitting the same fragment | PNG, MP4 | native app waves |
 | Browser (Cypress) | plugin writes files; `attach` | PNG, MP4, JSON | optional, same policy |
 | Android | `adb exec-out screencap -p`, `adb shell screenrecord`, `adb logcat -d` | PNG, MP4, log | UI waves on Android |
 | iOS | `xcrun simctl io booted screenshot`, `xcrun simctl io booted recordVideo` | PNG, MOV/MP4, log | UI waves on iOS |
@@ -308,14 +310,27 @@ tax on docs-only work.
 
 ### P2b — browser attach
 
-- `attach --from=steps.json` folds a fragment into the manifest. Fragment
-  schema is a subset of a step, so a fixture can emit it without importing
-  harness code. `role` is a label, not a proof, so an omitted `role` is
-  inferred from the MIME type and file name (`_role_for`); an explicit one
-  always wins. Fold-in is shipped; the Playwright fixture itself is not in
-  this repo yet (see ADR 0007's fixture-home question).
-- Playwright fixture: `afterEach` attaches screenshot on failure, video/trace
-  on failure, and a screenshot per named step when `EVIDENCE=1`.
+- `attach --fragment=steps.json` folds a fragment into the manifest.
+  Fragment schema is a subset of a step, so a fixture can emit it without
+  importing harness code. `role` is a label, not a proof, so an omitted
+  `role` is inferred from the MIME type and file name (`_role_for`); an
+  explicit one always wins.
+- Fragment artifacts come in two forms. **Manifest-ready** entries carry
+  `path` + `mime` + `sha256` + `bytes` and are recorded as-is.
+  **Source-file** entries carry `path` (+ optional `caption`, `role`,
+  `snippet`) naming a real file — resolved relative to the fragment's
+  directory then cwd — which `attach` copies under `raw/<step>/` and
+  hashes itself, with the same staleness guard and `--allow-old` override
+  as `attach --file`. This keeps the "attach computes hashes, never
+  trusts caller-supplied ones" rule true for producers too.
+- `--action=fixture` generates `e2e/evidence.fixture.ts` into the target
+  repo (fixture home resolved: generated per project, never a runtime
+  dependency). The fixture exports `test`/`expect` with an `evidence.step`
+  helper that screenshots each named step into `EVIDENCE_RUN_DIR` and
+  writes `steps-<spec>.json`; failed steps also capture the video when
+  Playwright recording is enabled. It covers web and mobile-web device
+  emulation; Electron desktop and native mobile are different producers
+  emitting the same fragment — no second fixture ships yet.
 - Tests: fragment fold-in, duplicate artifacts, poster selection, trace MIME.
 - Done when a Playwright run yields screenshots + video + trace + logs in one
   bundle, and the page shows them without a build step.

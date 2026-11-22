@@ -333,10 +333,13 @@ free-text rules — this is additive, not a new tax on docs-only work.
    uploads it as an artifact; the PR comment links to it and `SUMMARY.md` is
    appended to the PR body. Nothing is added to git.
 
-Open question for review: whether the Playwright fixture belongs in this repo
-or is generated per-project by the skill. Bundle location: local scratch
-`.openharness/evidence/` by default; `evidence/` (tracked, committed on
-request via `--tracked`) when a run's proof must travel with the repo.
+Resolved: the fixture home is this repo as a template, generated per-project
+by `harness_evidence --action=fixture` into the target repo — never a runtime
+dependency. Fragment artifacts may be source files (`path` only) that `attach`
+copies and hashes itself, or manifest-ready entries with caller hashes.
+Bundle location: local scratch `.openharness/evidence/` by default;
+`evidence/` (tracked, committed on request via `--tracked`) when a run's
+proof must travel with the repo.
 
 Amended: bundles now declare `kind` — `proof` (default; the evidence
 `ship_loop` verifies) or `walkthrough` (local-only companion material for

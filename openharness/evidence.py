@@ -808,6 +808,77 @@ def record_attach(
     return art
 
 
+def fragment_artifact(
+    bundle: Path | str,
+    step_id: str,
+    art: dict[str, Any],
+    base_dir: Path | str,
+    started_at: str = "",
+    allow_old: bool = False,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Normalize one source-file artifact from a steps.json fragment.
+
+    The producer names a real file (`path`, optional `caption`, `role`,
+    `snippet`, `captured_by`); relative paths resolve against `base_dir`
+    (the fragment's directory) then the cwd. The file is copied under
+    `raw/<step_id>/` and hashed here — attach never trusts a
+    caller-supplied digest. Returns (artifact, redaction entries); the
+    caller records the redactions on the manifest.
+
+    The same staleness rule as `record_attach` applies: a file older than
+    the step's `started_at` is refused unless `allow_old`.
+    """
+    bundle = Path(bundle)
+    if not isinstance(art, dict):
+        raise EvidenceError("fragment artifact must be an object")
+    raw_path = art.get("path")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise EvidenceError("fragment artifact requires a path")
+    src = Path(raw_path.strip()).expanduser()
+    if not src.is_absolute():
+        candidates = [Path(base_dir) / src, Path.cwd() / src]
+        src = next((c.resolve() for c in candidates if c.is_file()), None)
+        if src is None:
+            raise EvidenceError(
+                f"fragment artifact not found: {raw_path} "
+                f"(looked in {base_dir} and cwd)"
+            )
+    else:
+        src = src.resolve()
+    if not src.is_file():
+        raise EvidenceError(f"fragment artifact does not exist: {src}")
+
+    started = _parse_ts(started_at)
+    mtime = datetime.fromtimestamp(src.stat().st_mtime, timezone.utc)
+    if started and mtime < started - timedelta(seconds=5) and not allow_old:
+        raise EvidenceError(
+            f"{src} is older than step {step_id} "
+            f"({mtime.isoformat()} < {started.isoformat()}); "
+            "capture it during the step or pass --allow-old"
+        )
+
+    rel = _copy_into_raw(bundle, step_id, src)
+    path = bundle / rel
+    mime = _mime_for(path)
+    redactions = redact_text(path, rel) if _is_text(path, mime) else []
+    out: dict[str, Any] = {
+        "path": rel,
+        "mime": mime,
+        "sha256": sha256(path),
+        "bytes": path.stat().st_size,
+        "role": str(art.get("role") or "").strip() or _role_for(mime, path),
+    }
+    for key in ("caption", "snippet", "captured_by", "poster"):
+        value = art.get(key)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        clean, entries = redact_value(value)
+        out[key] = clean.strip()
+        for entry in entries:
+            redactions.append({**entry, "path": f"{rel}.{key}"})
+    return out, redactions
+
+
 def verify(
     bundle: Path | str,
     repo: Path | str | None = None,
