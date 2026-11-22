@@ -57,11 +57,17 @@ If the spec dir or phase is missing, ask. Do not guess.
      the AC `UNVERIFIED`, not `PASS`.
    - Walk the demo script's happy path in the code. Does the path exist end to
      end, with real wiring?
-   - Check user-facing copy against shipped capability: labels, buttons,
-     headings, and empty states must not imply features that do not exist
-     (e.g. an "Account" section or "Log in" flow when there is no auth).
-     Grep the changed UI sources for auth/account/payment wording and
-     confirm each promise is real.
+   - **Copy honesty — mandatory.** Read `## Scope (out)` / `## Non-goals`
+     in the spec and name the capabilities this release does not ship.
+     Grep `EXAMPLES.feature`, `BACKLOG.md` and every changed UI source
+     (`.tsx`, `.jsx`, `.html`, `.vue`, `.svelte` — quoted strings and JSX
+     text included) for wording that promises any of them. Judge each hit
+     in context: a word reused from an out-of-scope note (e.g. "request"
+     in "provider API request shapes are out") is not a promise, and a
+     negation or deferral ("no auth", "notifications are deferred") is
+     honest. For every real mismatch, record `file:line`, the exact
+     string, and the capability it implies as a CONCERN. Record a clean
+     check as evidence, not silence.
    - Check changed public contracts (routes, CLI flags, config keys, schema,
      events) against what the spec and README claim.
 
