@@ -1,13 +1,13 @@
 ---
 name: command-bridge
 type: block
-location: .claude/commands/*.md, .opencode/command/*.md
+location: .claude/commands/*.md, .opencode/commands/*.md
 interfaces: [slash-command discovery by walking up from cwd]
 ---
 # Block: command-bridge
 
 ## Purpose
-Turns skills and harness workflows into **slash commands** discoverable natively by agent CLIs (Claude Code, OpenCode) running inside the harness tree. Uses each CLI's convention: Claude looks for `.claude/commands/<name>.md`; OpenCode looks for `.opencode/command/<name>.md`.
+Turns skills and harness workflows into **slash commands** discoverable natively by agent CLIs (Claude Code, OpenCode) running inside the harness tree. Uses each CLI's convention: Claude looks for `.claude/commands/<name>.md`; OpenCode looks for `.opencode/commands/<name>.md`.
 
 ## Invariants
 - **D008 (central mode):** Commands are NOT copied into target repos. Discovery works because the session runs inside the harness tree and each CLI walks **up from cwd** to find its command dir.
@@ -23,6 +23,6 @@ Turns skills and harness workflows into **slash commands** discoverable natively
 - **No vendor SDK imports** anywhere to build these. Files are plain Markdown. (Agent-agnostic D002.)
 
 ## How to Extend
-1. After adding a new skill, run `/sync` to regenerate both `.claude/commands/<name>.md` and `.opencode/command/<name>.md` stubs.
+1. After adding a new skill, run `/sync` to regenerate both `.claude/commands/<name>.md` and `.opencode/commands/<name>.md` stubs.
 2. Edit the generated stubs: add the awareness preamble, flesh out the workflow, specify allowed tools.
 3. For commands spanning multiple skills (e.g. `/init` calls `init_profile` and then offers `/pull`), write the orchestration logic **in the Markdown** — the agent CLI is the orchestrator, not the harness. (D001.)

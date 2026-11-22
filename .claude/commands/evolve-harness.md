@@ -27,7 +27,7 @@ output and surface any drift; do not silently choose.
 3. Implement:
    - Code changes under `openharness/` or `skills/`
    - **Same commit rule**: for any touched building block, update its `SELF/blocks/<block>.md` in the same edit set.
-   - If skills were added/removed/renamed, run the equivalent of `/sync` to update `.claude/commands/` and `.opencode/command/`.
+   - If skills were added/removed/renamed, run the equivalent of `/sync` to update `.claude/commands/` and `.opencode/commands/`.
 
 4. Run the tests:
    ```

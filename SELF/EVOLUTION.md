@@ -13,7 +13,7 @@ type: rules
 4. Block frontmatter is authoritative: `name`, `type: block`, `location`, `interfaces` (list).
 
 ## Skills ⇄ Command Files Sync
-5. After adding, removing, or renaming a skill: run the equivalent of `/sync` so slash command files stay in sync across `.claude/commands/` and `.opencode/command/`.
+5. After adding, removing, or renaming a skill: run the equivalent of `/sync` so slash command files stay in sync across `.claude/commands/` and `.opencode/commands/`.
 6. Every command file that does engineering work **must** start with the awareness preamble (self + env outputs) and resolve the managed repo it operates on.
 
 ## LOC Budget (D003, split by D012)
