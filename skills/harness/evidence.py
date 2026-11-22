@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import shutil
+import signal
+import subprocess
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +32,130 @@ def _resolve(repo: Path, bundle: str, feature: str) -> Path:
             f"{evidence.bundle_root(repo, tracked=True)} — run `--action=new` first"
         )
     return latest[0]["bundle"]
+
+
+# ------------------------------------------------------------- device capture
+
+def _require_tool(name: str, hint: str) -> str:
+    path = shutil.which(name)
+    if not path:
+        raise SkillError(f"{name} not found — {hint}")
+    return path
+
+
+def _run(cmd: list[str], timeout: int = 0) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(
+            cmd, capture_output=True, timeout=timeout or None
+        )
+    except subprocess.TimeoutExpired as ex:
+        raise SkillError(f"`{' '.join(cmd)}` timed out") from ex
+    except OSError as ex:
+        raise SkillError(f"cannot run `{cmd[0]}`: {ex}") from ex
+
+
+def _check(run: subprocess.CompletedProcess, what: str) -> None:
+    if run.returncode != 0:
+        tail = (run.stderr or run.stdout or b"").decode(
+            "utf-8", errors="replace"
+        ).strip()[-300:]
+        raise SkillError(f"{what} failed (exit {run.returncode}): {tail}")
+
+
+def _capture_android(
+    workdir: Path, media: str, seconds: int, serial: str
+) -> list[tuple[Path, str]]:
+    adb = _require_tool("adb", "install Android platform-tools")
+    base = [adb] + (["-s", serial] if serial.strip() else [])
+    out: list[tuple[Path, str]] = []
+    want = {"screenshot", "video", "log"} if media == "all" else {media}
+
+    if "screenshot" in want:
+        p = workdir / "screenshot.png"
+        with p.open("wb") as fh:
+            run = _run([*base, "exec-out", "screencap", "-p"])
+            _check(run, "adb screencap")
+            fh.write(run.stdout)
+        if p.stat().st_size == 0:
+            raise SkillError("adb screencap produced an empty file")
+        out.append((p, "android screenshot"))
+
+    if "video" in want:
+        secs = max(1, int(seconds or 10))
+        remote = "/sdcard/openharness-evidence.mp4"
+        local = workdir / "recording.mp4"
+        _check(
+            _run(
+                [*base, "shell", "screenrecord", "--time-limit", str(secs), remote],
+                timeout=secs + 30,
+            ),
+            "adb screenrecord",
+        )
+        _check(_run([*base, "pull", remote, str(local)]), "adb pull")
+        _run([*base, "shell", "rm", "-f", remote])
+        out.append((local, f"android screenrecord ({secs}s)"))
+
+    if "log" in want:
+        p = workdir / "logcat.txt"
+        run = _run([*base, "logcat", "-d", "-t", "500"])
+        _check(run, "adb logcat")
+        p.write_bytes(run.stdout or b"")
+        out.append((p, "adb logcat (last 500 lines)"))
+
+    return out
+
+
+def _capture_ios(
+    workdir: Path, media: str, seconds: int
+) -> list[tuple[Path, str]]:
+    xcrun = _require_tool(
+        "xcrun", "install Xcode command line tools (xcrun simctl)"
+    )
+    sim = [xcrun, "simctl"]
+    out: list[tuple[Path, str]] = []
+    want = {"screenshot", "video", "log"} if media == "all" else {media}
+
+    if "screenshot" in want:
+        p = workdir / "screenshot.png"
+        _check(
+            _run([*sim, "io", "booted", "screenshot", str(p)]),
+            "simctl screenshot",
+        )
+        out.append((p, "ios simulator screenshot"))
+
+    if "video" in want:
+        secs = max(1, int(seconds or 10))
+        p = workdir / "recording.mov"
+        proc = subprocess.Popen(
+            [*sim, "io", "booted", "recordVideo", str(p)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            proc.wait(timeout=secs)
+        except subprocess.TimeoutExpired:
+            proc.send_signal(signal.SIGINT)
+            try:
+                proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+                raise SkillError("simctl recordVideo did not stop")
+        if proc.returncode != 0 or not p.is_file() or p.stat().st_size == 0:
+            raise SkillError("simctl recordVideo produced no file")
+        out.append((p, f"ios simctl recordVideo ({secs}s)"))
+
+    if "log" in want:
+        p = workdir / "device.log"
+        run = _run(
+            [*sim, "spawn", "booted", "log", "show",
+             "--last", "5m", "--style", "compact"]
+        )
+        _check(run, "simctl log show")
+        p.write_bytes(run.stdout or b"")
+        out.append((p, "ios simulator log (last 5m)"))
+
+    return out
 
 
 @skill
@@ -62,6 +190,10 @@ def harness_evidence(
     kind: str = "proof",
     out_dir: str = "e2e",
     force: bool = False,
+    device: str = "",
+    media: str = "screenshot",
+    seconds: int = 0,
+    serial: str = "",
 ) -> str:
     """Capture, render, verify or list evidence bundles (ADR 0007).
 
@@ -86,12 +218,16 @@ def harness_evidence(
               them — or manifest-ready entries (path+mime+sha256+bytes).
       fixture Write a Playwright evidence fixture into the repo (out_dir,
               default e2e/); it emits steps-*.json fragments for `attach`.
+      capture Grab a screenshot, recording or log from a connected device
+              (device=android via adb, ios via xcrun simctl) and attach the
+              files to the resolved bundle's step. The harness never drives
+              the device itself — it shells to the platform tool.
       render  Write index.html + SUMMARY.md from evidence.json.
       verify  Check manifest, artifacts, hashes, commit, secrets, tracking.
               Raises (CLI exit 2) when anything is wrong.
 
     Params:
-      action: list|new|step|attach|render|verify.
+      action: list|new|step|attach|fixture|capture|render|verify.
       repo: Repository root (default cwd).
       bundle: Explicit bundle path; else the newest bundle for `feature`,
         else the newest bundle overall.
@@ -132,6 +268,12 @@ def harness_evidence(
       out_dir: On `fixture`, subdirectory of `repo` that receives the
         generated Playwright fixture (default `e2e`).
       force: On `fixture`, overwrite an existing fixture file.
+      device: On `capture`, `android` (adb) or `ios` (xcrun simctl, booted
+        simulator). Required for `capture`.
+      media: On `capture`, `screenshot` (default), `video`, `log`, or `all`.
+      seconds: On `capture --media=video`, recording length (default 10).
+      serial: On `capture --device=android`, adb `-s` serial when several
+        devices are attached.
     """
     repo_path = Path(repo)
     action = (action or "list").strip().lower()
@@ -375,6 +517,50 @@ def harness_evidence(
             f"{warn}"
         )
 
+    if action == "capture":
+        device = device.strip().lower()
+        if device not in ("android", "ios"):
+            raise SkillError("capture requires --device=android|ios")
+        media = media.strip().lower() or "screenshot"
+        if media not in ("screenshot", "video", "log", "all"):
+            raise SkillError(
+                f"media must be screenshot|video|log|all, got {media!r}"
+            )
+        if seconds < 0:
+            raise SkillError("--seconds must be zero or positive")
+        target = _resolve(repo_path, bundle, feature)
+        attached = []
+        with tempfile.TemporaryDirectory(prefix="oh-capture-") as tmp:
+            workdir = Path(tmp)
+            try:
+                produced = (
+                    _capture_android(workdir, media, seconds, serial)
+                    if device == "android"
+                    else _capture_ios(workdir, media, seconds)
+                )
+            except SkillError:
+                raise
+            except Exception as ex:  # device tools fail in many shapes
+                raise SkillError(f"device capture failed: {ex}") from ex
+            for path, caption in produced:
+                try:
+                    art = evidence.record_attach(
+                        target,
+                        path,
+                        step_id=step,
+                        caption=caption or f"{device} {media}",
+                        by=by,
+                    )
+                except evidence.EvidenceError as ex:
+                    raise SkillError(str(ex)) from ex
+                attached.append(art)
+        names = ", ".join(a["path"] for a in attached)
+        return (
+            f"Captured {len(attached)} artifact(s) from {device} into "
+            f"{target.name}\n  {names}\n"
+            "Next: `--action=render`."
+        )
+
     if action in ("render", "verify"):
         target = _resolve(repo_path, bundle, feature)
         if action == "render":
@@ -413,5 +599,5 @@ def harness_evidence(
 
     raise SkillError(
         f"unknown action {action!r} "
-        "(list|new|step|attach|fixture|render|verify)"
+        "(list|new|step|attach|fixture|capture|render|verify)"
     )

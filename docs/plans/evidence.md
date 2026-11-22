@@ -324,10 +324,15 @@ log summaries for human review.
   with manifest-ready and source-file artifact forms, `--action=fixture`
   generating the Playwright fixture per repo, `kind:"walkthrough"`
   bundles.
-- **B2 — device capture.** `--action=capture --device=android|ios`
-  shelling to `adb`/`xcrun` when present (install hint when not);
-  `attach --by=<name>` for manual captures. Electron desktop and native
-  mobile emit the same fragment — no second fixture needed.
+- **B2 — device capture** — ✅ shipped.
+  `--action=capture --device=android|ios` shells to `adb`
+  (screencap/screenrecord/logcat, optional `--serial`) or `xcrun simctl`
+  on the booted simulator (screenshot/recordVideo/log show) and attaches
+  the files via `record_attach`; `--media=screenshot|video|log|all`,
+  `--seconds` for video. Missing tools fail with an install hint.
+  `attach --by=<name>` covers manual captures. Electron desktop and
+  native mobile producers still emit the same fragment — no second
+  fixture needed.
 - **B3 — page depth.** Coverage matrix (AC/scenario → step → artifact via
   `covers`), thumbnails in the timeline, lightbox, video poster/chapters,
   client-side log filter/copy, explicit `--inline` linked-files list.
