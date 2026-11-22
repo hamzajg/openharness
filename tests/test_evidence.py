@@ -1260,3 +1260,95 @@ def test_tdd_proof_rejects_out_of_order_runs(tmp_path):
     proof = evidence.tdd_proof(manifest)
     assert not proof["ok"]
     assert any("after" in p for p in proof["problems"])
+
+
+def test_new_bundle_kind_walkthrough_stays_in_scratch(tmp_path):
+    bundle = evidence.new_bundle(
+        tmp_path, "cart", head=HEAD, run="20260101T000000Z-abc1234", kind="walkthrough"
+    )
+    assert bundle.parent == tmp_path / ".openharness" / "evidence" / "cart"
+    assert evidence.load(bundle)["kind"] == "walkthrough"
+
+
+def test_new_bundle_kind_defaults_to_proof(tmp_path):
+    bundle = evidence.new_bundle(tmp_path, "cart", head=HEAD, run="20260101T000000Z-abc1234")
+    assert evidence.load(bundle)["kind"] == "proof"
+
+
+def test_walkthrough_cannot_be_tracked(tmp_path):
+    with pytest.raises(evidence.EvidenceError, match="local-only"):
+        evidence.new_bundle(
+            tmp_path, "cart", head=HEAD, run="20260101T000000Z-abc1234",
+            tracked=True, kind="walkthrough",
+        )
+
+
+def test_new_bundle_rejects_unknown_kind(tmp_path):
+    with pytest.raises(evidence.EvidenceError, match="kind must be one of"):
+        evidence.new_bundle(tmp_path, "cart", head=HEAD, kind="bogus")
+
+
+def test_manifest_without_kind_loads_as_proof(tmp_path):
+    bundle = evidence.new_bundle(tmp_path, "cart", head=HEAD, run="20260101T000000Z-abc1234")
+    manifest = json.loads((bundle / "evidence.json").read_text())
+    del manifest["kind"]
+    _save(bundle, manifest)
+    assert "kind" not in evidence.load(bundle)
+    rows = evidence.list_bundles(tmp_path)
+    assert rows[0]["kind"] == "proof"
+
+
+def test_manifest_with_invalid_kind_is_rejected(tmp_path):
+    bundle = evidence.new_bundle(tmp_path, "cart", head=HEAD, run="20260101T000000Z-abc1234")
+    manifest = json.loads((bundle / "evidence.json").read_text())
+    manifest["kind"] = "bogus"
+    _save(bundle, manifest)
+    with pytest.raises(evidence.EvidenceError, match="kind must be one of"):
+        evidence.load(bundle)
+
+
+def test_verify_warns_walkthrough_in_tracked_root(tmp_path):
+    if not shutil.which("git"):
+        pytest.skip("git not installed")
+    _git_init(tmp_path)
+    bundle = evidence.new_bundle(
+        tmp_path, "cart", head=HEAD, run="20260101T000000Z-abc1234",
+        tracked=True, kind="proof",
+    )
+    manifest = json.loads((bundle / "evidence.json").read_text())
+    manifest["kind"] = "walkthrough"
+    _save(bundle, manifest)
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+    assert "walkthrough-in-tracked-root" in _codes(report)
+    assert report.ok  # a warning, not an error
+
+
+def test_proof_bundle_in_tracked_root_has_no_kind_warning(tmp_path):
+    if not shutil.which("git"):
+        pytest.skip("git not installed")
+    _git_init(tmp_path)
+    bundle = evidence.new_bundle(
+        tmp_path, "cart", head=HEAD, run="20260101T000000Z-abc1234", tracked=True
+    )
+    report = evidence.verify(bundle, repo=tmp_path, head=HEAD)
+    assert "walkthrough-in-tracked-root" not in _codes(report)
+
+
+def test_list_rows_carry_kind(tmp_path):
+    proof, _ = _make(tmp_path)
+    wt = evidence.new_bundle(
+        tmp_path, "cart", head=HEAD, run="20260202T000000Z-def5678", kind="walkthrough"
+    )
+    rows = {r["bundle"]: r for r in evidence.list_bundles(tmp_path)}
+    assert rows[proof]["kind"] == "proof"
+    assert rows[wt]["kind"] == "walkthrough"
+
+
+def test_render_shows_walkthrough_kind(tmp_path):
+    bundle = evidence.new_bundle(
+        tmp_path, "cart", head=HEAD, run="20260101T000000Z-abc1234", kind="walkthrough"
+    )
+    paths = evidence.render(bundle)
+    html_text = paths["html"].read_text()
+    assert "walkthrough" in html_text
+    assert "walkthrough" in paths["summary"].read_text()

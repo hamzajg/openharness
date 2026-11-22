@@ -63,6 +63,11 @@ If the PR or branch is missing, inspect `specs/<feature>/LOOP.md` and
      - the green and refactor steps run the wave's tests and pass; the
        refactor step changed no observable behavior (no weakened or
        deleted assertions).
+   - For UI-touching waves, check the companion walkthrough bundle
+     (`kind: "walkthrough"` in `.openharness/evidence/<feature>/<run>/
+     evidence.json`): it should carry the screenshots/recordings the
+     scenarios imply. Missing or mismatched media is a concern, not a
+     blocker — the proof bundle remains the gate evidence.
    - Check the domain and experience contracts when the spec has them
      (D019):
      - `DOMAIN.md` terms are used consistently — code, scenario names and

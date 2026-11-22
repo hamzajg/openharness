@@ -128,7 +128,11 @@ them.
    redact tokens in output.
 3. Before `complete`: `--action=render` then `--action=verify` (hashes,
    commit, secrets). Fix what verify reports; never commit the bundle.
-4. `SUMMARY.md` can be pasted into the PR body or the LOOP evidence
+4. UI media can also go in a companion walkthrough bundle —
+   `--action=new ... --kind=walkthrough` (same feature/wave, scratch
+   root only). It holds screenshots, recordings and log summaries for
+   local review; it is companion material, never the wave's proof.
+5. `SUMMARY.md` can be pasted into the PR body or the LOOP evidence
    column.
 
 ## Gates

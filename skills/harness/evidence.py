@@ -59,6 +59,7 @@ def harness_evidence(
     by: str = "",
     fragment: str = "",
     tracked: bool = False,
+    kind: str = "proof",
 ) -> str:
     """Capture, render, verify or list evidence bundles (ADR 0007).
 
@@ -115,6 +116,9 @@ def harness_evidence(
         type and file name, exactly as `attach --file` does.
       tracked: On `new`, place the bundle under `evidence/` (committable)
         instead of the gitignored scratch root.
+      kind: On `new`, `proof` (default — the wave/finish evidence ship_loop
+        verifies) or `walkthrough` (local-only companion material: screenshots,
+        recordings, log summaries; cannot be combined with `tracked`).
     """
     repo_path = Path(repo)
     action = (action or "list").strip().lower()
@@ -125,17 +129,18 @@ def harness_evidence(
             return f"No evidence bundles under {evidence.bundle_root(repo_path)}."
         width = max(len(r["feature"]) for r in rows) if rows else 8
         lines = [
-            f"{'feature':{width}}  {'run':26}  {'verdict':8}  {'steps':>5}  {'arts':>4}  {'loc':7}  head"
+            f"{'feature':{width}}  {'run':26}  {'kind':11}  {'verdict':8}  {'steps':>5}  {'arts':>4}  {'loc':7}  head"
         ]
         for r in rows:
             loc = "tracked" if r.get("tracked") else "local"
+            rkind = r.get("kind") or "proof"
             if r.get("invalid"):
                 lines.append(
-                    f"{r['feature']:{width}}  {r['run_id']:26}  {'INVALID':8}  {'-':>5}  {'-':>4}  {loc:7}  {r['invalid']}"
+                    f"{r['feature']:{width}}  {r['run_id']:26}  {'?':11}  {'INVALID':8}  {'-':>5}  {'-':>4}  {loc:7}  {r['invalid']}"
                 )
                 continue
             lines.append(
-                f"{r['feature']:{width}}  {r['run_id']:26}  {r['verdict']:8}  "
+                f"{r['feature']:{width}}  {r['run_id']:26}  {rkind:11}  {r['verdict']:8}  "
                 f"{r['steps']:>5}  {r['artifacts']:>4}  {loc:7}  {(r['head'] or '?')[:12]}"
             )
         lines.append("")
@@ -160,6 +165,7 @@ def harness_evidence(
                 summary=summary,
                 not_verified=items,
                 tracked=tracked,
+                kind=kind,
             )
         except evidence.EvidenceError as ex:
             raise SkillError(str(ex)) from ex
