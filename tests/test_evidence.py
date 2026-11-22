@@ -515,6 +515,57 @@ def test_render_shows_a_recording(tmp_path):
     assert 'src="raw/s1/session.webm"' in page
 
 
+def test_render_builds_the_coverage_matrix_from_covers(tmp_path):
+    bundle, manifest = _make(tmp_path)
+    manifest["steps"][0]["covers"] = ["AC1", "add an item"]
+    manifest["steps"][0]["checks"] = [
+        {"name": "cart count", "status": "pass", "expected": "1", "actual": "1"}
+    ]
+    _save(bundle, manifest)
+
+    page = evidence.render(bundle)["html"].read_text()
+
+    assert "<h2>Acceptance coverage</h2>" in page
+    assert "<td>AC1</td>" in page and ">s1</td>" in page
+    assert "cart count — expected 1, got 1 (pass)" in page
+
+
+def test_render_shows_step_artifacts_and_log_controls(tmp_path):
+    bundle, _ = _make(tmp_path)
+
+    page = evidence.render(bundle)["html"].read_text()
+
+    assert 'class="thumb"' in page
+    assert 'class="logfilter"' in page and 'class="logcopy"' in page
+    assert 'id="lb"' in page and "ArrowRight" in page
+
+
+def test_render_uses_the_declared_poster_for_video(tmp_path):
+    bundle, manifest = _make(tmp_path)
+    _add_artifact(bundle, manifest, "raw/s1/session.webm", "video/webm", b"fake-webm")
+    manifest["steps"][0]["artifacts"][-1]["poster"] = "raw/s1/shot.png"
+    _save(bundle, manifest)
+
+    page = evidence.render(bundle)["html"].read_text()
+
+    assert 'poster="raw/s1/shot.png"' in page
+
+
+def test_render_inline_lists_files_that_stayed_external(tmp_path):
+    bundle, _ = _make(tmp_path)
+    # Force an over-budget artifact: shrink the inline budget for this test.
+    import openharness.evidence as ev
+    old = ev.INLINE_BUDGET
+    ev.INLINE_BUDGET = 4
+    try:
+        page = ev.render(bundle, inline=True)["html"].read_text()
+    finally:
+        ev.INLINE_BUDGET = old
+
+    assert "<h2>Linked files</h2>" in page
+    assert "raw/s1/shot.png" in page
+
+
 def test_empty_bundle_warns_that_it_proves_nothing(tmp_path):
     bundle = evidence.new_bundle(tmp_path, "empty", head=HEAD, run="20260101T000000Z-abc1234")
 
