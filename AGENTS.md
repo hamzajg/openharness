@@ -176,7 +176,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   (`--tracked`) that proves the TDD cycle — ordered
   `--tdd=red --expected-failure` → `--tdd=green` → `--tdd=refactor`
   steps. UI-touching waves must attach screenshots
-  per the capture policy in `docs/plans/evidence-v2.md`; the harness
+  per the capture policy in `docs/plans/evidence.md`; the harness
   never drives browsers itself. Bundles declare `kind`: `proof`
   (default, gate evidence) or `walkthrough` (local-only companion
   material — `--kind=walkthrough`, never `--tracked`). UI walkthroughs

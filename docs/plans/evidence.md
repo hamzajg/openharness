@@ -1,7 +1,10 @@
-# Evidence v2 — capture, walkthrough page, and sharing
+# Evidence — capture, walkthrough page, and sharing
 
-Status: draft · 2026-11-17 · extends [ADR 0007](../adr/0007-evidence-bundles.md)
-(P1 shipped). Scope: P2 capture, P3 renderer/loop wiring, P4 sharing.
+Status: phases P1–P2b shipped · extends
+[ADR 0007](../adr/0007-evidence-bundles.md). One evidence system, delivered
+in phases: P1 contract+renderer+verify, P2 capture, P3 renderer/loop
+wiring, P4 sharing. Manifest schema versions (`openharness.evidence/1`,
+`/2`) are internal compatibility labels, not product versions.
 
 ## Why this exists
 
@@ -59,8 +62,9 @@ Concretely:
    Cypress, `adb`, `xcrun`, or a human produce files; the harness starts at the
    manifest and the attach boundary. A browser step is *attached*, never
    synthesized.
-2. **Manifest v2 is additive.** v1 bundles keep loading and rendering. New
-   fields are optional except where `verify` needs them for a UI wave.
+2. **The manifest schema is additive.** Older bundles keep loading
+   and rendering. New fields are optional except where `verify` needs
+   them for a UI wave.
 3. **Media is step-scoped.** A screenshot without a step, a caption, and a
    hash is not evidence; it is a file.
 4. **A UI wave without media is not done.** `review_delivery` and `ship_loop`
@@ -88,7 +92,7 @@ Every bundle declares `kind` in its manifest (absent = `proof`):
   Per-wave optional; it is not gate evidence — it carries no `tdd:` steps,
   so `tdd_proof` cannot pass on it.
 
-## Manifest v2
+## Manifest (schema `openharness.evidence/2`)
 
 ```jsonc
 {
@@ -188,7 +192,7 @@ Rules the skill enforces:
 `--action=prune --keep=3` keeps the newest three runs per feature. It never
 deletes a bundle referenced by a `LOOP.md` row or a gate.
 
-## Walkthrough page v2
+## Walkthrough page
 
 One HTML file, inline CSS and ~3 KB vanilla JS, no CDN, no fonts, no network.
 Opens from `file://`. Sections in review order:
@@ -300,7 +304,7 @@ tax on docs-only work.
   guard, and copies into `raw/<step>/`.
 - Redaction runs on the command, title, note, log and text artifacts before
   hashing; counts land in `redactions` with a manifest path.
-- Manifest v2 (`openharness.evidence/2`) with `/1` still accepted; new
+- Manifest schema `openharness.evidence/2` with `/1` still accepted; new
   optional fields are `capture`, `step.covers`, `step.checks`,
   `artifact.role/caption/poster`, `redactions[].note`.
 - Tests: 60 evidence tests (step exit codes, timeout, duplicate id, stale
@@ -344,9 +348,9 @@ tax on docs-only work.
 - Done when an Android or iOS UI wave can attach a screenshot and a short
   recording without hand-writing manifest JSON.
 
-### P3 — renderer v2 and enforcement
+### P3 — page depth and loop enforcement
 
-- Manifest v2 rendering: coverage matrix, thumbnails in the timeline,
+- Manifest rendering: coverage matrix, thumbnails in the timeline,
   lightbox, video poster/chapters, log filter/copy, redaction notes.
 - `--inline` budget with an explicit list of files left linked.
 - `review_delivery` findings and `ship_loop` evidence token.

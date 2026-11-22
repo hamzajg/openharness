@@ -1,7 +1,7 @@
 ---
 name: evidence
 type: block
-location: openharness/evidence.py, skills/harness/evidence.py, docs/adr/0007-evidence-bundles.md, docs/plans/evidence-v2.md
+location: openharness/evidence.py, skills/harness/evidence.py, docs/adr/0007-evidence-bundles.md, docs/plans/evidence.md
 interfaces: [harness_evidence.invoke, harness_evidence --action=list|new|step|attach|fixture|render|verify, evidence.new_bundle, evidence.record_step, evidence.record_attach, evidence.fragment_artifact, evidence.verify, evidence.list_bundles]
 ---
 # Block: evidence
@@ -95,8 +95,9 @@ bundle loads, records that wave, passes `verify`, proves TDD
 `--force` bypasses the gate like every other loop precondition.
 `review_delivery` reports per-wave TDD status as `tdd-missing` concerns —
 it surfaces the gap without re-blocking legacy waves. Still open
-(P3 of `docs/plans/evidence-v2.md`): no Playwright fixture ships in this
-repo (target projects generate one).
+(P3/P4 of `docs/plans/evidence.md`): `evidence:<run-id>` tokens in
+LOOP.md/gate evidence, `--action=share`/`prune`, and the CI template;
+the Playwright fixture ships via `--action=fixture`.
 
 ## Invariants
 - A bundle is proof of one run, not a product artifact: scratch by default,

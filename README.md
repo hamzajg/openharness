@@ -171,4 +171,4 @@ python -m openharness run harness_evidence --action=verify --repo=. --feature=ph
 private keys, JWTs and JSON-shaped secrets before hashing; `verify` fails if a
 token still appears in a log, an artifact changed, or the manifest commit is
 not the checked-out one. The full design — capture policy, walkthrough page,
-loop wiring, sharing — is in `docs/plans/evidence-v2.md`.
+loop wiring, sharing — is in `docs/plans/evidence.md`.
