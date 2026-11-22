@@ -48,6 +48,11 @@ TRACKED_ROOT = Path("evidence")
 KINDS = ("command", "browser", "api", "manual")
 STATUSES = ("pass", "fail", "skip", "manual")
 VERDICTS = ("pass", "fail", "partial")
+#: What a bundle is for. `proof` (the default, also when `kind` is absent)
+#: carries the wave/finish evidence `ship_loop` verifies; `walkthrough` is
+#: local-only companion material — screenshots, recordings, log summaries —
+#: and is refused under the tracked root.
+BUNDLE_KINDS = ("proof", "walkthrough")
 #: Optional `tdd` marker on a step: the TDD phase the run belongs to.
 #: `red` must be an expected failure, `green`/`refactor` must pass, and
 #: ship_loop requires them in red -> green -> refactor order.
@@ -141,14 +146,22 @@ def new_bundle(
     not_verified: Iterable[str] = (),
     run: str | None = None,
     tracked: bool = False,
+    kind: str = "proof",
 ) -> Path:
     """Create an empty bundle and its manifest; returns the bundle directory.
 
     `tracked=True` places the bundle under `evidence/` — the folder meant to
-    be committed — instead of the local scratch root.
+    be committed — instead of the local scratch root. `kind="walkthrough"`
+    marks local-only companion material and cannot be combined with
+    `tracked`.
     """
     if not feature.strip():
         raise EvidenceError("feature is required")
+    kind = (kind or "proof").strip().lower()
+    if kind not in BUNDLE_KINDS:
+        raise EvidenceError(f"kind must be one of {BUNDLE_KINDS}, got {kind!r}")
+    if kind == "walkthrough" and tracked:
+        raise EvidenceError("walkthrough bundles are local-only — drop --tracked")
     # Record the commit this evidence belongs to; `verify` refuses an empty one
     # rather than letting a bundle float free of the run it describes.
     head = head or (_git_head(Path(repo)) or "")
@@ -167,6 +180,7 @@ def new_bundle(
         "repo": {"slug": "", "branch": branch, "head": head, "base": base},
         "ci": {"pr": None, "url": None, "sha": None, "conclusion": None},
         "verdict": "pass",
+        "kind": kind,
         "summary": summary,
         "not_verified": [str(x) for x in not_verified],
         "capture": {},
@@ -213,6 +227,8 @@ def _schema_problems(m: Any) -> list[str]:
             out.append(f"{key} must be a non-empty string")
     if m.get("verdict") not in VERDICTS:
         out.append(f"verdict must be one of {VERDICTS}, got {m.get('verdict')!r}")
+    if "kind" in m and m["kind"] not in BUNDLE_KINDS:
+        out.append(f"kind must be one of {BUNDLE_KINDS}, got {m['kind']!r}")
     if not isinstance(m.get("not_verified"), list):
         out.append("not_verified must be a list (possibly empty)")
     if not isinstance(m.get("repo"), dict):
@@ -845,6 +861,15 @@ def verify(
                 "— `git add` it to publish the evidence",
             )
         )
+    if manifest.get("kind") == "walkthrough" and in_tracked_root:
+        report.findings.append(
+            Finding(
+                "warning",
+                "walkthrough-in-tracked-root",
+                "walkthrough bundles are local-only companion material — "
+                f"move it under {ROOT}/ or recreate it without the tracked root",
+            )
+        )
 
     # -- commit binding
     recorded = (manifest.get("repo") or {}).get("head") or ""
@@ -1065,9 +1090,11 @@ def summary_markdown(manifest: dict) -> str:
     arts = [a for _, a in iter_artifacts(manifest)]
     images = [a for a in arts if a.get("mime", "").startswith("image/")]
     videos = [a for a in arts if a.get("mime", "").startswith("video/")]
+    kind = manifest.get("kind") or "proof"
     lines = [
         f"## Evidence — {manifest['feature']}"
-        + (f" · wave {manifest['wave']}" if manifest.get("wave") else ""),
+        + (f" · wave {manifest['wave']}" if manifest.get("wave") else "")
+        + (f" · {kind}" if kind != "proof" else ""),
         "",
         f"- verdict: **{manifest['verdict']}**",
         f"- run: `{manifest['run_id']}`",
@@ -1106,6 +1133,9 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
         f'<span class="chip verdict v-{e(verdict)}"><b>{e(verdict.upper())}</b></span>',
         f'<span class="chip">run <b>{e(manifest["run_id"])}</b></span>',
     ]
+    kind = manifest.get("kind") or "proof"
+    if kind != "proof":
+        chips.append(f'<span class="chip">kind <b>{e(kind)}</b></span>')
     if repo.get("head"):
         chips.append(f'<span class="chip">head <b>{e(repo["head"])}</b></span>')
     if repo.get("branch"):
@@ -1456,6 +1486,7 @@ def list_bundles(
                     "wave": m.get("wave"),
                     "run_id": m["run_id"],
                     "verdict": m["verdict"],
+                    "kind": m.get("kind") or "proof",
                     "head": (m.get("repo") or {}).get("head") or "",
                     "steps": len(m.get("steps") or []),
                     "artifacts": sum(len(s.get("artifacts") or []) for s in m.get("steps") or []),

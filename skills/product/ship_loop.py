@@ -751,7 +751,9 @@ def _evidence_error(
         f"  ... --action=verify --repo={root} --feature={feature}",
         "The bundle must cover this wave, verify clean and record the commit now "
         "checked out. `--tracked` on `new` stores it under `evidence/` instead "
-        "of the scratch root.",
+        "of the scratch root. For UI media (screenshots, recordings, log "
+        "summaries) create a companion `--kind=walkthrough` bundle — it stays "
+        "local and never satisfies a gate.",
         "The harness does not drive browsers — produce screenshots with "
         "Playwright/manual capture and attach them.",
     ]

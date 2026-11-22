@@ -337,3 +337,9 @@ Open question for review: whether the Playwright fixture belongs in this repo
 or is generated per-project by the skill. Bundle location: local scratch
 `.openharness/evidence/` by default; `evidence/` (tracked, committed on
 request via `--tracked`) when a run's proof must travel with the repo.
+
+Amended: bundles now declare `kind` — `proof` (default; the evidence
+`ship_loop` verifies) or `walkthrough` (local-only companion material for
+screenshots, recordings and log summaries; cannot be created under the
+tracked root, and `verify` warns if one lands there). The storage roots are
+unchanged; `kind` names what a bundle is for.

@@ -123,6 +123,17 @@ If an input is missing, ask for it. Do not change code first.
      commands.
    - Render and verify the bundle before finishing:
      `--action=render` then `--action=verify`.
+   - For UI-touching waves, also create a walkthrough bundle —
+     companion material, not the wave's proof bundle:
+
+     ```
+     python -m openharness run harness_evidence --action=new --repo=<repo> \
+       --feature=<feature> --wave=<n> --kind=walkthrough
+     ```
+
+     Attach screenshots, short recordings and a summarized log to it. It
+     stays in the local scratch root (never `--tracked`), and the PR body
+     links both run ids.
 
 7. **Commit.**
    - Use conventional messages (`feat:`, `fix:`, `test:`, `chore:`).
@@ -142,6 +153,7 @@ If an input is missing, ask for it. Do not change code first.
      - TDD evidence: RED failing output, GREEN passing output, REFACTOR
        re-run (commands + results)
      - test evidence (commands + results)
+     - proof bundle run id, plus the walkthrough run id for UI waves
      - `Stacked on #<n>` and the merge order when the base is another PR
      - known gaps or follow-ups
 

@@ -73,6 +73,21 @@ Concretely:
    page reports what was scrubbed. Binary media is marked "not scanned" rather
    than implied clean.
 
+## Two evidence tiers (implemented)
+
+Every bundle declares `kind` in its manifest (absent = `proof`):
+
+- **`proof`** — the wave/finish evidence `ship_loop` verifies: TDD steps,
+  commit binding, rendered page. Lives in `.openharness/evidence/` scratch
+  by default; `--tracked` on `new` places it under `evidence/` to be
+  committed when a run's proof should travel with the repo.
+- **`walkthrough`** — local-only companion material: screenshots,
+  recordings, summarized logs for human review. `new --kind=walkthrough`
+  always lands in the scratch root (`--tracked` is refused) and `verify`
+  warns `walkthrough-in-tracked-root` if one is moved under `evidence/`.
+  Per-wave optional; it is not gate evidence — it carries no `tdd:` steps,
+  so `tdd_proof` cannot pass on it.
+
 ## Manifest v2
 
 ```jsonc

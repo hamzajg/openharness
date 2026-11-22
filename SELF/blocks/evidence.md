@@ -10,7 +10,13 @@ interfaces: [harness_evidence.invoke, harness_evidence --action=list|new|step|at
 Makes "done" a reviewable object instead of a sentence: one bundle per run,
 with an authoritative manifest, the raw media, the logs, and a generated
 walkthrough page that opens offline with no network and no build step
-(ADR 0007). The loop used to record `pytest 12 passed; CI green` in `LOOP.md`
+(ADR 0007). Every bundle declares a `kind`: `proof` (the default — the
+wave/finish evidence `ship_loop` verifies, scratch or `--tracked`) or
+`walkthrough` (local-only companion material for screenshots, recordings
+and log summaries; `new` refuses `--kind=walkthrough --tracked`, and
+`verify` warns `walkthrough-in-tracked-root` if one lands under
+`evidence/`). Walkthroughs are per-wave optional and never the gate
+evidence — they carry no `tdd:` steps, so `tdd_proof` cannot pass on them. The loop used to record `pytest 12 passed; CI green` in `LOOP.md`
 — true or not, it could not be seen, and it was gone by the next session.
 
 The harness does not drive browsers or devices (D001). Playwright, `adb`,
@@ -36,7 +42,7 @@ tracks is an error, and a tracked-root bundle git does not yet track draws an
 | Action | Effect |
 |---|---|
 | `list` | Bundles under both roots, newest first, with verdict, counts, commit. |
-| `new` | Create a bundle and manifest (feature required; `--wave`, `--head`). |
+| `new` | Create a bundle and manifest (feature required; `--wave`, `--head`, `--tracked`, `--kind=proof|walkthrough`). |
 | `step` | Run a command; record real exit code, wall time, cwd, redacted log. Optional `--tdd=red|green|refactor` marks the TDD phase the run belongs to. |
 | `attach` | Copy a file under `raw/<step>/` (hash, MIME, mtime guard), or fold a `steps.json` fragment in with `--fragment`. |
 | `render` | Write `index.html` + `SUMMARY.md` from the manifest. |
