@@ -25,7 +25,11 @@ from pathlib import Path
 
 from openharness import evidence as evidence_bundles
 from openharness.skill import SkillError, skill
-from skills.product.spec_scaffold import value_contract_status
+from skills.product.spec_scaffold import (
+    domain_status,
+    section_status,
+    value_contract_status,
+)
 
 _WAVE_RE = re.compile(r"^##\s+Wave\s+(\d+)\b.*$", re.M)
 _SCENARIO_RE = re.compile(r"^\s*Scenario(?: Outline)?:\s*(.+?)\s*$")
@@ -348,6 +352,15 @@ def _filled_decision_review(path: Path) -> bool:
     return True
 
 
+def _check_target(check: str) -> tuple[str, str]:
+    """(repo-relative path, section) for `file:`/`section:` gate checks."""
+    payload = check.split(":", 1)[1].strip()
+    if "#" in payload:
+        rel, section = payload.rsplit("#", 1)
+        return rel.strip(), section.strip()
+    return payload, ""
+
+
 def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
     """(effective status, evidence) — `stale` means met but evidence vanished."""
     row = state["gates"].get(gate["id"], {})
@@ -355,14 +368,20 @@ def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
     evidence = row.get("evidence", "—")
     if status == "waived":
         return "waived", evidence
-    if status == "met" and gate["check"].lower().startswith("file:"):
-        rel = gate["check"].split(":", 1)[1].strip()
+    check = gate["check"].lower()
+    if status == "met" and (check.startswith("file:") or check.startswith("section:")):
+        rel, section = _check_target(gate["check"])
         path = root / rel if rel else Path("")
         if not rel or not path.exists():
             return "stale", evidence
         if path.name == "DECISION-REVIEW.md" and not _filled_decision_review(path):
             return "stale", evidence
-        if path.name == "SPEC.md" and not value_contract_status(_read(path))[0]:
+        if path.name == "DOMAIN.md" and not domain_status(_read(path))[0]:
+            return "stale", evidence
+        if check.startswith("file:") and path.name == "SPEC.md":
+            if not value_contract_status(_read(path))[0]:
+                return "stale", evidence
+        if check.startswith("section:") and not section_status(_read(path), section)[0]:
             return "stale", evidence
     if status in ("met", "failed"):
         return status, evidence
@@ -448,7 +467,15 @@ def _gate_directive(root: Path, spec_dir: Path, phase: str, blocking: list[tuple
             lines.append("  fix: the evidence no longer satisfies the gate — restore it or re-record the gate")
         elif gate["resolver"] == "agent":
             hint = "create the artifact" if gate["type"] in ("artifact", "data") else "run the check"
-            if gate["check"].lower().endswith("spec.md"):
+            gcheck = gate["check"].lower()
+            if gcheck.endswith("domain.md"):
+                hint = "fill DOMAIN.md — tier, glossary, bounded contexts, aggregates (D019)"
+            elif gcheck.startswith("section:"):
+                hint = (
+                    f"fill `## {gate['check'].rsplit('#', 1)[-1]}` in the checked "
+                    "file (D019)"
+                )
+            elif gcheck.endswith("spec.md"):
                 hint = "fill `## Value contract` in SPEC.md (D017)"
             lines.append(f"  next (agent): {hint}, then record it:")
             lines.append(
@@ -486,11 +513,13 @@ def _phase_guidance(root: Path) -> str:
         "   highest score and record the choice in SPEC.md → Decisions.",
         "3. Scaffold: `python -m openharness run spec_scaffold --repo_path="
         f"{root} --feature=\"<name>\"`",
-        "4. Fill SPEC.md (incl. `## Value contract` with a numeric target and",
+        "4. Fill SPEC.md (incl. `## Value contract` with a numeric target,",
+        "   `## Experience` — journey/edge states/UX bar or N/A — reason, and",
         "   `## Decisions` — every one-way-door choice, options + simplest/",
-        "   reversible alternative, consequences), EXAMPLES.feature (@w<N>",
+        "   reversible alternative, consequences), DOMAIN.md (tier, glossary,",
+        "   bounded contexts, aggregates), EXAMPLES.feature (@w<N>",
         "   tags) and BACKLOG.md (user stories, one `## US<n> — ...` block",
-        "   each). Keep the scaffold's G0 (value contract) and G1 gates.",
+        "   each). Keep the scaffold's G0–G3 gates.",
         "5. Challenge the decisions: `challenge_decision --spec_dir=<dir> --write`,",
         "   decision-challenger fills DECISION-REVIEW.md, record gate G1 met.",
         "6. `python -m openharness run wave_plan --spec_dir="
@@ -1168,8 +1197,9 @@ def ship_loop(
             if status == "met":
                 if not evidence.strip():
                     return "ERROR: --evidence is required to mark a gate met"
-                if g["check"].lower().startswith("file:"):
-                    rel = g["check"].split(":", 1)[1].strip()
+                gcheck = g["check"].lower()
+                if gcheck.startswith("file:") or gcheck.startswith("section:"):
+                    rel, section = _check_target(g["check"])
                     path = root / rel if rel else Path("")
                     if not rel or not path.exists():
                         return f"ERROR: evidence file `{rel}` does not exist — create it first"
@@ -1180,7 +1210,16 @@ def ship_loop(
                             "decision-challenger fill VERDICT, STEELMAN, "
                             "SMALLEST NEXT STEP and REVISIT TRIGGER first"
                         )
-                    if path.name == "SPEC.md":
+                    if path.name == "DOMAIN.md":
+                        ok, problems = domain_status(_read(path))
+                        if not ok:
+                            return (
+                                "ERROR: DOMAIN.md has no filled domain model — "
+                                + ", ".join(problems[:4])
+                                + ". Fill the tier and every section before "
+                                "marking this gate met (D019)"
+                            )
+                    if gcheck.startswith("file:") and path.name == "SPEC.md":
                         ok, problems = value_contract_status(_read(path))
                         if not ok:
                             return (
@@ -1188,6 +1227,15 @@ def ship_loop(
                                 + ", ".join(problems[:3])
                                 + ". Fill all fields with a measurable target "
                                 "before marking this gate met (D017)"
+                            )
+                    if gcheck.startswith("section:"):
+                        ok, problems = section_status(_read(path), section)
+                        if not ok:
+                            return (
+                                f"ERROR: {path.name} has no filled `## {section}` — "
+                                + ", ".join(problems[:4])
+                                + ". Fill it (or declare `N/A — <reason>`) "
+                                "before marking this gate met (D019)"
                             )
                 row.update({"status": "met", "evidence": _clean(evidence), "updated": _now()})
                 _event(state, f"gate {gid} met: {_clean(evidence)}")

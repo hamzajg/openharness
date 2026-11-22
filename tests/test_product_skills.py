@@ -7,7 +7,13 @@ import pytest
 
 from openharness.skill import SkillError
 from skills.product.discover_product import discover_product
-from skills.product.spec_scaffold import spec_scaffold, value_contract_status
+from skills.product.spec_scaffold import (
+    domain_status,
+    experience_status,
+    section_status,
+    spec_scaffold,
+    value_contract_status,
+)
 from skills.product.wave_plan import wave_plan
 
 
@@ -48,7 +54,13 @@ def test_spec_scaffold_creates_artifacts_with_outcome_hypothesis(tmp_path):
     assert (d / "EXAMPLES.feature").is_file()
     assert (d / "BACKLOG.md").is_file()
     assert (d / "GATES.md").is_file()
+    assert (d / "DOMAIN.md").is_file()
     spec = (d / "SPEC.md").read_text()
+    assert "## Experience" in spec
+    gates = (d / "GATES.md").read_text()
+    assert "G2 — Domain model captured" in gates
+    assert "G3 — Experience contract filled" in gates
+    assert "section:specs/user-notifications/SPEC.md#Experience" in gates
     assert "## Outcome hypothesis" in spec
     assert "Opportunity evidence" in spec
     assert "do not invent baselines" in spec
@@ -89,6 +101,86 @@ def test_value_contract_needs_filled_fields_and_a_numeric_target():
     )
     ok, problems = value_contract_status(template)
     assert not ok and "Problem" in problems
+
+
+FILLED_DOMAIN = """# Domain model: Demo
+
+**Tier:** domain-heavy
+
+## Ubiquitous language
+
+- Order: a customer purchase — used in checkout scenario
+
+## Bounded contexts
+
+- Storefront owns Cart and Order; Payments owns Payment
+- Storefront calls Payments synchronously; no shared tables
+
+## Domain model
+
+- Order aggregate enforces the paid-total invariant at commit
+
+## Integration style
+
+- Synchronous calls; order state strongly consistent
+
+## External translations
+
+- none — no external systems touched
+"""
+
+
+def test_domain_status_needs_tier_and_filled_sections():
+    ok, problems = domain_status("# Domain model\n\nNo sections.\n")
+    assert not ok and "Tier" in problems[0]
+
+    template = "**Tier:** simple | standard | domain-heavy\n\n## Ubiquitous language\n\n- (term: meaning — used in x)\n"
+    ok, problems = domain_status(template)
+    assert not ok
+
+    ok, problems = domain_status(FILLED_DOMAIN)
+    assert ok and problems == []
+
+    # leave only a template placeholder in the section
+    broken = FILLED_DOMAIN.replace(
+        "- Order aggregate enforces the paid-total invariant at commit",
+        "- (aggregates and their invariants)",
+    )
+    ok, problems = domain_status(broken)
+    assert not ok and any("Domain model" in p for p in problems)
+
+
+def test_experience_status_needs_fields_or_reasoned_na():
+    spec = "# Spec\n\n## Experience\n\n- Primary journey: (steps)\n"
+    ok, problems = experience_status(spec)
+    assert not ok and "## Experience" not in problems
+
+    na = "# Spec\n\n## Experience\n\nN/A\n"
+    ok, problems = experience_status(na)
+    assert not ok and "reason" in problems[0]
+
+    na_reason = "# Spec\n\n## Experience\n\nN/A — backend job, no user-facing surface\n"
+    ok, problems = experience_status(na_reason)
+    assert ok and problems == []
+
+    filled = """## Experience
+
+- Primary journey: 1. open cart 2. checkout 3. see confirmation
+- Edge states: empty cart shows browse CTA; payment failure keeps the cart
+- UX bar: single-page checkout, no mode switching
+- Accessibility: keyboard navigable, labeled fields
+
+## Scope (in)
+"""
+    ok, problems = experience_status(filled)
+    assert ok and problems == []
+
+
+def test_section_status_dispatches_experience():
+    ok, _ = section_status(FILLED_DOMAIN, "Ubiquitous language")
+    assert ok
+    ok, problems = section_status("# x\n\n## Missing\n\n- (placeholder only)\n", "Nope")
+    assert not ok and "## Nope" in problems[0]
 
 
 def test_spec_scaffold_never_overwrites(tmp_path):
