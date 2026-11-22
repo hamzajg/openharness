@@ -45,6 +45,10 @@ Otherwise stop and report that you need a target repo.
      (1–5 each). Show the table.
    - In autonomous mode, pick the highest score. Otherwise, pick the
      hinted feature.
+   - Classify the feature's domain complexity: `simple | standard |
+     domain-heavy` — simple introduces no new domain concepts, standard
+     touches existing ones, domain-heavy invents or reshapes them. Record
+     the tier and a one-line justification in DOMAIN.md.
    - Record the choice and the scores in `SPEC.md` → Decisions. Note which
      evidence supports the opportunity; label unverified assumptions rather
      than presenting them as user research.
@@ -71,6 +75,11 @@ Otherwise stop and report that you need a target repo.
      observable signal (and baseline if known), and a follow-up owner/date.
      Do not invent research or baselines; the numeric target is the explicit
      value-contract claim. Mark unknowns.
+   - `## Experience` (D019): the primary user journey as ordered steps,
+     the edge states that matter (empty/loading/error/permission-denied),
+     a concrete UX bar (what "intuitive" means here), and accessibility
+     notes. A feature with no user-facing surface writes
+     `N/A — <reason>`; a bare N/A is rejected by gate G3.
    - Five-dimension fit (D018): in the outcome hypothesis, name which of
      business/user value, economic viability, UX/adoption, technical/
      operational quality, and adaptability the feature improves, and which
@@ -100,55 +109,79 @@ Otherwise stop and report that you need a target repo.
      `/challenge-decision` before wave planning (gate G1). Do not run the
      review yourself.
 
-5. **Write `EXAMPLES.feature`.**
+5. **Write `DOMAIN.md` — the domain contract (D019).**
+   - Set `**Tier:**` to the classification from step 2.
+   - Ubiquitous language: one entry per term — `Term: meaning — used in
+     <scenario/story/API/screen>`. Seed from `discover_product`'s Domain
+     vocabulary section and the existing code; never invent synonyms.
+     These words must match scenarios, stories, code and UI copy.
+   - Bounded contexts: name the context that owns each concept this
+     feature touches, the context map (dependencies, translation/ACL
+     points), and which concepts are new vs borrowed.
+   - Domain model: aggregates with their invariants, entities/value
+     objects this feature adds, and the transaction boundary (does one
+     transaction span aggregates?).
+   - Integration style: domain events vs synchronous calls, and what must
+     be strongly consistent vs eventual.
+   - External translations: external systems/models entering the context
+     and how they are translated — or an explicit `none — <reason>`.
+   - `simple` tier is honest thinness, not absence: still name the owning
+     context and state "no new domain concepts" explicitly.
+   - Prefix any one-way-door domain decision (context boundary, aggregate
+     split, consistency model) with `REVIEW:` so G1's DDD lens reviews it.
+
+6. **Write `EXAMPLES.feature`.**
    - Observable Gherkin only.
    - Cover the happy path and the 2–3 edge cases that would fail a demo.
    - Tag each scenario `@w<N>` for its delivery wave.
    - Make scenario names precise. Tests will cite them.
 
-6. **Write `BACKLOG.md`.**
+7. **Write `BACKLOG.md`.**
    - One user story per block:
      `## US<n> — As a <role>, I want <goal>, so that <value>`
    - Fields: `- Scenarios: @wN`, optional `- Depends: USk`,
      `- Size: S|M|L`, `- Notes:`.
    - Order by user value. `Depends:` gives technical order only.
 
-7. **Write `GATES.md` — preconditions.**
+8. **Write `GATES.md` — preconditions.**
    - Derive the gates from the acceptance criteria and business rules.
    - For each criterion, ask: *what must be decided, known, or available
      before this can be built or proven?*
    - Write each gate as:
 
      ```
-     ## G1 — <short title>
+     ## G4 — <short title>
      - Before: spec | plan | wave:<n> | validate | finish
      - Type: decision | artifact | external | technical | quality | data
      - Owner: <role, e.g. product-owner, security, platform>
      - Resolver: human | agent
      - Blocking: yes | no
-     - Check: manual | file:<repo-relative-path> | command:<exact command>
+     - Check: manual | file:<repo-relative-path> | section:<path>#<heading> | command:<exact command>
      - Why: <which AC / business rule depends on it>
      ```
 
-   - Keep 2–6 gates. Each gate must be falsifiable: a decision id, a
-     path, or a command output. "Quality is good" is not a gate.
-   - KEEP the scaffold's `G1 — Design decisions challenged` gate
-     (`Before: plan`, `Check: file:specs/<feature>/DECISION-REVIEW.md`).
-     It is what forces the architecture review before waves start. Do not
-     delete or weaken it; a human may waive it, you may not.
+   - The scaffold already owns G0–G3 (value contract, design challenge,
+     domain model, experience). Number agent-added gates from **G4** and
+     keep the total reasonable — each must be falsifiable: a decision id,
+     a path, a section, or a command output. "Quality is good" is not a
+     gate.
+   - KEEP all four scaffold gates. G1 (`Design decisions challenged`) is
+     what forces the architecture review before waves start; G2/G3 force
+     the domain and experience contracts. Do not delete or weaken them;
+     a human may waive them, you may not.
    - `Resolver: human` for decisions or access a person must grant:
      domain rules, pricing, legal, credentials, external sign-off.
    - `Resolver: agent` for artifacts and checks you can produce.
-   - Prefer `Check: file:<path>` for artifacts. The oracle can verify the
-     file exists.
+   - Prefer `Check: file:<path>` for artifacts, `section:<path>#<heading>`
+     for a single filled section of a file (e.g. SPEC.md's `## Experience`).
+     The oracle validates content, not just existence, for known files.
    - Use `command:<cmd>` for measurable checks. You run it and record
      the output. The oracle never runs repo commands.
    - `Blocking: no` only for genuinely optional improvements.
    - `Before:` must be exactly `spec`, `plan`, `wave:<n>`, `validate`, or
      `finish`. An invalid value blocks every phase.
-   - Delete the template line "No gates defined yet." when you add gates.
 
-8. **Plan the waves.**
+9. **Plan the waves.**
 
    ```
    python -m openharness run wave_plan --spec_dir=<repo>/specs/<feature>
@@ -158,7 +191,7 @@ Otherwise stop and report that you need a target repo.
    fix `BACKLOG.md` or `EXAMPLES.feature` and re-run until clean. Each
    wave must ship alone: one branch, one PR, green tests, demoable.
 
-9. **Audit the spec before waves.**
+10. **Audit the spec before waves.**
 
    ```
    python -m openharness run review_delivery --repo_path=<repo> \
@@ -170,7 +203,7 @@ Otherwise stop and report that you need a target repo.
    Fix every confirmed blocker and re-run. A `BLOCK` verdict means the spec
    is not ready for waves; do not plan around it.
 
-10. **Check the loop state.**
+11. **Check the loop state.**
 
    ```
    python -m openharness run ship_loop --action=status --repo_path=<repo>
@@ -180,16 +213,17 @@ Otherwise stop and report that you need a target repo.
    correctly owned. Do not mark gates met. The orchestrator does that when
    the evidence exists.
 
-11. **Return** the report below.
+12. **Return** the report below.
 
 ## Output contract
 
 ```
 FEATURE: <slug>
 CHOSEN: <name> — score <n>/125 (<value>,<feasibility>,<differentiation>)
-FILES:  SPEC.md · EXAMPLES.feature · BACKLOG.md · GATES.md · WAVES.md
+TIER:   simple | standard | domain-heavy — <one-line justification>
+FILES:  SPEC.md · DOMAIN.md · EXAMPLES.feature · BACKLOG.md · GATES.md · WAVES.md
 WAVES:  W1 <items> · W2 <items> ...
-GATES:  G1 <title> (<before>, <resolver>) · G2 ... | none
+GATES:  G0–G3 scaffold + G4+ <title> (<before>, <resolver>) | scaffold only
 AUDIT:  spec PASS | CONCERNS | BLOCK (accepted: ...)
 OUTCOME: <hypothesis, evidence status, signal, owner/date>
 REVIEW: <high-impact decisions to challenge> | none

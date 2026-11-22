@@ -124,11 +124,16 @@ def _detect_stack(root: Path) -> list[str]:
     return found[:4]
 
 
+_CLASS_RE = re.compile(r"\bclass\s+([A-Z][A-Za-z0-9_]{2,})\b")
+
+
 def _scan_signals(root: Path):
     code_files = test_files = 0
     placeholders = []
     routes = 0
     route_hits = []
+    classes: dict[str, int] = {}
+    dir_counts: dict[str, int] = {}
     for p in _iter_files(root):
         if p.suffix.lower() not in _CODE_EXTS and p.suffix not in (".cshtml", ".vue", ".svelte"):
             continue
@@ -143,6 +148,12 @@ def _scan_signals(root: Path):
             test_files += 1
         else:
             code_files += 1
+            parts = p.relative_to(root).parts[:-1]
+            if parts:
+                top = "/".join(parts[:2])
+                dir_counts[top] = dir_counts.get(top, 0) + 1
+            for name in _CLASS_RE.findall(text):
+                classes[name] = classes.get(name, 0) + 1
         hits = sum(len(rx.findall(text)) for rx in _PLACEHOLDER_RES)
         if hits:
             placeholders.append((rel, hits))
@@ -150,7 +161,7 @@ def _scan_signals(root: Path):
         routes += rhits
         if rhits:
             route_hits.append((rel, rhits))
-    return code_files, test_files, placeholders, routes, route_hits
+    return code_files, test_files, placeholders, routes, route_hits, classes, dir_counts
 
 
 def _existing_specs(root: Path) -> list[str]:
@@ -189,7 +200,8 @@ def discover_product(repo_path: str = ".") -> str:
         return f"ERROR: {repo_path} is not a directory"
 
     stack = _detect_stack(root)
-    code_files, test_files, placeholders, routes, route_hits = _scan_signals(root)
+    (code_files, test_files, placeholders, routes, route_hits,
+     classes, dir_counts) = _scan_signals(root)
     specs = _existing_specs(root)
 
     out = [f"# Product Surface Report — {root.name}", ""]
@@ -218,11 +230,29 @@ def discover_product(repo_path: str = ".") -> str:
         for rel, n in top:
             out.append(f"  - `{rel}` ({n})")
     out.append("")
+    out.append("## Domain vocabulary")
+    out.append("Candidate terms for DOMAIN.md's ubiquitous language — verify")
+    out.append("against the code before adopting; invented terms are worse")
+    out.append("than borrowed ones.")
+    if dir_counts:
+        out.append("- Modules/areas by source-file count:")
+        for rel, n in sorted(dir_counts.items(), key=lambda x: -x[1])[:8]:
+            out.append(f"  - `{rel}/` ({n} files)")
+    if classes:
+        out.append("- PascalCase types by frequency:")
+        for name, n in sorted(classes.items(), key=lambda x: -x[1])[:12]:
+            out.append(f"  - `{name}` ({n})")
+    if not dir_counts and not classes:
+        out.append("- (no code signals — greenfield; derive terms from the")
+        out.append("  problem statement and user interviews, not invention)")
+    out.append("")
     out.append("## Spec state")
     out.append(f"- `specs/` features present: {', '.join(specs) if specs else '(none — greenfield for spec-driven work)'}")
     out.append("")
     out.append("## Agent next step")
     out.append("Turn the gaps above into 3-5 candidate feature themes, score them")
     out.append("(user value × feasibility × wow), pick ONE, then run")
-    out.append("`spec_scaffold` to create `specs/<feature>/`.")
+    out.append("`spec_scaffold` to create `specs/<feature>/` — including")
+    out.append("DOMAIN.md (glossary seeded from the vocabulary above) and")
+    out.append("SPEC.md's `## Experience` section.")
     return "\n".join(out)

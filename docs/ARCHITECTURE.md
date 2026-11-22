@@ -47,7 +47,7 @@ OpenHarness is simultaneously:
   the harness never injects
   into agent sessions.
 - **Product delivery:** `/ship-loop` → `ship_loop --action=next` reads
-  `specs/<feature>/{SPEC.md,EXAMPLES.feature,BACKLOG.md,GATES.md,WAVES.md,LOOP.md,LOOP.state.json}`
+  `specs/<feature>/{SPEC.md,DOMAIN.md,EXAMPLES.feature,BACKLOG.md,GATES.md,WAVES.md,LOOP.md,LOOP.state.json}`
   → checks blocking gates for the current phase → returns one directive (or a
   `GATE:`/`NEXT: fix wave-plan warnings` directive) → the agent delegates it
   to a subagent role → outcome recorded back into `LOOP.md`/`LOOP.state.json`.

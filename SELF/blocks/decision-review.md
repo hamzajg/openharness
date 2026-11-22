@@ -33,7 +33,8 @@ Two halves:
 One source is required:
 
 - `--adr=<path>` — a decision record (relative to the repo or absolute);
-- `--spec_dir=<dir>` — reads the `## Decisions` section of `SPEC.md`;
+- `--spec_dir=<dir>` — reads the `## Decisions` section of `SPEC.md` and,
+  when present, `DOMAIN.md` (the domain contract feeds the DDD lens);
 - `--decision="<text>"` — inline, when no artifact exists yet.
 
 Optional: `--paths="<a,b>"` code paths to inspect; `--write` to persist the
