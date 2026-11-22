@@ -333,9 +333,13 @@ log summaries for human review.
   `attach --by=<name>` covers manual captures. Electron desktop and
   native mobile producers still emit the same fragment — no second
   fixture needed.
-- **B3 — page depth.** Coverage matrix (AC/scenario → step → artifact via
-  `covers`), thumbnails in the timeline, lightbox, video poster/chapters,
-  client-side log filter/copy, explicit `--inline` linked-files list.
+- **B3 — page depth** — ✅ shipped.
+  Coverage matrix derived from `step.covers` (uncovered steps counted),
+  per-step artifact thumbnails and `checks` rows in the timeline,
+  keyboard lightbox on the gallery, video `poster` frames, client-side
+  log filter/copy, capture-tool chip, and an explicit linked-files list
+  on `--inline` renders. Video chapters remain future work — the
+  manifest records no step→video timing to build them from.
 - **B4 — sharing and retention.** `--action=share` zip + sha256,
   `--action=prune --keep=N` (never deletes a bundle referenced by
   LOOP.md), CI artifact template, opt-in `--public` sanitized copy with

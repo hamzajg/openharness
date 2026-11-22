@@ -82,6 +82,17 @@ otherwise it is inferred — image → `screenshot`, video → `video`, `.har` �
 Binary media is not scanned for secrets and is reported that way rather than
 implicitly clean.
 
+## Walkthrough page
+`render` emits one offline `index.html` (inline CSS/JS, no network):
+verdict chips incl. `manifest.capture` tool/device, an acceptance-coverage
+table derived from `step.covers` (steps without covers are counted, not
+hidden), per-step artifact thumbnails and `checks` rows, a screenshot
+gallery with a keyboard lightbox, videos with `poster` frames, log panes
+with client-side filter/copy, the provenance table, the redaction report,
+and — for `--inline` renders — an explicit linked-files list of artifacts
+that stayed external. Video chapters need step-to-video timing the manifest
+does not record; posters come from `artifact.poster` or a sibling image.
+
 ## TDD steps
 A step may carry `tdd: red|green|refactor`. `tdd_proof(manifest)` requires
 one step per phase: `red` a failed command marked `expected_failure`,

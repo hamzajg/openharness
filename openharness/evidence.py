@@ -1222,9 +1222,14 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
     repo = manifest.get("repo") or {}
     ci = manifest.get("ci") or {}
     steps = manifest.get("steps") or []
-    arts = [a for _, a in iter_artifacts(manifest)]
+    art_pairs = list(iter_artifacts(manifest))
+    arts = [a for _, a in art_pairs]
     images = [a for a in arts if a.get("mime", "").startswith("image/")]
-    videos = [a for a in arts if a.get("mime", "").startswith("video/")]
+    video_pairs = [
+        (s, a) for s, a in art_pairs
+        if (a.get("mime") or "").startswith("video/")
+    ]
+    videos = [a for _, a in video_pairs]
     verdict = manifest["verdict"]
     e = html.escape
     empty = not steps and not arts
@@ -1236,6 +1241,14 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
     kind = manifest.get("kind") or "proof"
     if kind != "proof":
         chips.append(f'<span class="chip">kind <b>{e(kind)}</b></span>')
+    cap = manifest.get("capture") or {}
+    if cap.get("tool"):
+        cap_txt = str(cap["tool"])
+        if cap.get("version"):
+            cap_txt += f" {cap['version']}"
+        if cap.get("device"):
+            cap_txt += f" · {cap['device']}"
+        chips.append(f'<span class="chip">capture <b>{e(cap_txt)}</b></span>')
     if repo.get("head"):
         chips.append(f'<span class="chip">head <b>{e(repo["head"])}</b></span>')
     if repo.get("branch"):
@@ -1289,6 +1302,34 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
             "evidence for a wave.</p></div>"
         )
 
+    # -- acceptance coverage (derived from step.covers, never authored)
+    cover_map: dict[str, list[dict]] = {}
+    bare_steps = 0
+    for step in steps:
+        covers = step.get("covers") or []
+        if not covers:
+            bare_steps += 1
+        for c in covers:
+            cover_map.setdefault(str(c), []).append(step)
+    if cover_map:
+        parts.append(
+            "<h2>Acceptance coverage</h2><table><tr><th>Cover</th>"
+            "<th>Steps</th><th>Artifacts</th></tr>"
+        )
+        for c in sorted(cover_map):
+            covered = cover_map[c]
+            n_arts = sum(len(s.get("artifacts") or []) for s in covered)
+            labels = ", ".join(str(s.get("id") or "?") for s in covered)
+            parts.append(
+                f"<tr><td>{e(c)}</td><td class='mono'>{e(labels)}</td>"
+                f"<td>{n_arts}</td></tr>"
+            )
+        parts.append("</table>")
+        if bare_steps:
+            parts.append(
+                f'<p class="note">{bare_steps} step(s) declare no covers.</p>'
+            )
+
     # -- walkthrough
     if steps:
         parts.append("<h2>Walkthrough</h2>")
@@ -1309,6 +1350,38 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
                 details.append(f'<div class="cmd">{e(step["cmd"])}</div>')
             if note:
                 details.append(f'<div class="note">{e(str(note))}</div>')
+            step_artifacts = step.get("artifacts") or []
+            if step_artifacts:
+                thumbs = []
+                for art in step_artifacts:
+                    mime = art.get("mime") or ""
+                    if mime.startswith("image/"):
+                        src = _src(art, bundle, inline)
+                        thumbs.append(
+                            f'<a href="{e(_rel_src(art))}"><img class="thumb" '
+                            f'src="{e(src)}" alt="{e(str(art.get("caption") or ""))}" '
+                            'loading="lazy"></a>'
+                        )
+                    else:
+                        thumbs.append(
+                            f'<a class="artlink" href="{e(_rel_src(art))}">'
+                            f'{e(art.get("role") or "file")} · '
+                            f'{e(_size(art.get("bytes")))}</a>'
+                        )
+                details.append('<div class="arts">' + "".join(thumbs) + "</div>")
+            checks = step.get("checks") or []
+            lis = []
+            for chk in checks:
+                if not isinstance(chk, dict):
+                    continue
+                txt = str(chk.get("name") or "?")
+                if chk.get("expected") is not None or chk.get("actual") is not None:
+                    txt += f" — expected {chk.get('expected')}, got {chk.get('actual')}"
+                if chk.get("status"):
+                    txt += f" ({chk['status']})"
+                lis.append(f"<li>{e(txt)}</li>")
+            if lis:
+                details.append("<ul class='checks'>" + "".join(lis) + "</ul>")
             details.append("</div>")
             details.append(f'<span class="note">{e(_duration(dur))}</span></div>')
             parts.append("".join(details))
@@ -1344,11 +1417,21 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
     # -- recording
     if videos:
         parts.append("<h2>Recording</h2>")
-        for art in videos:
+        for vstep, art in video_pairs:
             src = _rel_src(art)
+            poster = art.get("poster") or next(
+                (
+                    a["path"]
+                    for a in (vstep.get("artifacts") or [])
+                    if (a.get("mime") or "").startswith("image/")
+                ),
+                "",
+            )
+            poster_attr = f' poster="{e(poster)}"' if poster else ""
             parts.append(
                 '<div class="card">'
-                f'<video controls preload="metadata" src="{e(src)}"></video>'
+                f'<video controls preload="metadata"{poster_attr} '
+                f'src="{e(src)}"></video>'
                 f'<p class="note">{e(art.get("caption") or art["path"])} · '
                 f'{e(_size(art.get("bytes")))} · sha256 {e(art["sha256"][:12])}…</p></div>'
             )
@@ -1373,7 +1456,7 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
     logs = [s for s in steps if s.get("log")]
     if logs:
         parts.append("<h2>Logs</h2>")
-        for step in logs:
+        for i, step in enumerate(logs):
             path = bundle / step["log"]
             body = (
                 path.read_text(errors="replace")
@@ -1384,9 +1467,14 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
             label = f"{step.get('id')} · {step.get('title')}"
             if code is not None:
                 label += f" (exit {code})"
+            pid = f"log-{i}"
             parts.append(
+                f'<div class="logpane"><div class="logbar">'
+                f'<input class="logfilter" placeholder="filter lines…" '
+                f'data-target="{pid}">'
+                f'<button class="logcopy" data-target="{pid}">copy</button></div>'
                 f"<details><summary>{e(label)}</summary>"
-                f'<pre>{e(_clip(body))}</pre></details>'
+                f'<pre id="{pid}">{e(_clip(body))}</pre></details></div>'
             )
 
     # -- provenance
@@ -1400,6 +1488,29 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
                 f'<td class="mono">{e(art["sha256"][:16])}…</td></tr>'
             )
         parts.append("</table>")
+
+    if inline and arts:
+        linked = []
+        for art in arts:
+            if (art.get("mime") or "").startswith("video/"):
+                linked.append(art)  # video is never inlined — stays linked
+                continue
+            if not _src(art, bundle, inline).startswith("data:"):
+                linked.append(art)
+        if linked:
+            parts.append(
+                "<h2>Linked files</h2><p class='note'>These artifacts stayed "
+                "external — keep the bundle folder next to this page for them "
+                "to resolve.</p><table><tr><th>Artifact</th><th>Size</th>"
+                "<th>sha256</th></tr>"
+            )
+            for art in linked:
+                parts.append(
+                    f'<tr><td class="mono">{e(art["path"])}</td>'
+                    f'<td>{e(_size(art.get("bytes")))}</td>'
+                    f'<td class="mono">{e(art["sha256"][:16])}…</td></tr>'
+                )
+            parts.append("</table>")
 
     if ci.get("url"):
         parts.append(
@@ -1420,6 +1531,10 @@ def _page(manifest: dict, bundle: Path, inline: bool) -> str:
                 parts.append(f'<p class="note">{e(str(r))}</p>')
         parts.append("</div>")
 
+    parts.append(
+        '<div id="lb" hidden><img id="lbimg" alt=""><div id="lbcap"></div></div>'
+    )
+    parts.append("<script>" + _JS + "</script>")
     parts.append(
         '<p class="footer">Regenerate with '
         f'<code>python -m openharness run harness_evidence --action=render '
@@ -1538,9 +1653,67 @@ table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
 th{color:var(--muted);font-weight:500;font-size:12px}
 details{margin-top:10px}summary{cursor:pointer;color:var(--muted);font-size:13px}
+.arts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.arts .thumb{width:72px;height:48px;object-fit:cover;border:1px solid var(--line);
+border-radius:6px;display:block}
+.artlink{font-size:12px;border:1px solid var(--line);border-radius:999px;
+padding:2px 9px;color:var(--muted);text-decoration:none}
+.artlink:hover{color:var(--text)}
+.checks{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+.checks li{margin:2px 0}
+.logpane{margin-top:10px}
+.logbar{display:flex;gap:8px;margin-bottom:6px}
+.logfilter{flex:1;max-width:300px;background:var(--panel);border:1px solid var(--line);
+border-radius:7px;color:var(--text);padding:4px 10px;font:12px var(--mono)}
+.logcopy{background:var(--panel);border:1px solid var(--line);border-radius:7px;
+color:var(--muted);padding:4px 10px;font-size:12px;cursor:pointer}
+.logcopy:hover{color:var(--text)}
+#lb{position:fixed;inset:0;background:rgba(0,0,0,.86);display:flex;
+align-items:center;justify-content:center;z-index:9;cursor:zoom-out}
+#lb[hidden]{display:none}
+#lb img{max-width:92vw;max-height:86vh;border-radius:8px}
+#lbcap{position:absolute;bottom:20px;left:0;right:0;text-align:center;
+color:#cfd6e0;font-size:13px}
 .footer{margin-top:40px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);
 padding-top:14px}.footer code{font-family:var(--mono)}
 a{color:inherit}
+"""
+
+_JS = """
+(function(){
+var lb=document.getElementById('lb'),img=document.getElementById('lbimg'),
+cap=document.getElementById('lbcap');
+var shots=[].slice.call(document.querySelectorAll('.gallery figure a')),cur=0;
+function open(i){if(!shots.length)return;cur=(i+shots.length)%shots.length;
+var a=shots[cur],im=a.querySelector('img');img.src=im?im.src:a.href;
+var f=a.closest('figure').querySelector('figcaption');
+cap.textContent=f?f.textContent.trim():'';lb.hidden=false;}
+shots.forEach(function(a,i){a.addEventListener('click',function(ev){
+ev.preventDefault();open(i);});});
+document.addEventListener('keydown',function(ev){
+if(lb.hidden)return;
+if(ev.key==='Escape')lb.hidden=true;
+else if(ev.key==='ArrowRight')open(cur+1);
+else if(ev.key==='ArrowLeft')open(cur-1);});
+lb.addEventListener('click',function(){lb.hidden=true;});
+document.querySelectorAll('.logfilter').forEach(function(inp){
+var pre=document.getElementById(inp.getAttribute('data-target'));if(!pre)return;
+inp.addEventListener('input',function(){
+var q=inp.value.toLowerCase();
+if(!pre.dataset.full)pre.dataset.full=pre.textContent;
+pre.textContent=pre.dataset.full.split('\\n').filter(function(l){
+return !q||l.toLowerCase().indexOf(q)>=0;}).join('\\n');});});
+document.querySelectorAll('.logcopy').forEach(function(btn){
+btn.addEventListener('click',function(){
+var pre=document.getElementById(btn.getAttribute('data-target'));if(!pre)return;
+var text=pre.dataset.full||pre.textContent,done=function(){
+btn.textContent='copied';setTimeout(function(){btn.textContent='copy';},1200);};
+if(navigator.clipboard&&navigator.clipboard.writeText){
+navigator.clipboard.writeText(text).then(done,function(){});}
+else{var ta=document.createElement('textarea');ta.value=text;
+document.body.appendChild(ta);ta.select();
+try{document.execCommand('copy');}catch(err){}ta.remove();done();}});});
+})();
 """
 
 
