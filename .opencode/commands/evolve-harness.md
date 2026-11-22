@@ -28,7 +28,7 @@ output and surface any drift; do not silently choose.
 3. Implement:
    - Code under `openharness/` or `skills/`
    - Same-commit rule: update corresponding `SELF/blocks/<block>.md` in the same edit set
-   - If skills changed, run the equivalent of `/sync` to update `.claude/commands/` and `.opencode/command/`
+   - If skills changed, run the equivalent of `/sync` to update `.claude/commands/` and `.opencode/commands/`
 
 4. Run tests:
    ```bash

@@ -22,5 +22,5 @@ Defines typed executable units called **skills** (Python functions decorated wit
 1. Create a new `.py` file under `skills/<category>/` (file MUST NOT start with `_`).
 2. Import `from openharness.skill import skill`.
 3. Define a typed function decorated with `@skill`. Include a descriptive docstring.
-4. Run `/sync` to generate matching `.claude/commands/<name>.md` and `.opencode/command/<name>.md` files.
+4. Run `/sync` to generate matching `.claude/commands/<name>.md` and `.opencode/commands/<name>.md` files.
 5. Add a test under `tests/` that invokes the skill via both `Skill.invoke` and `python -m openharness run`.

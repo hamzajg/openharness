@@ -1,5 +1,5 @@
 ---
-description: Regenerate/verify that every skill has a matching command file in .claude/commands/ and .opencode/command/
+description: Regenerate/verify that every skill has a matching command file in .claude/commands/ and .opencode/commands/
 allowed-tools: [Bash, Read, Edit, Write]
 ---
 # /sync — Keep skills ⇄ slash command files in sync
@@ -27,7 +27,7 @@ Read the active registry (REPOS.md or .openharness/REPOS.local.md) and .openharn
    !`python -m openharness`
    ```
 
-2. Enumerate existing command files under `.claude/commands/` and `.opencode/command/`.
+2. Enumerate existing command files under `.claude/commands/` and `.opencode/commands/`.
 
 3. For every skill in the catalog that is missing a command file in EITHER directory, create a stub command file in both:
    - Name: `<skill_name_with_underscores_replaced_by_dashes>.md`

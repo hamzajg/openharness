@@ -14,14 +14,14 @@ The harness folder is the user's working root for an entire multi-repo product/e
 
 **Role B — Context Package (loaded into the agent, in place).**
 Because agent sessions run inside the harness tree, the harness's agent-facing assets are natively discoverable by the agent CLI:
-- `.claude/commands/` and `.opencode/commands/` → slash commands (legacy `.opencode/command/` still discovered)
+- `.claude/commands/` and `.opencode/commands/` → slash commands
 - `.claude/agents/` and `.opencode/agents/` → focused subagent roles for the delivery loop
 - `skills/` → Python skills executed via the agent's Bash tool through `python -m openharness run <skill>`
 - `SELF/` → the harness's own specs/principles (agent-readable)
 - `.openharness/ENV.md` → ecosystem profile; optional repo-level `sources/<repo>/.openharness/ENV.md`
 - local RAG (`.openharness/chroma`) for project knowledge
 
-> **The agent CLI is ALWAYS the orchestrator.** The harness never launches agents, never schedules tasks. It provides context (markdown), skills (python), awareness (SELF/ + ENV.md), repo management (active registry + pull), and observation (serve). Harness files are never copied into target repos — repos under `sources/` remain untouched, pristine checkouts. Agent CLIs discover commands via the harness root's `.claude/commands/` / `.opencode/command/` because sessions run inside the harness tree (CLI config dirs are found by walking up from cwd). **This is D008: central mode only.**
+> **The agent CLI is ALWAYS the orchestrator.** The harness never launches agents, never schedules tasks. It provides context (markdown), skills (python), awareness (SELF/ + ENV.md), repo management (active registry + pull), and observation (serve). Harness files are never copied into target repos — repos under `sources/` remain untouched, pristine checkouts. Agent CLIs discover commands via the harness root's `.claude/commands/` / `.opencode/commands/` because sessions run inside the harness tree (CLI config dirs are found by walking up from cwd). **This is D008: central mode only.**
 
 ## Interfaces
 

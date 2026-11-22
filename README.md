@@ -9,7 +9,7 @@ The harness folder is your working root for an entire multi-repo product/ecosyst
 
 **Role B — Context Package (loaded into the agent, in place).**
 Because agent sessions run inside the harness tree, the harness's agent-facing assets are natively discoverable:
-- `.claude/commands/` and `.opencode/commands/` → slash commands (legacy `.opencode/command/` still discovered)
+- `.claude/commands/` and `.opencode/commands/` → slash commands
 - `.claude/agents/` and `.opencode/agents/` → focused subagent roles for the delivery loop
 - `skills/` → Python skills executed via `python -m openharness run <skill>`
 - `SELF/` → the harness's own specs/principles (agent-readable)

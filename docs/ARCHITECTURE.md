@@ -13,7 +13,7 @@ OpenHarness is simultaneously:
    clones them into `sources/` (gitignored, reconstructable via `pull`). Launch agent CLIs from the
    harness root or a `sources/<repo>` — the harness tree *is* the workspace.
 2. **Context package** — agent-facing assets discoverable in place:
-   `.claude/commands/`, `.opencode/commands/` (legacy `command/`),
+   `.claude/commands/`, `.opencode/commands/`,
    `.claude/agents/`, `.opencode/agents/`, `skills/` (Python, run via
    `python -m openharness run <skill>`), `SELF/` (specs/principles),
    `.openharness/ENV.md`, local RAG index.
