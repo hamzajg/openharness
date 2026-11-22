@@ -93,10 +93,16 @@ shows the real scenario failure is the wave-reviewer's semantic check.
 bundle loads, records that wave, passes `verify`, proves TDD
 (`tdd_proof`), and is bound to the checked-out commit; both roots count.
 `--force` bypasses the gate like every other loop precondition. Track A2
-(in progress) adds `--bundle=<run-id>` wave binding, `evidence:<run-id>`
-gate tokens, and ancestor commit binding; the plan is two tracks
-(`docs/plans/evidence.md`): **proof** owns loop enforcement, **walkthrough**
-owns local media — UI-media requirements never apply to proof bundles.
+adds `--bundle=<run-id>` wave binding (recorded on the wave row and
+rendered as `evidence:<run-id>`), `evidence:<run-id>` gate tokens
+(verified proof bundles only — walkthroughs rejected), and ancestor
+commit binding (a recorded head that is an ancestor of the checked
+commit verifies; unrelated histories still fail). `review_delivery`
+reports `unbound-wave-evidence`, `stale-evidence`, and
+`evidence-contradicts-loop` as advisory concerns. The plan is two tracks
+(`docs/plans/evidence.md`): **proof** owns loop enforcement,
+**walkthrough** owns local media — UI-media requirements never apply to
+proof bundles.
 `review_delivery` reports per-wave TDD status as `tdd-missing` concerns —
 it surfaces the gap without re-blocking legacy waves.
 
