@@ -177,6 +177,78 @@ def test_value_contract_gate_requires_filled_fields(tmp_path):
     assert "GATE:" in out and "G0" in out and "stale" in out
 
 
+def test_scaffold_creates_domain_and_experience_gates(tmp_path):
+    spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
+    gates = (tmp_path / "specs" / "cart-checkout" / "GATES.md").read_text()
+    assert "G2 — Domain model captured" in gates
+    assert "Check: file:specs/cart-checkout/DOMAIN.md" in gates
+    assert "G3 — Experience contract filled" in gates
+    assert "Check: section:specs/cart-checkout/SPEC.md#Experience" in gates
+
+
+def test_domain_gate_requires_filled_model(tmp_path):
+    spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
+    d = tmp_path / "specs" / "cart-checkout"
+
+    out = _run(tmp_path, action="gate", gate="G2", status="met",
+               evidence="file:specs/cart-checkout/DOMAIN.md")
+    assert out.startswith("ERROR") and "no filled domain model" in out
+
+    (d / "DOMAIN.md").write_text(FILLED_DOMAIN_MD)
+    out = _run(tmp_path, action="gate", gate="G2", status="met",
+               evidence="file:specs/cart-checkout/DOMAIN.md")
+    assert "Gate G2 met" in out
+
+
+def test_experience_gate_requires_fields_or_reasoned_na(tmp_path):
+    spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
+    d = tmp_path / "specs" / "cart-checkout"
+    evidence_arg = "section:specs/cart-checkout/SPEC.md#Experience"
+
+    out = _run(tmp_path, action="gate", gate="G3", status="met", evidence=evidence_arg)
+    assert out.startswith("ERROR") and "## Experience" in out
+
+    spec = d / "SPEC.md"
+    spec.write_text(spec.read_text().replace(
+        "## Experience", "## Experience\n\nN/A", 1,
+    ))
+    out = _run(tmp_path, action="gate", gate="G3", status="met", evidence=evidence_arg)
+    assert out.startswith("ERROR") and "reason" in out
+
+    spec.write_text(spec.read_text().replace(
+        "N/A\n", "N/A — backend job, no user-facing surface\n", 1,
+    ))
+    out = _run(tmp_path, action="gate", gate="G3", status="met", evidence=evidence_arg)
+    assert "Gate G3 met" in out
+
+
+FILLED_DOMAIN_MD = """\
+# Domain model: Cart
+
+**Tier:** standard
+
+## Ubiquitous language
+
+- Cart: the shopper's pending purchase — used in checkout scenario
+
+## Bounded contexts
+
+- Storefront owns Cart; Payments owns Payment
+
+## Domain model
+
+- Cart aggregate enforces the non-empty checkout invariant
+
+## Integration style
+
+- Synchronous calls; cart state strongly consistent
+
+## External translations
+
+- none — no external systems touched
+"""
+
+
 def test_scaffold_creates_design_challenge_gate(tmp_path):
     spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
     gates = tmp_path / "specs" / "cart-checkout" / "GATES.md"

@@ -72,6 +72,58 @@ def _fill_value_contract(d: Path) -> None:
     spec.write_text(text)
 
 
+FILLED_DOMAIN = """\
+# Domain model: Cart
+
+**Tier:** standard
+
+## Ubiquitous language
+
+- Cart: the shopper's pending purchase — used in add/checkout scenarios
+
+## Bounded contexts
+
+- Storefront owns Cart and Order; Payments owns Payment
+- Storefront calls Payments synchronously; no shared tables
+
+## Domain model
+
+- Cart aggregate enforces the non-empty checkout invariant
+
+## Integration style
+
+- Synchronous calls to Orders context; cart state strongly consistent
+
+## External translations
+
+- none — no external systems touched
+"""
+
+FILLED_EXPERIENCE = """\
+## Experience
+
+- Primary journey: 1. add item 2. review cart 3. checkout
+- Edge states: empty cart shows browse CTA; payment failure keeps the cart
+- UX bar: single-page checkout, no mode switching
+- Accessibility: keyboard navigable, labeled fields
+
+"""
+
+
+def _fill_domain(d: Path) -> None:
+    (d / "DOMAIN.md").write_text(FILLED_DOMAIN)
+
+
+def _fill_experience(d: Path) -> None:
+    spec = d / "SPEC.md"
+    text = re.sub(
+        r"^## Experience\s*$[\s\S]*?(?=^## )",
+        FILLED_EXPERIENCE,
+        spec.read_text(), count=1, flags=re.M,
+    )
+    spec.write_text(text)
+
+
 def _write(root: Path, rel: str, content: str) -> Path:
     p = root / rel
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -99,6 +151,18 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
         repo_path=str(root), spec_dir=str(d), action="gate", gate="G1",
         status="met",
         evidence=f"file:{d.relative_to(root)}/DECISION-REVIEW.md",
+    )
+    _fill_domain(d)
+    ship_loop.invoke(
+        repo_path=str(root), spec_dir=str(d), action="gate", gate="G2",
+        status="met",
+        evidence=f"file:{d.relative_to(root)}/DOMAIN.md",
+    )
+    _fill_experience(d)
+    ship_loop.invoke(
+        repo_path=str(root), spec_dir=str(d), action="gate", gate="G3",
+        status="met",
+        evidence=f"section:{d.relative_to(root)}/SPEC.md#Experience",
     )
     (d / "SPEC-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
     _bundle(root, name)
@@ -170,6 +234,12 @@ def test_scaffolded_without_waves_asks_for_plan(tmp_path):
     (d / "DECISION-REVIEW.md").write_text(DECISION_REVIEW)
     _run(tmp_path, action="gate", gate="G1", status="met",
          evidence="file:specs/cart-checkout/DECISION-REVIEW.md")
+    _fill_domain(d)
+    _run(tmp_path, action="gate", gate="G2", status="met",
+         evidence="file:specs/cart-checkout/DOMAIN.md")
+    _fill_experience(d)
+    _run(tmp_path, action="gate", gate="G3", status="met",
+         evidence="section:specs/cart-checkout/SPEC.md#Experience")
     out = _run(tmp_path)
     assert "audit the spec" in out and "SPEC-AUDIT.md" in out
     (d / "SPEC-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")

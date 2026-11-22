@@ -48,6 +48,16 @@ measurable — a number, a unit, and a review window.
 - Signal: (observable measure and baseline if known; do not invent baselines; target lives in the Value contract)
 - Follow-up owner/date: (who will review the signal and when?)
 
+## Experience
+
+<!-- Required for any user-facing surface (D019). A feature with no user
+    -facing surface writes `N/A — <reason>`; a bare N/A is rejected. -->
+
+- Primary journey: (the ordered steps the primary user takes)
+- Edge states: (empty / loading / error / permission-denied states that matter)
+- UX bar: (what "intuitive" concretely means for this feature)
+- Accessibility: (keyboard / screen-reader / contrast notes, or n/a — reason)
+
 ## Scope (in)
 
 -
@@ -85,6 +95,54 @@ measurable — a number, a unit, and a review window.
      this shape. -->
 
 - (record ADR-style choices here as they are made)
+"""
+
+_DOMAIN_MD = """# Domain model: {title}
+
+> The domain contract for this feature (D019): ubiquitous language,
+> bounded contexts, aggregates and invariants. Fill every section. `simple`
+> tier means the feature introduces no NEW domain concepts — say so
+> explicitly and name the owning context; it is not a blank file. Deeper
+> tiers are checked semantically by the spec audit and wave reviewer.
+
+**Tier:** simple | standard | domain-heavy
+
+## Ubiquitous language
+
+<!-- One entry per term this feature introduces or relies on. Use the SAME
+     words in scenarios, stories, code and UI copy. -->
+
+- (term: meaning — used in scenario/story/API/screen)
+
+## Bounded contexts
+
+<!-- Which context owns each concept; where translation is needed. -->
+
+- (owning context and the concepts it owns)
+- (context map: dependencies between contexts, ACL/translation points)
+- (new concepts introduced, or "none — all terms borrowed from <context>")
+
+## Domain model
+
+<!-- Only what this feature needs. Invariants are enforced at the boundary. -->
+
+- (aggregates and their invariants)
+- (entities / value objects this feature adds or changes)
+- (transaction boundary: what commits together; does one span aggregates?)
+
+## Integration style
+
+<!-- How this feature's context talks to the rest of the system. -->
+
+- (domain events vs synchronous calls, and why)
+- (what must be strongly consistent vs may be eventual)
+
+## External translations
+
+<!-- External systems/models entering this context and how they are
+     translated — or an explicit "none". -->
+
+- (external system/model and its translation, or "none — <reason>")
 """
 
 _FEATURE = """# {title} — specifications by example
@@ -140,7 +198,9 @@ _GATES_MD = """# Gates: {title}
 >
 > Gate types: decision | artifact | external | technical | quality | data.
 > Resolver: `human` (needs a person to decide/provide something) or `agent`
-> (the agent can satisfy it). Check: `manual`, `file:<repo-relative-path>`, or
+> (the agent can satisfy it). Check: `manual`, `file:<repo-relative-path>`,
+> `section:<repo-relative-path>#<heading>` (the named `##` section must be
+> filled — used for SPEC.md sections that need their own contract), or
 > `command:<exact command>` (the agent runs it and records the output as
 > evidence — the oracle never executes it).
 
@@ -156,14 +216,14 @@ _GATES_MD = """# Gates: {title}
   before wave planning commits the features.
 
 <!-- Example (indented so it is not parsed):
-  ## G1 — Domain glossary agreed
+  ## G4 — Pricing rules approved
   - Before: spec
   - Type: decision
   - Owner: product-owner
   - Resolver: human
   - Blocking: yes
   - Check: manual
-  - Why: AC-2 and AC-3 use domain terms that must be defined once.
+  - Why: AC-2 and AC-3 use pricing terms that must be defined once.
 -->
 
 ## G1 — Design decisions challenged
@@ -178,6 +238,30 @@ _GATES_MD = """# Gates: {title}
   challenger review — alternatives, tradeoffs, testability, and a filled
   VERDICT — must exist before wave planning locks the design in. A human may
   waive this gate for genuinely trivial features.
+
+## G2 — Domain model captured
+- Before: plan
+- Type: artifact
+- Owner: agent
+- Resolver: agent
+- Blocking: yes
+- Check: file:specs/{slug}/DOMAIN.md
+- Why: D019 — waves inherit the ubiquitous language, bounded contexts,
+  aggregates and invariants declared here. The file must name its tier
+  (simple|standard|domain-heavy) and fill every section; `simple` still
+  names the owning context and states "no new domain concepts" explicitly.
+
+## G3 — Experience contract filled
+- Before: plan
+- Type: artifact
+- Owner: agent
+- Resolver: agent
+- Blocking: yes
+- Check: section:specs/{slug}/SPEC.md#Experience
+- Why: D019 — user-facing features must name the primary journey, edge
+  states, a concrete UX bar and accessibility notes before planning. A
+  feature with no user-facing surface writes `N/A — <reason>`; a bare N/A
+  is rejected.
 """
 
 
@@ -220,6 +304,117 @@ def value_contract_status(text: str) -> tuple[bool, list[str]]:
     return not problems, problems
 
 
+_COMMENT_RE = re.compile(r"<!--[\s\S]*?-->")
+_PAREN_RE = re.compile(r"\([^)]*\)")
+_SECTION_RE = lambda name: re.compile(  # noqa: E731
+    rf"^##\s+{re.escape(name)}\s*$([\s\S]*?)(?=^## |\Z)", re.M
+)
+
+
+def _section_body(text: str, name: str) -> str:
+    match = _SECTION_RE(name).search(text)
+    if not match:
+        return ""
+    return _COMMENT_RE.sub("", match.group(1))
+
+
+def _has_content_line(body: str) -> bool:
+    """True when a section has a line that is not template placeholder.
+
+    Template guidance lives in `<!-- -->` comments and placeholder bullets are
+    fully parenthesized (e.g. `- (term: meaning — used in …)`), so stripping
+    `(...)` groups and markdown punctuation leaves real content only.
+    """
+    for line in body.splitlines():
+        s = line.strip()
+        if not s or s.startswith(">"):
+            continue
+        residue = re.sub(r"[^0-9A-Za-z]", "", _PAREN_RE.sub(" ", s))
+        if len(residue) >= 3:
+            return True
+    return False
+
+
+_DOMAIN_SECTIONS = (
+    "Ubiquitous language", "Bounded contexts", "Domain model",
+    "Integration style", "External translations",
+)
+_TIER_RE = re.compile(
+    r"^\s*\*{0,2}Tier:?\*{0,2}\s*[:=]?\s*"
+    r"(simple|standard|domain-heavy)\s*\.?\s*$",
+    re.I | re.M,
+)
+
+
+def domain_status(text: str) -> tuple[bool, list[str]]:
+    """(filled, problems) for DOMAIN.md (D019).
+
+    Shallow by design: the tier must be one of the three declared values and
+    every `##` section must hold at least one non-placeholder line. Whether a
+    `domain-heavy` tier got a *real* model is semantic — the spec audit and
+    wave reviewer judge that, not this check.
+    """
+    problems = []
+    if not _TIER_RE.search(text):
+        problems.append("Tier (simple | standard | domain-heavy)")
+    for section in _DOMAIN_SECTIONS:
+        body = _section_body(text, section)
+        if not body.strip():
+            problems.append(f"## {section}")
+        elif not _has_content_line(body):
+            problems.append(f"## {section} (still template placeholders)")
+    return not problems, problems
+
+
+_EXPERIENCE_FIELDS = ("Primary journey", "Edge states", "UX bar", "Accessibility")
+_NA_LINE_RE = re.compile(r"^N/?A\b", re.I)
+_NA_REASON_RE = re.compile(r"^N/?A\s*[—–-]\s*(\S.{7,})\s*$", re.I)
+_BARE_NA_RE = re.compile(r"^n/?a\.?$", re.I)
+
+
+def experience_status(text: str) -> tuple[bool, list[str]]:
+    """(filled, problems) for SPEC.md's `## Experience` section (D019).
+
+    Either every field is substantively filled, or the whole section declares
+    `N/A — <reason>` (a bare N/A is rejected — explicit defaults, not silent
+    skips). Per-field `n/a — <reason>` is allowed inside filled fields.
+    """
+    body = _section_body(text, "Experience")
+    if not body.strip():
+        return False, ["## Experience"]
+    first = next((l.strip() for l in body.splitlines() if l.strip()), "")
+    if _NA_LINE_RE.match(first):
+        if _NA_REASON_RE.match(first):
+            return True, []
+        return False, ["## Experience (N/A needs a reason after the dash)"]
+    problems = []
+    for field in _EXPERIENCE_FIELDS:
+        fm = re.search(
+            rf"^-\s*{re.escape(field)}\s*:\s*(.+?)\s*$",
+            body, re.M | re.I,
+        )
+        value = fm.group(1).strip() if fm else ""
+        if not value or _UNFILLED_VALUE_RE.search(value) or _BARE_NA_RE.match(value):
+            problems.append(field)
+    return not problems, problems
+
+
+def section_status(text: str, section: str) -> tuple[bool, list[str]]:
+    """(filled, problems) for a generic `## <section>` gate target.
+
+    `Experience` delegates to its field-aware validator; any other section
+    only needs to exist with at least one non-placeholder line.
+    """
+    if section.strip().lower() == "experience":
+        return experience_status(text)
+    body = _section_body(text, section.strip())
+    if not body.strip():
+        return False, [f"## {section.strip()}"]
+    if not _has_content_line(body):
+        return False, [f"## {section.strip()} (still template placeholders)"]
+    return True, []
+
+
 @skill
 def spec_scaffold(repo_path: str = ".", feature: str = "", output_dir: str = "specs") -> str:
     """Create specs/<feature>/ with SPEC.md, EXAMPLES.feature, BACKLOG.md, GATES.md skeletons.
@@ -258,6 +453,7 @@ def spec_scaffold(repo_path: str = ".", feature: str = "", output_dir: str = "sp
             when="(action)",
             then="(observable outcome)",
         ),
+        "DOMAIN.md": _DOMAIN_MD.format(title=title),
         "BACKLOG.md": _BACKLOG_MD.format(
             title=title,
             first_item="(first user-facing capability)",
@@ -282,8 +478,9 @@ def spec_scaffold(repo_path: str = ".", feature: str = "", output_dir: str = "sp
     for s in skipped:
         out.append(f"- kept existing `{s}`")
     out.append("")
-    out.append("Next: fill SPEC.md (problem/users/scope/acceptance criteria), write real")
-    out.append("Gherkin scenarios in EXAMPLES.feature with @w<N> tags, add")
+    out.append("Next: fill SPEC.md (problem/users/scope/acceptance criteria/experience),")
+    out.append("write real Gherkin scenarios in EXAMPLES.feature with @w<N> tags,")
+    out.append("fill DOMAIN.md (tier, glossary, bounded contexts, aggregates), add")
     out.append("backlog items to BACKLOG.md, define preconditions in GATES.md,")
     out.append("then run `wave_plan`.")
     return "\n".join(out)

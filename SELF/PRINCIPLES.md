@@ -268,3 +268,30 @@ complexity, duplicate capability, security and operational debt, and unused
 software more expensive relative to the code itself. The scarce work is
 choosing what is worth building, validating assumptions, integrating with
 real processes, and measuring whether the outcome improved (ADR 0010).
+
+### D019 — The domain model and the experience are spec artifacts
+
+Rule: Every feature carries two contracts beyond the value contract.
+`DOMAIN.md` captures the ubiquitous language (one agreed word per concept),
+the bounded contexts that own each concept, the aggregates and invariants,
+the transaction boundary, and how external models are translated. `SPEC.md`
+carries `## Experience`: the primary user journey, the edge states that
+matter, a concrete UX bar, and accessibility notes.
+
+Both scale with a declared tier — `simple | standard | domain-heavy` — but
+`tier` controls required *depth*, never existence. A `simple` feature still
+names its owning context and states "no new domain concepts" explicitly; a
+user-facing feature still names its journey or declares `N/A — <reason>`.
+A bare `N/A` is rejected: skipping is an explicit, reviewable decision, not
+a silent default. Scaffold gates G2 (DOMAIN.md) and G3 (`## Experience`)
+block wave planning until both are filled; only a named human may waive
+them. Deterministic checks prove presence and non-placeholder content —
+whether a `domain-heavy` model is *real* is semantic judgment for the spec
+audit, the challenger and the wave reviewer (ADR 0011).
+
+Because: AI agents invent vocabulary freely — the same concept gets three
+names across spec, code and UI, boundaries are redrawn per wave, and
+invariants leak into callers. Specs that skip the domain model produce
+plausible-looking waves that do not compose. The experience contract does
+the same for UX: "intuitive" is ungradeable until it is written down as a
+journey, edge states and a bar a reviewer can check (ADR 0011).
