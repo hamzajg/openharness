@@ -92,12 +92,13 @@ shows the real scenario failure is the wave-reviewer's semantic check.
 `ship_loop --action=complete --wave=N` and `--action=finish` refuse until a
 bundle loads, records that wave, passes `verify`, proves TDD
 (`tdd_proof`), and is bound to the checked-out commit; both roots count.
-`--force` bypasses the gate like every other loop precondition.
+`--force` bypasses the gate like every other loop precondition. Track A2
+(in progress) adds `--bundle=<run-id>` wave binding, `evidence:<run-id>`
+gate tokens, and ancestor commit binding; the plan is two tracks
+(`docs/plans/evidence.md`): **proof** owns loop enforcement, **walkthrough**
+owns local media — UI-media requirements never apply to proof bundles.
 `review_delivery` reports per-wave TDD status as `tdd-missing` concerns —
-it surfaces the gap without re-blocking legacy waves. Still open
-(P3/P4 of `docs/plans/evidence.md`): `evidence:<run-id>` tokens in
-LOOP.md/gate evidence, `--action=share`/`prune`, and the CI template;
-the Playwright fixture ships via `--action=fixture`.
+it surfaces the gap without re-blocking legacy waves.
 
 ## Invariants
 - A bundle is proof of one run, not a product artifact: scratch by default,

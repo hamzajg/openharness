@@ -345,4 +345,6 @@ Amended: bundles now declare `kind` — `proof` (default; the evidence
 `ship_loop` verifies) or `walkthrough` (local-only companion material for
 screenshots, recordings and log summaries; cannot be created under the
 tracked root, and `verify` warns if one lands there). The storage roots are
-unchanged; `kind` names what a bundle is for.
+unchanged; `kind` names what a bundle is for. The delivery plan is
+therefore two tracks — proof owns loop enforcement, walkthrough owns local
+media; UI-media requirements never apply to proof bundles.
