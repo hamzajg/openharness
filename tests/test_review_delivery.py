@@ -146,9 +146,11 @@ def _delivery(root: Path, name: str = "cart") -> Path:
     wave_plan.invoke(spec_dir=str(d))
     _bundles(root, name)
     _run(root, action="start", wave=1)
-    _run(root, action="complete", wave=1, note="tests 2/2, CI green", pr="#12")
+    _run(root, action="complete", wave=1, note="tests 2/2, CI green", pr="#12",
+         bundle="run-w1")
     _run(root, action="start", wave=2)
-    _run(root, action="complete", wave=2, note="tests 2/2, CI green", pr="#13")
+    _run(root, action="complete", wave=2, note="tests 2/2, CI green", pr="#13",
+         bundle="run-w2")
     _write(root, "tests/test_cart.py", textwrap.dedent("""\
         def test_cart():
             # add an item
@@ -257,6 +259,40 @@ def test_done_wave_without_tdd_steps_is_a_concern(tmp_path):
     manifest_path.write_text(json.dumps(manifest))
     out = _audit(tmp_path, spec_dir=str(d), phase="delivery")
     assert "[tdd-missing]" in out
+    assert "0 blockers" in out
+
+
+def test_unbound_done_wave_is_a_concern(tmp_path):
+    """Done waves should name their proof bundle; legacy rows stay advisory."""
+    d = _delivery(tmp_path)
+    loop = (d / "LOOP.md").read_text()
+    loop = loop.replace(" · evidence:run-w1", "").replace(" · evidence:run-w2", "")
+    (d / "LOOP.md").write_text(loop)
+    out = _audit(tmp_path, spec_dir=str(d), phase="delivery")
+    assert out.count("[unbound-wave-evidence]") == 2
+    assert "0 blockers" in out
+
+
+def test_stale_bound_bundle_is_a_concern(tmp_path):
+    d = _delivery(tmp_path)
+    loop = (d / "LOOP.md").read_text().replace("evidence:run-w1", "evidence:gone")
+    (d / "LOOP.md").write_text(loop)
+    out = _audit(tmp_path, spec_dir=str(d), phase="delivery")
+    assert "[stale-evidence]" in out
+    assert "does not resolve" in out
+    assert "0 blockers" in out
+
+
+def test_fail_verdict_bundle_contradicts_a_done_wave(tmp_path):
+    d = _delivery(tmp_path)
+    manifest_path = (
+        tmp_path / ".openharness" / "evidence" / "cart" / "run-w1" / "evidence.json"
+    )
+    manifest = json.loads(manifest_path.read_text())
+    manifest["verdict"] = "fail"
+    manifest_path.write_text(json.dumps(manifest))
+    out = _audit(tmp_path, spec_dir=str(d), phase="delivery")
+    assert "[evidence-contradicts-loop]" in out
     assert "0 blockers" in out
 
 

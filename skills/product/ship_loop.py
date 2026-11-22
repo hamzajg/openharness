@@ -170,11 +170,18 @@ def _load_state(spec_dir: Path) -> dict:
     waves = {}
     for m in _STATE_ROW_RE.finditer(text):
         w = int(m.group(1))
+        ev = m.group(5)
+        bundle = ""
+        bm = re.search(r"\s*·\s*evidence:(\S+)\s*$", ev)
+        if bm:
+            bundle = bm.group(1)
+            ev = ev[: bm.start()].rstrip()
         waves[w] = {
             "status": m.group(2) if m.group(2) in _WAVE_STATUSES else "pending",
             "branch": m.group(3),
             "pr": m.group(4),
-            "evidence": m.group(5),
+            "evidence": ev,
+            "bundle": bundle,
             "updated": m.group(6),
         }
     events = []
@@ -219,9 +226,12 @@ def _save_state(spec_dir: Path, state: dict) -> None:
     ]
     for w in numbers:
         row = state["waves"].get(w, {})
+        ev = row.get("evidence", "—")
+        if row.get("bundle"):
+            ev = f"{ev} · evidence:{row['bundle']}"
         out.append(
             f"| {w} | {row.get('status', 'pending')} | {row.get('branch', '—')} "
-            f"| {row.get('pr', '—')} | {row.get('evidence', '—')} "
+            f"| {row.get('pr', '—')} | {ev} "
             f"| {row.get('updated', '—')} |"
         )
     gate_numbers = sorted(
@@ -265,7 +275,8 @@ def _save_state(spec_dir: Path, state: dict) -> None:
 
 def _wave(state: dict, n: int) -> dict:
     return state["waves"].setdefault(
-        n, {"status": "pending", "branch": "—", "pr": "—", "evidence": "—", "updated": "—"}
+        n, {"status": "pending", "branch": "—", "pr": "—", "evidence": "—",
+            "bundle": "", "updated": "—"}
     )
 
 
@@ -654,72 +665,90 @@ def _audit_block_brief(root: Path, spec_dir: Path, phase: str) -> str:
 
 
 
+def _resolve_bundle(root: Path, feature: str, run_id: str) -> Path | None:
+    return evidence_bundles.resolve_bundle(root, feature, run_id)
+
+
 def _evidence_error(
     root: Path,
     feature: str,
     wave: int | None = None,
     required_waves: set[int] | None = None,
+    bundle: str = "",
 ) -> str:
     """ADR 0007: completion is proven only by verifying evidence bundles.
 
     `wave=N` requires a bundle recorded for that wave. Feature close-out
     (`wave=None`) accepts a feature-level bundle (`wave` 0/None) or, when
     `required_waves` is given, one verified bundle for every done wave —
-    a single later-wave bundle must not prove the whole feature.
+    a single later-wave bundle must not prove the whole feature. `bundle`
+    pins the check to one run id instead of "any verifying bundle".
     """
     roots = [
         evidence_bundles.bundle_root(root),
         evidence_bundles.bundle_root(root, tracked=True),
     ]
+    pinned = None
+    if bundle.strip():
+        pinned = _resolve_bundle(root, feature, bundle)
+        if pinned is None:
+            return (
+                f"ERROR: --bundle={bundle.strip()} does not resolve to an "
+                f"evidence bundle for {feature!r} under {roots[0]} or "
+                f"{roots[1]}."
+            )
     rejected: list[str] = []
     covered: set[int] = set()
-    for base in roots:
-        feature_dir = base / feature
-        if not feature_dir.is_dir():
-            continue
-        runs = sorted(
-            (b for b in feature_dir.iterdir() if b.is_dir()),
-            key=lambda b: b.name,
-            reverse=True,  # newest run first: the run just captured matches
-        )
-        for bundle in runs:
-            if not (bundle / "evidence.json").is_file():
-                continue
-            if not (bundle / "index.html").is_file():
-                rejected.append(f"{bundle.name}: not rendered (no index.html)")
-                continue
-            try:
-                manifest = evidence_bundles.load(bundle)
-            except evidence_bundles.EvidenceError as ex:
-                rejected.append(f"{bundle.name}: invalid manifest ({ex})")
-                continue
-            recorded_wave = manifest.get("wave")
-            if wave is not None and recorded_wave != wave:
-                rejected.append(
-                    f"{bundle.name}: records wave {recorded_wave}, not wave {wave}"
+    if pinned is not None:
+        run_list = [pinned]
+    else:
+        run_list = []
+        for base in roots:
+            feature_dir = base / feature
+            if feature_dir.is_dir():
+                run_list += sorted(
+                    (b for b in feature_dir.iterdir() if b.is_dir()),
+                    key=lambda b: b.name,
+                    reverse=True,  # newest run first: the run just captured matches
                 )
-                continue
-            report = evidence_bundles.verify(bundle, repo=root)
-            if not report.ok:
-                why = "; ".join(f.message for f in report.errors[:2])
-                rejected.append(f"{bundle.name}: verify failed ({why})")
-                continue
-            proof = evidence_bundles.tdd_proof(manifest)
-            if not proof["ok"]:
-                why = "; ".join(proof["problems"][:3])
-                rejected.append(f"{bundle.name}: TDD proof incomplete ({why})")
-                continue
-            if wave is not None or required_waves is None:
-                return ""
-            if recorded_wave in (None, 0):
-                return ""
-            if recorded_wave in required_waves:
-                covered.add(recorded_wave)
-                continue
+    for bundle in run_list:
+        if not (bundle / "evidence.json").is_file():
+            continue
+        if not (bundle / "index.html").is_file():
+            rejected.append(f"{bundle.name}: not rendered (no index.html)")
+            continue
+        try:
+            manifest = evidence_bundles.load(bundle)
+        except evidence_bundles.EvidenceError as ex:
+            rejected.append(f"{bundle.name}: invalid manifest ({ex})")
+            continue
+        recorded_wave = manifest.get("wave")
+        if wave is not None and recorded_wave != wave:
             rejected.append(
-                f"{bundle.name}: records wave {recorded_wave}, "
-                "not required for finish"
+                f"{bundle.name}: records wave {recorded_wave}, not wave {wave}"
             )
+            continue
+        report = evidence_bundles.verify(bundle, repo=root)
+        if not report.ok:
+            why = "; ".join(f.message for f in report.errors[:2])
+            rejected.append(f"{bundle.name}: verify failed ({why})")
+            continue
+        proof = evidence_bundles.tdd_proof(manifest)
+        if not proof["ok"]:
+            why = "; ".join(proof["problems"][:3])
+            rejected.append(f"{bundle.name}: TDD proof incomplete ({why})")
+            continue
+        if wave is not None or required_waves is None:
+            return ""
+        if recorded_wave in (None, 0):
+            return ""
+        if recorded_wave in required_waves:
+            covered.add(recorded_wave)
+            continue
+        rejected.append(
+            f"{bundle.name}: records wave {recorded_wave}, "
+            "not required for finish"
+        )
 
     if required_waves is not None:
         missing = sorted(w for w in required_waves if w not in covered)
@@ -1038,6 +1067,7 @@ def ship_loop(
     wave: int = 0,
     note: str = "",
     pr: str = "",
+    bundle: str = "",
     branch: str = "",
     gate: str = "",
     status: str = "",
@@ -1072,10 +1102,14 @@ def ship_loop(
       wave: Wave number for start/complete/reset.
       note: Evidence (complete), reason (block), or waiver/failure reason (gate).
       pr: PR reference recorded on complete.
+      bundle: Proof-bundle run id for `complete` — pins completion to one
+        verified bundle instead of "any verifying bundle"; recorded on the
+        wave row as `bundle`.
       branch: Branch name recorded on start (default feat/<feature>-w<N>).
       gate: Gate id for `gate` (e.g. G1).
       status: Gate status for `gate`: pending|met|waived|failed.
-      evidence: Proof recorded when a gate is marked met.
+      evidence: Proof recorded when a gate is marked met — `evidence:<run-id>`
+        pins it to a verified proof bundle under either evidence root.
       waived_by: Human who approved a waiver (required with `--status=waived`).
       max_iterations: Hard stop after this many `next` calls (default 25).
       review: `required` (default) or `advisory`. When required, the loop
@@ -1244,6 +1278,31 @@ def ship_loop(
                                 + ". Fill it (or declare `N/A — <reason>`) "
                                 "before marking this gate met (D019)"
                             )
+                ev = evidence.strip()
+                if ev.lower().startswith("evidence:"):
+                    rid = ev.split(":", 1)[1].strip()
+                    bdir = _resolve_bundle(root, d.name, rid)
+                    if bdir is None:
+                        return (
+                            f"ERROR: evidence bundle `{rid}` not found for "
+                            f"{d.name} under either evidence root"
+                        )
+                    try:
+                        bman = evidence_bundles.load(bdir)
+                    except evidence_bundles.EvidenceError as ex:
+                        return f"ERROR: evidence bundle `{rid}` invalid ({ex})"
+                    if bman.get("kind") == "walkthrough":
+                        return (
+                            "ERROR: walkthrough bundles are companion media, "
+                            "not gate evidence — bind a proof bundle"
+                        )
+                    rep = evidence_bundles.verify(bdir, repo=root)
+                    if not rep.ok:
+                        why = "; ".join(f.message for f in rep.errors[:2])
+                        return (
+                            f"ERROR: evidence bundle `{rid}` fails verify "
+                            f"({why})"
+                        )
                 row.update({"status": "met", "evidence": _clean(evidence), "updated": _now()})
                 _event(state, f"gate {gid} met: {_clean(evidence)}")
             elif status == "waived":
@@ -1303,19 +1362,23 @@ def ship_loop(
                 return f"ERROR: wave {wave} is not in WAVES.md"
             if not note.strip():
                 return "ERROR: --note is required — record the evidence (tests, CI, demo)"
-            ev_err = _evidence_error(root, d.name, wave)
+            ev_err = _evidence_error(root, d.name, wave, bundle=bundle)
             if ev_err and not force:
                 return ev_err
             row = _wave(state, wave)
             if row["status"] != "in-progress" and not force:
                 return f"ERROR: wave {wave} is {row['status']}, not in-progress (or --force)"
+            pinned = _resolve_bundle(root, d.name, bundle) if bundle.strip() else None
             row.update({
                 "status": "done",
                 "pr": _clean(pr) if pr else row.get("pr", "—"),
                 "evidence": _clean(note),
+                "bundle": pinned.name if pinned else row.get("bundle", ""),
                 "updated": _now(),
             })
-            _event(state, f"complete wave {wave}" + (f" ({pr})" if pr else "") + f": {_clean(note)}")
+            _event(state, f"complete wave {wave}" + (f" ({pr})" if pr else "")
+                      + (f" [bundle {pinned.name}]" if pinned else "")
+                      + f": {_clean(note)}")
             _save_state(d, state)
             return (f"Recorded wave {wave} done.\n\n" + _summary(root, d, state, waves, budget, review)
                     + "\n\n" + _decide(root, d, state, waves, review))

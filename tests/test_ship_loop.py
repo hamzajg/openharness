@@ -538,6 +538,60 @@ def test_finish_requires_rendered_evidence_bundle(tmp_path):
     assert out.startswith("ERROR") and "harness_evidence" in out
 
 
+def test_complete_binds_the_named_bundle(tmp_path):
+    """--bundle pins completion to one run and records it on the wave row."""
+    d = _spec(tmp_path)
+    _run(tmp_path, action="start", wave=1)
+    out = _run(tmp_path, action="complete", wave=1, note="ok", bundle="run-w1")
+    assert "Recorded wave 1 done" in out
+    state = json.loads((d / "LOOP.state.json").read_text())
+    assert state["waves"]["1"]["bundle"] == "run-w1"
+    assert "evidence:run-w1" in (d / "LOOP.md").read_text()
+
+
+def test_complete_rejects_a_bundle_for_another_wave(tmp_path):
+    _spec(tmp_path)
+    _run(tmp_path, action="start", wave=1)
+    out = _run(tmp_path, action="complete", wave=1, note="ok", bundle="run-w2")
+    assert out.startswith("ERROR")
+    assert "records wave 2, not wave 1" in out
+
+
+def test_complete_rejects_an_unknown_bundle(tmp_path):
+    _spec(tmp_path)
+    _run(tmp_path, action="start", wave=1)
+    out = _run(tmp_path, action="complete", wave=1, note="ok", bundle="nope")
+    assert out.startswith("ERROR") and "does not resolve" in out
+
+
+def test_gate_met_accepts_a_verified_bundle_token(tmp_path):
+    d = _spec(tmp_path)
+    out = _run(tmp_path, action="gate", gate="G0", status="met",
+               evidence="evidence:run-w1")
+    assert "Gate G0 met" in out
+    assert "evidence:run-w1" in (d / "LOOP.md").read_text()
+
+
+def test_gate_met_rejects_an_unresolvable_bundle_token(tmp_path):
+    _spec(tmp_path)
+    out = _run(tmp_path, action="gate", gate="G1", status="met",
+               evidence="evidence:no-such-run")
+    assert out.startswith("ERROR") and "not found" in out
+
+
+def test_gate_met_rejects_a_walkthrough_bundle(tmp_path):
+    """Walkthroughs are companion media — never gate evidence."""
+    _spec(tmp_path)
+    wt = evidence.new_bundle(
+        tmp_path, "cart-checkout", wave=1, head="abc1234",
+        run="wt-1", kind="walkthrough",
+    )
+    (wt / "index.html").write_text("<html/>")
+    out = _run(tmp_path, action="gate", gate="G1", status="met",
+               evidence="evidence:wt-1")
+    assert out.startswith("ERROR") and "walkthrough" in out
+
+
 # ---------- multi-feature / errors ----------
 
 def test_moves_to_next_feature_after_one_is_done(tmp_path):

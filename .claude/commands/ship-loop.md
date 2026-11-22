@@ -78,8 +78,8 @@ disk.
 | Moment | Command |
 |---|---|
 | Before you touch code | `--action=start --wave=N` |
-| After green CI + review | `--action=complete --wave=N --pr="#<n>" --note="<tests N/N, CI green, demo: ...>"` |
-| Agent-owned gate is satisfied | `--action=gate --gate=G1 --status=met --evidence="file:docs/x.md / command output"` |
+| After green CI + review | `--action=complete --wave=N --pr="#<n>" --note="<tests N/N, CI green, demo: ...>" --bundle="<run-id>"` |
+| Agent-owned gate is satisfied | `--action=gate --gate=G1 --status=met --evidence="file:docs/x.md / command output"` — or pin a proof bundle with `--evidence="evidence:<run-id>"` (verified under either evidence root; walkthroughs do not qualify) |
 | Gate needs a human | `--action=block --note="G1: <decision or access needed>"`; after resolution record `met`/`waived`, then `--action=resume` |
 | Human waived a gate | `--action=gate --gate=G1 --status=waived --waived-by="<name>" --note="<reason>"` |
 | Human must decide something | `--action=block --note="<exactly what must be decided>"` |
@@ -127,6 +127,9 @@ them.
    redact tokens in output.
 3. Before `complete`: `--action=render` then `--action=verify` (hashes,
    commit, secrets). Fix what verify reports; never commit the bundle.
+   Then record the run id with `--bundle="<run-id>"` on `complete` — the
+   wave row keeps the binding (`evidence:<run-id>`) so the audit can
+   re-check it later.
 4. UI media can also go in a companion walkthrough bundle —
    `--action=new ... --kind=walkthrough` (same feature/wave, scratch
    root only). It holds screenshots, recordings and log summaries for
