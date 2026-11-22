@@ -7,6 +7,14 @@ type: principles
 ## KISS
 Keep It Simple, Stupid. No frameworks beyond the explicitly listed ones. No abstractions "for the future." Complexity budget D003 is enforced on every commit.
 
+## Sustainable Outcomes (D018)
+Good software is not code volume. It solves a meaningful problem for
+identified users, creates measurable value, delivers it reliably, and stays
+economically sustainable to operate and evolve. Judge work on five dimensions
+— business/user value, economic viability, UX/adoption, technical/operational
+quality, and adaptability/longevity — and report outcomes, not output. These
+are lenses for judgment, not a scoring engine.
+
 ## Agent-Agnostic
 No harness code may import or reference a specific vendor SDK. Agent differences are handled only in Markdown command files and thin "observer" modules that tail agent session log files.
 
@@ -229,3 +237,34 @@ while it is still cheap to change direction; leaving outcome measurement
 after release keeps the oracle honest about what it can know. The contract is
 a short spec field and an existing gate mechanism — no scoring engine, no ROI
 calculator, no business dashboard, no new runtime module (ADR 0009).
+
+### D018 — Good software is sustainable outcomes, not output
+
+Rule: Judge every feature and decision on five dimensions:
+(1) business and user value — a real problem and a meaningful outcome;
+(2) economic viability — lifecycle benefit justifies build, operate, adopt,
+migrate and support cost; (3) UX and adoption — users can and actually do
+achieve their objectives; (4) technical and operational quality — correct,
+secure, reliable, performant and maintainable; (5) adaptability and longevity
+— the system can evolve without disproportionate cost.
+
+Quality has three levels: product (works for its users), system (behaves
+correctly and safely) and business (remains a good investment). Technical
+quality is an enabler, not the goal. Delivery reports lead with outcome
+evidence — time, error rate, adoption, cost — and treat features, APIs and
+coverage as supporting output. A technically excellent system nobody uses, a
+popular system that loses money indefinitely, and a profitable system that
+risks customer data are all failures of different dimensions.
+
+These dimensions are advisory lenses in `product-framer`,
+`challenge_decision` and `delivery-auditor`; they never become a score, a
+dashboard, a gate or a runtime module. D017's value contract remains the
+pre-planning artifact. KISS remains the implementation discipline: prefer the
+simplest intervention that delivers the outcome, including not building it.
+
+Because: AI lowers the cost of producing code, not the cost of producing the
+wrong code. Cheap implementation makes wrong problems, unnecessary
+complexity, duplicate capability, security and operational debt, and unused
+software more expensive relative to the code itself. The scarce work is
+choosing what is worth building, validating assumptions, integrating with
+real processes, and measuring whether the outcome improved (ADR 0010).

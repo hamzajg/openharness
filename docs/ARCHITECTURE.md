@@ -1,7 +1,7 @@
 # Architecture — openharness
 
 Current-state map. Descriptive, not aspirational; normative decisions live
-in `SELF/PRINCIPLES.md` (D001–D017). See `docs/adr/` for the baseline record.
+in `SELF/PRINCIPLES.md` (D001–D018). See `docs/adr/` for the baseline record.
 
 ## Dual role
 
@@ -62,7 +62,9 @@ OpenHarness is simultaneously:
   without a filled verdict (D013); the audit never marks a gate.
   Copy honesty is judged by `delivery-auditor` from Scope(out) and changed
   UI copy; the deterministic brief deliberately does not match capability
-  terms — context decides whether wording is a promise.
+  terms — context decides whether wording is a promise. The same auditor
+  judges outcomes over output (D018): outcome evidence against feature/API/
+  coverage counts, with unmeasured outcomes recorded as unverified.
 - **Decision review:** `/challenge-decision` → `challenge_decision` builds a
   deterministic brief (record completeness, heuristic code signals, design
   moves, lens questions) → `decision-challenger` supplies alternatives,

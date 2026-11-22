@@ -71,6 +71,11 @@ If the source is missing, ask. Do not invent a decision.
    - **Craftsmanship:** smallest reversible step, intention-revealing
      names, explicit error model, no speculative abstraction, documented
      migration.
+   - **Sustainable outcomes (D018):** judge the decision across business/
+     user value, economic viability, UX/adoption, technical/operational
+     quality, and adaptability/longevity. Name the dimensions it improves
+     and any it makes worse. Prefer the simplest option that delivers the
+     outcome; "do nothing" is valid. No score replaces judgment.
    - **Problem and forces / decision record:** dominant constraint,
      recorded alternatives, consequences, owner and status, revisit
      trigger.

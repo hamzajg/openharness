@@ -88,11 +88,13 @@ If the PR or branch is missing, inspect `specs/<feature>/LOOP.md` and
        refactor step changed no observable behavior (no weakened or
        deleted assertions).
 
-4. **Check for regressions.**
+4. **Check for regressions and unnecessary scope.**
    - Look for changed behavior outside the wave's scope.
    - Look for broken public contracts.
    - Look for removed error handling.
    - Look for weakened tests.
+   - Look for duplicate capability, speculative abstraction, or new
+     operational surface with no stated need (D018).
 
 5. **Check hygiene.**
    - Secrets, credentials, `.env` files.

@@ -84,6 +84,9 @@ All waves must be recorded done. If not, report that. Do not validate.
    - Keep acceptance validation separate from user-outcome evaluation.
      `ship_loop --action=finish` means acceptance-validated; it does not
      mean merged or deployed.
+   - Report outcomes before output (D018): lead with the value contract's
+     target and any real evidence; features, APIs and coverage are supporting
+     output. Name the five dimensions the release improves or puts at risk.
    - In `VALIDATION.md`, record an `Outcome follow-up` with the observed
      signal/result and its source after release. If it is not released yet,
      leave the status pending with an owner/review date. This is not a finish

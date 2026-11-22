@@ -1,7 +1,8 @@
 # ADR 0009 — Outcomes over output: the value contract
 
-Status: accepted · 2026-11-21 · relates to D009 (delivery loop),
-D010 (gates), D011 (advisory design review), D013 (delivery audit), D017
+Status: accepted · 2026-11-21 · extended by D018 (ADR 0010) · relates to
+D009 (delivery loop), D010 (gates), D011 (advisory design review), D013
+(delivery audit), D017
 
 ## Context
 

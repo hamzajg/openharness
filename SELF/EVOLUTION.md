@@ -5,7 +5,7 @@ type: rules
 # Rules for Agents Modifying the Harness
 
 ## Before You Change Anything
-1. **Read `SELF/PRINCIPLES.md` first.** Every decision D001–D017 is binding precedent.
+1. **Read `SELF/PRINCIPLES.md` first.** Every decision D001–D018 is binding precedent.
 2. Never violate a standing decision. If you must, **append D00N+1** with rationale that **explicitly supersedes** it. Reference the old decision by number.
 
 ## Block Spec Contract

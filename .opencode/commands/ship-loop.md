@@ -290,6 +290,10 @@ branch. Never commit secrets or `.env` files. One logical change per PR.
   an observable signal, and an owner/review date when known. Never invent
   user research or baselines; the numeric target is the explicit
   value-contract claim.
+- Report outcomes, not output (D018): lead with the value contract's target
+  and whatever real evidence exists; features, APIs and coverage are
+  supporting output. Name the five dimensions the release improves and any
+  it makes worse. Unmeasured outcomes stay unverified, not implied.
 - The harness protocol does not sandbox agents. Read the target repo's
   `AGENTS.md` and layered `.openharness/ENV.md`; follow host permission
   prompts and least-privilege settings. Do not broaden filesystem, network,
