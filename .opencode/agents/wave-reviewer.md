@@ -90,8 +90,9 @@ If the PR or branch is missing, inspect `specs/<feature>/LOOP.md` and
    - For UI-touching waves, check the companion walkthrough bundle
      (`kind: "walkthrough"` in `.openharness/evidence/<feature>/<run>/
      evidence.json`): it should carry the screenshots/recordings the
-     scenarios imply. Missing or mismatched media is a concern, not a
-     blocker — the proof bundle remains the gate evidence.
+     scenarios imply — via the Playwright fixture's `steps-*.json`
+     fragments or direct `attach`. Missing or mismatched media is a
+     concern, not a blocker — the proof bundle remains the gate evidence.
    - Check the domain and experience contracts when the spec has them
      (D019):
      - `DOMAIN.md` terms are used consistently — code, scenario names and

@@ -60,6 +60,8 @@ def harness_evidence(
     fragment: str = "",
     tracked: bool = False,
     kind: str = "proof",
+    out_dir: str = "e2e",
+    force: bool = False,
 ) -> str:
     """Capture, render, verify or list evidence bundles (ADR 0007).
 
@@ -79,7 +81,11 @@ def harness_evidence(
       new     Create an empty bundle + manifest (feature required).
       step    Run a command; record exit code, duration and log.
       attach  Add a file to a step (copies it under raw/<step>/) or fold a
-              steps.json fragment into the manifest.
+              steps.json fragment into the manifest. Fragment artifacts may
+              be source files ({path, caption?}) — attach copies and hashes
+              them — or manifest-ready entries (path+mime+sha256+bytes).
+      fixture Write a Playwright evidence fixture into the repo (out_dir,
+              default e2e/); it emits steps-*.json fragments for `attach`.
       render  Write index.html + SUMMARY.md from evidence.json.
       verify  Check manifest, artifacts, hashes, commit, secrets, tracking.
               Raises (CLI exit 2) when anything is wrong.
@@ -113,12 +119,19 @@ def harness_evidence(
       by: Who captured a manual artifact.
       fragment: Path to a JSON fragment (steps.json) to fold into the manifest.
         An artifact `role` omitted by the fragment is inferred from its MIME
-        type and file name, exactly as `attach --file` does.
+        type and file name, exactly as `attach --file` does. Artifacts may
+        also be source files (`path` only): attach resolves them relative to
+        the fragment's directory then cwd, copies them under raw/<step>/,
+        and computes mime/sha256/bytes itself — the same staleness guard and
+        `--allow-old` override as `attach --file` apply.
       tracked: On `new`, place the bundle under `evidence/` (committable)
         instead of the gitignored scratch root.
       kind: On `new`, `proof` (default — the wave/finish evidence ship_loop
         verifies) or `walkthrough` (local-only companion material: screenshots,
         recordings, log summaries; cannot be combined with `tracked`).
+      out_dir: On `fixture`, subdirectory of `repo` that receives the
+        generated Playwright fixture (default `e2e`).
+      force: On `fixture`, overwrite an existing fixture file.
     """
     repo_path = Path(repo)
     action = (action or "list").strip().lower()
@@ -243,6 +256,10 @@ def harness_evidence(
                 raise SkillError("fragment must be a step object or a list of step objects")
 
             manifest = evidence.load(target)
+            frag_base = (
+                fragment_path.parent if fragment_path.is_file() else Path.cwd()
+            )
+            frag_redactions: list[dict] = []
             existing = {s.get("id") for s in manifest["steps"]}
             folded = []
             for step_data in steps_in:
@@ -256,15 +273,38 @@ def harness_evidence(
                     raise SkillError(f"fragment status must be one of {evidence.STATUSES}")
                 if step_data["id"] in existing:
                     raise SkillError(f"step {step_data['id']!r} already exists")
+                new_arts = []
                 for art in step_data.get("artifacts") or []:
-                    for key in ("path", "mime", "sha256", "bytes"):
-                        if key not in art:
-                            raise SkillError(f"artifact missing required field: {key}")
-                    # `role` is a label, not a proof: infer it from MIME/suffix
-                    # when the producer omitted it, exactly like `attach --file`.
-                    # An explicit role always wins.
-                    if not str(art.get("role") or "").strip():
-                        art["role"] = evidence._role_for(art["mime"], Path(art["path"]))
+                    if not isinstance(art, dict) or not str(art.get("path") or "").strip():
+                        raise SkillError("fragment artifact requires a path")
+                    if "sha256" in art:
+                        # Manifest-ready form: bundle-relative path with a
+                        # producer-supplied digest — recorded as-is.
+                        for key in ("mime", "sha256", "bytes"):
+                            if key not in art:
+                                raise SkillError(f"artifact missing required field: {key}")
+                        # `role` is a label, not a proof: infer it from
+                        # MIME/suffix when omitted; explicit wins.
+                        if not str(art.get("role") or "").strip():
+                            art["role"] = evidence._role_for(art["mime"], Path(art["path"]))
+                        new_arts.append(art)
+                    else:
+                        # Source-file form: a real file the harness copies
+                        # into raw/<step>/ and hashes itself.
+                        try:
+                            norm, reds = evidence.fragment_artifact(
+                                target,
+                                str(step_data["id"]),
+                                art,
+                                frag_base,
+                                started_at=str(step_data.get("started_at") or ""),
+                                allow_old=allow_old,
+                            )
+                        except evidence.EvidenceError as ex:
+                            raise SkillError(str(ex)) from ex
+                        frag_redactions.extend(reds)
+                        new_arts.append(norm)
+                step_data["artifacts"] = new_arts
                 existing.add(step_data["id"])
                 folded.append(step_data)
 
@@ -289,6 +329,7 @@ def harness_evidence(
                     manual["captured_by"] = by.strip()
                 manifest["steps"].append(manual)
             manifest["steps"].extend(folded)
+            manifest.setdefault("redactions", []).extend(frag_redactions)
             evidence._write_manifest(target, manifest)
             names = ", ".join(f"{s['id']} ({s['status']})" for s in folded)
             arts = sum(len(s.get("artifacts") or []) for s in folded)
@@ -297,6 +338,42 @@ def harness_evidence(
                 f"  artifacts: {arts}\n"
                 "Next: `--action=render`."
             )
+
+    if action == "fixture":
+        template = Path(__file__).with_name("evidence_playwright_fixture.ts")
+        if not template.is_file():
+            raise SkillError(f"fixture template missing: {template}")
+        out_dir = Path(out_dir.strip() or "e2e")
+        if out_dir.is_absolute() or ".." in out_dir.parts:
+            raise SkillError("out_dir must be a relative path inside the repo")
+        target = repo_path / out_dir / "evidence.fixture.ts"
+        if target.exists() and not force:
+            raise SkillError(
+                f"{target} already exists — pass --force to overwrite "
+                "or edit it in place (the fixture belongs to the repo)"
+            )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(template.read_text())
+
+        warn = ""
+        pkg = repo_path / "package.json"
+        if pkg.is_file() and "@playwright/test" not in pkg.read_text(errors="replace"):
+            warn = (
+                "\nWarning: package.json does not list @playwright/test — "
+                "install it and `npx playwright install` first."
+            )
+        return (
+            f"Wrote {target}\n"
+            "Next: import { test, expect } from it in your spec, run with "
+            "EVIDENCE_RUN_DIR set, then fold the emitted steps-*.json into a "
+            "walkthrough bundle:\n"
+            f"  EVIDENCE_RUN_DIR=/tmp/walk npx playwright test <spec>\n"
+            f"  python -m openharness run harness_evidence --action=new "
+            f"--repo={repo_path} --feature=<feature> --wave=<n> --kind=walkthrough\n"
+            "  python -m openharness run harness_evidence --action=attach "
+            "--bundle=<bundle> --fragment=$EVIDENCE_RUN_DIR/steps-<spec>.json"
+            f"{warn}"
+        )
 
     if action in ("render", "verify"):
         target = _resolve(repo_path, bundle, feature)
@@ -335,5 +412,6 @@ def harness_evidence(
         return "\n".join(lines)
 
     raise SkillError(
-        f"unknown action {action!r} (list|new|step|attach|render|verify)"
+        f"unknown action {action!r} "
+        "(list|new|step|attach|fixture|render|verify)"
     )

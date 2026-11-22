@@ -131,6 +131,10 @@ them.
    `--action=new ... --kind=walkthrough` (same feature/wave, scratch
    root only). It holds screenshots, recordings and log summaries for
    local review; it is companion material, never the wave's proof.
+   Playwright repos: generate the fixture once with
+   `--action=fixture --repo=<repo>`, run the wave's spec with
+   `EVIDENCE_RUN_DIR` set, then fold each `steps-<spec>.json` with
+   `--action=attach --fragment=<run>/steps-<spec>.json`.
 5. `SUMMARY.md` can be pasted into the PR body or the LOOP evidence
    column.
 

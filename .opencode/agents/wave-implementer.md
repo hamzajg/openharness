@@ -131,9 +131,13 @@ If an input is missing, ask for it. Do not change code first.
        --feature=<feature> --wave=<n> --kind=walkthrough
      ```
 
-     Attach screenshots, short recordings and a summarized log to it. It
-     stays in the local scratch root (never `--tracked`), and the PR body
-     links both run ids.
+     In Playwright repos, generate the fixture once
+     (`--action=fixture --repo=<repo>`), run the wave's spec with
+     `EVIDENCE_RUN_DIR` set, and fold each emitted `steps-<spec>.json`
+     with `--action=attach --fragment=<run>/steps-<spec>.json`. Otherwise
+     attach screenshots, short recordings and a summarized log directly.
+     The bundle stays in the local scratch root (never `--tracked`), and
+     the PR body links both run ids.
 
 7. **Commit.**
    - Use conventional messages (`feat:`, `fix:`, `test:`, `chore:`).

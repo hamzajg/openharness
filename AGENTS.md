@@ -179,7 +179,10 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   per the capture policy in `docs/plans/evidence-v2.md`; the harness
   never drives browsers itself. Bundles declare `kind`: `proof`
   (default, gate evidence) or `walkthrough` (local-only companion
-  material — `--kind=walkthrough`, never `--tracked`).
+  material — `--kind=walkthrough`, never `--tracked`). UI walkthroughs
+  are produced by `--action=fixture` (generates a Playwright fixture
+  per repo) emitting `steps-*.json` fragments folded in with
+  `--action=attach --fragment`.
 - Never mark a gate `met` without evidence or `waived` without a human's name
   and reason. Fix a wrong gate in `GATES.md`; do not route around it.
 - `/challenge-decision` verdicts stay advisory: never make a verdict a gate
