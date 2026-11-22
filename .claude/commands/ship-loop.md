@@ -142,7 +142,9 @@ them.
    screenshots, recordings and logs via `adb`/`xcrun simctl` and attaches
    them (missing tools fail with an install hint).
 5. `SUMMARY.md` can be pasted into the PR body or the LOOP evidence
-   column.
+   column. To hand the bundle off, `--action=share` writes
+   `<run-id>.zip` + `.sha256`; `--action=prune --keep=N` trims old
+   scratch runs without touching loop-referenced bundles.
 
 ## Gates
 
