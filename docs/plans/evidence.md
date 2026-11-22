@@ -77,20 +77,18 @@ Concretely:
    page reports what was scrubbed. Binary media is marked "not scanned" rather
    than implied clean.
 
-## Two evidence tiers (implemented)
+## Two evidence tracks (implemented)
 
-Every bundle declares `kind` in its manifest (absent = `proof`):
-
-- **`proof`** — the wave/finish evidence `ship_loop` verifies: TDD steps,
-  commit binding, rendered page. Lives in `.openharness/evidence/` scratch
-  by default; `--tracked` on `new` places it under `evidence/` to be
-  committed when a run's proof should travel with the repo.
-- **`walkthrough`** — local-only companion material: screenshots,
-  recordings, summarized logs for human review. `new --kind=walkthrough`
-  always lands in the scratch root (`--tracked` is refused) and `verify`
-  warns `walkthrough-in-tracked-root` if one is moved under `evidence/`.
-  Per-wave optional; it is not gate evidence — it carries no `tdd:` steps,
-  so `tdd_proof` cannot pass on it.
+Every bundle declares `kind` in its manifest (absent = `proof`) — the two
+tracks of this plan. Track A is proof: the wave/finish evidence
+`ship_loop` verifies (TDD steps, commit binding, rendered page), in
+`.openharness/evidence/` scratch by default or `evidence/` when `--tracked`
+commits it with the repo. Track B is walkthrough: local-only companion
+material (screenshots, recordings, summarized logs) that `new
+--kind=walkthrough` always places in scratch (`--tracked` refused), `verify`
+warns `walkthrough-in-tracked-root` if moved under `evidence/`, and which is
+never gate evidence — it carries no `tdd:` steps, so `tdd_proof` cannot
+pass on it.
 
 ## Manifest (schema `openharness.evidence/2`)
 
@@ -148,7 +146,7 @@ New optional fields: `capture`, `step.covers`, `step.checks`,
 `EXAMPLES.feature`. It is what makes the coverage matrix possible and what
 turns "I clicked around" into "AC5 was exercised by step s3".
 
-## Capture surface
+## Capture surface (Track B producers)
 
 | Source | How it is produced | Artifacts | Default |
 |---|---|---|---|
@@ -179,7 +177,7 @@ Rules the skill enforces:
 - Video is copied as captured. `--compress` uses `ffmpeg` when present and
   records the command; it is never required.
 
-## Capture policy (recommended and enforced)
+## Capture policy (Track B)
 
 | Artifact | When | Retention |
 |---|---|---|
@@ -192,7 +190,7 @@ Rules the skill enforces:
 `--action=prune --keep=3` keeps the newest three runs per feature. It never
 deletes a bundle referenced by a `LOOP.md` row or a gate.
 
-## Walkthrough page
+## Walkthrough page (Track B)
 
 One HTML file, inline CSS and ~3 KB vanilla JS, no CDN, no fonts, no network.
 Opens from `file://`. Sections in review order:
@@ -245,7 +243,7 @@ Create, edit, and delete a photo note; empty note rejected.
 **Not verified:** rotation on a physical device; tablet layout
 ```
 
-## Sharing
+## Sharing (Track B)
 
 | Mode | What it is | When |
 |---|---|---|
@@ -270,30 +268,75 @@ Heavy media can be split into a second artifact with `if: failure()`. The PR
 comment carries `SUMMARY.md` plus the artifact link; the harness does not post
 it itself (no network in the skill).
 
-## Loop wiring
+## Loop wiring (Track A — proof)
 
-- `ship_loop complete --wave=N --evidence=evidence:<run-id>` accepts a bundle
-  token. Before recording the wave as done it runs `evidence.verify`, checks
-  `manifest.repo.head` against the wave head, and refuses a `fail` verdict.
-- `review_delivery` gains four findings:
-  - `stale-evidence` — bundle head does not match the wave head.
-  - `evidence-contradicts-loop` — bundle verdict `fail` on a wave recorded
-    `done`.
-  - `ui-wave-without-media` — changed paths touch web/mobile and no step has
-    an image or video artifact.
-  - `unverified-evidence` — bundle missing, invalid, or `verify` errors.
-- Agent-owned gates may use `evidence:<run-id>` as their evidence; `ship_loop
-  gate` verifies it before marking the gate met. Human-owned gates still need
-  a named human.
-- `LOOP.md` rows may carry `evidence:<run-id>`; the page and the row point at
-  each other.
+Track A owns everything the loop enforces. Track B (walkthrough media)
+never satisfies a gate and is never required by one.
+
+- `ship_loop complete --wave=N --bundle=<run-id>` binds a specific verified
+  bundle to the wave row; `--evidence="evidence:<run-id>"` does the same
+  for agent-owned gates. Before recording, the oracle runs
+  `evidence.verify`, requires the manifest's wave to match, and refuses a
+  `fail` verdict. `manifest.repo.head` binds to an ancestor of HEAD — a
+  bundle proves the run at its recorded commit; later commits do not
+  stale it.
+- `review_delivery` findings on proof bundles: `stale-evidence` (bound
+  bundle no longer resolves/verifies), `evidence-contradicts-loop` (verdict
+  `fail` on a `done` wave), `unbound-wave-evidence` (done wave with no
+  bundle recorded — legacy visibility, not a blocker).
+- `LOOP.md`/`LOOP.state.json` wave rows carry the bound `bundle` run-id;
+  the page and the row point at each other.
+- **Media ownership rule:** UI screenshots, recordings and `covers`
+  coverage live in Track B walkthrough bundles. A proof bundle is never
+  required to carry media; `ui-wave-without-media`-style checks, when
+  built, evaluate walkthrough bundles only.
 
 Waves without a bundle keep today's free-text rules. This is additive, not a
 tax on docs-only work.
 
-## Implementation plan
+## Implementation plan — two tracks
 
-### P2a — capture core (no browser) — ✅ implemented 2026-11-17
+One evidence system, two tracks matching the manifest `kind` field.
+
+### Track A — proof (gate evidence)
+
+Compact, reviewable, tracked-eligible. Commands, logs, TDD steps,
+commit-bound verdicts. This is what `ship_loop` and gates check.
+
+- **A1 — contract, verify, render, TDD** — ✅ shipped.
+  Manifest + schema, `verify` (hashes, secrets, commit binding, tracking
+  split), generated page/`SUMMARY.md`, `step`/`attach` with redaction,
+  `tdd_proof` ordering, `complete`/`finish` enforcement.
+- **A2 — loop binding** — in progress.
+  `--bundle=<run-id>` on `complete`, `evidence:<run-id>` gate tokens,
+  ancestor commit binding, `review_delivery` proof findings, LOOP.md
+  bundle field.
+- **A3 — verdict depth (future).** CI-sha cross-checks, per-AC `covers`
+  on proof steps if wanted; kept deliberately small — proof stays cheap.
+
+### Track B — walkthrough (local media)
+
+Rich, local-only, never gate evidence. Screenshots, recordings, traces,
+log summaries for human review.
+
+- **B1 — capture + producers** — ✅ shipped.
+  `step`/`attach`/redaction (shared primitives), `attach --fragment`
+  with manifest-ready and source-file artifact forms, `--action=fixture`
+  generating the Playwright fixture per repo, `kind:"walkthrough"`
+  bundles.
+- **B2 — device capture.** `--action=capture --device=android|ios`
+  shelling to `adb`/`xcrun` when present (install hint when not);
+  `attach --by=<name>` for manual captures. Electron desktop and native
+  mobile emit the same fragment — no second fixture needed.
+- **B3 — page depth.** Coverage matrix (AC/scenario → step → artifact via
+  `covers`), thumbnails in the timeline, lightbox, video poster/chapters,
+  client-side log filter/copy, explicit `--inline` linked-files list.
+- **B4 — sharing and retention.** `--action=share` zip + sha256,
+  `--action=prune --keep=N` (never deletes a bundle referenced by
+  LOOP.md), CI artifact template, opt-in `--public` sanitized copy with
+  human approval.
+
+### Shipped-phase detail (was P2a/P2b)
 
 - `harness_evidence --action=step --bundle=… --title=… -- <cmd>`: runs the
   command, captures stdout/stderr to `logs/<id>.log`, records exit code,
@@ -304,70 +347,25 @@ tax on docs-only work.
   guard, and copies into `raw/<step>/`.
 - Redaction runs on the command, title, note, log and text artifacts before
   hashing; counts land in `redactions` with a manifest path.
-- Manifest schema `openharness.evidence/2` with `/1` still accepted; new
-  optional fields are `capture`, `step.covers`, `step.checks`,
-  `artifact.role/caption/poster`, `redactions[].note`.
-- Tests: 60 evidence tests (step exit codes, timeout, duplicate id, stale
-  attach, `--allow-old`, magic-byte MIME, JSON redaction, title redaction,
-  v1 compatibility, CLI passthrough). Full suite passes.
-- Not yet in P2a: `--action=fixture` and `attach --from=steps.json` (P2b).
-
-### P2b — browser attach
-
+- Manifest schema `openharness.evidence/2` with `/1` still accepted; optional
+  fields: `capture`, `step.covers`, `step.checks`,
+  `artifact.role/caption/poster`, `redactions[].note`, `kind`.
 - `attach --fragment=steps.json` folds a fragment into the manifest.
-  Fragment schema is a subset of a step, so a fixture can emit it without
-  importing harness code. `role` is a label, not a proof, so an omitted
-  `role` is inferred from the MIME type and file name (`_role_for`); an
-  explicit one always wins.
-- Fragment artifacts come in two forms. **Manifest-ready** entries carry
-  `path` + `mime` + `sha256` + `bytes` and are recorded as-is.
-  **Source-file** entries carry `path` (+ optional `caption`, `role`,
-  `snippet`) naming a real file — resolved relative to the fragment's
-  directory then cwd — which `attach` copies under `raw/<step>/` and
-  hashes itself, with the same staleness guard and `--allow-old` override
-  as `attach --file`. This keeps the "attach computes hashes, never
-  trusts caller-supplied ones" rule true for producers too.
+  Fragment artifacts come in two forms: **manifest-ready** (`path` +
+  `mime` + `sha256` + `bytes`, recorded as-is) and **source-file**
+  (`path` + optional `caption`/`role`/`snippet` — resolved relative to the
+  fragment's directory then cwd, copied under `raw/<step>/`, hashed by the
+  harness). `role` is inferred from MIME/suffix when omitted.
 - `--action=fixture` generates `e2e/evidence.fixture.ts` into the target
-  repo (fixture home resolved: generated per project, never a runtime
-  dependency). The fixture exports `test`/`expect` with an `evidence.step`
+  repo. The fixture exports `test`/`expect` with an `evidence.step`
   helper that screenshots each named step into `EVIDENCE_RUN_DIR` and
-  writes `steps-<spec>.json`; failed steps also capture the video when
-  Playwright recording is enabled. It covers web and mobile-web device
-  emulation; Electron desktop and native mobile are different producers
-  emitting the same fragment — no second fixture ships yet.
-- Tests: fragment fold-in, duplicate artifacts, poster selection, trace MIME.
-- Done when a Playwright run yields screenshots + video + trace + logs in one
-  bundle, and the page shows them without a build step.
-
-### P2c — device and manual capture
-
-- Optional `--action=capture --device=android|ios`: shell out to `adb` /
-  `xcrun` when present; fail with an install hint when not.
-- `attach --by=<name>` records who captured a manual artifact.
-- Tests: tool-missing path, output naming, MP4/PNG MIME.
-- Done when an Android or iOS UI wave can attach a screenshot and a short
-  recording without hand-writing manifest JSON.
-
-### P3 — page depth and loop enforcement
-
-- Manifest rendering: coverage matrix, thumbnails in the timeline,
-  lightbox, video poster/chapters, log filter/copy, redaction notes.
-- `--inline` budget with an explicit list of files left linked.
-- `review_delivery` findings and `ship_loop` evidence token.
-- Tests: HTML escaping, coverage matrix, missing artifact card, inline budget,
-  UI-wave detection, stale/contradictory bundle, keyboard markup.
-- Done when a reviewer can open one page and answer the four questions above,
-  and a stale or media-less UI bundle is blocked.
-
-### P4 — sharing and retention
-
-- `--action=share` zip + sha256; `--action=prune --keep=N`.
-- CI template and PR-comment snippet in docs.
-- `--public` sanitized copy with a human approval step.
-- Tests: zip contents, prune keeps referenced bundles, public copy refuses
-  secrets.
-- Done when a teammate can download one zip, open `index.html`, and verify it
-  offline.
+  writes `steps-<spec>.json`; failed steps also capture video when
+  Playwright recording is enabled. Covers web and mobile-web device
+  emulation.
+- Tests: evidence suite covers step exit codes, timeout, duplicate id,
+  stale attach, `--allow-old`, magic-byte MIME, JSON redaction, title
+  redaction, schema compatibility, CLI passthrough, fragment fold-in in
+  both artifact forms, `kind` rules, and the fixture action.
 
 ## Non-goals
 
@@ -396,9 +394,8 @@ tax on docs-only work.
    failures? Recommendation: the latter, with screenshots always.
 2. **`covers` strictness.** Required for browser steps, or a warning? 
    Recommendation: required for UI waves; warning elsewhere.
-3. **Fixture home.** Template in this repo, generated into target repos, or
-   both? Recommendation: template here, generated per project, never a runtime
-   dependency.
+3. **Fixture home** — resolved: template in this repo, generated into
+   target repos by `--action=fixture`, never a runtime dependency.
 4. **`--public`.** Is a committed, sanitized bundle ever wanted for public
    repos, or is a CI artifact enough? Recommendation: keep `--public` opt-in
    and off by default.
