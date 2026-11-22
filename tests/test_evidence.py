@@ -187,6 +187,50 @@ def test_commit_mismatch_is_an_error(tmp_path):
     assert "abc1234" in report.render() and "9999fff" in report.render()
 
 
+def _git(root: Path, *args: str) -> str:
+    run = subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=True, capture_output=True, text=True,
+    )
+    return run.stdout.strip()
+
+
+def _init_git(root: Path) -> None:
+    if not shutil.which("git"):
+        pytest.skip("git not installed")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    _git(root, "config", "user.email", "t@example.com")
+    _git(root, "config", "user.name", "t")
+
+
+def test_verify_accepts_a_recorded_head_that_is_an_ancestor(tmp_path):
+    """Proof recorded at commit A still verifies after commit B lands on top."""
+    _init_git(tmp_path)
+    _git(tmp_path, "commit", "-q", "--allow-empty", "-m", "a")
+    head_a = _git(tmp_path, "rev-parse", "HEAD")
+    bundle, _ = _make(tmp_path, head=head_a)
+    _git(tmp_path, "commit", "-q", "--allow-empty", "-m", "b")
+
+    report = evidence.verify(bundle, repo=tmp_path)
+
+    assert "commit-mismatch" not in _codes(report)
+    assert report.ok, report.render()
+
+
+def test_verify_rejects_a_head_from_an_unrelated_history(tmp_path):
+    _init_git(tmp_path)
+    _git(tmp_path, "commit", "-q", "--allow-empty", "-m", "a")
+    head_a = _git(tmp_path, "rev-parse", "HEAD")
+    bundle, _ = _make(tmp_path, head=head_a)
+    _git(tmp_path, "checkout", "-q", "--orphan", "unrelated")
+    _git(tmp_path, "commit", "-q", "--allow-empty", "-m", "c")
+
+    report = evidence.verify(bundle, repo=tmp_path)
+
+    assert "commit-mismatch" in _codes(report)
+    assert not report.ok
+
+
 def test_hash_mismatch_is_an_error(tmp_path):
     bundle, _ = _make(tmp_path)
     (bundle / "raw" / "s1" / "shot.png").write_bytes(PNG + b"\x00")

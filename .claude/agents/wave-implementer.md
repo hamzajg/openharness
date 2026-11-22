@@ -148,7 +148,9 @@ If an input is missing, ask for it. Do not change code first.
      - TDD evidence: RED failing output, GREEN passing output, REFACTOR
        re-run (commands + results)
      - test evidence (commands + results)
-     - proof bundle run id, plus the walkthrough run id for UI waves
+     - proof bundle run id, stated explicitly so the orchestrator can bind
+       it with `complete --bundle=<run-id>`; plus the walkthrough run id
+       for UI waves
      - `Stacked on #<n>` and the merge order when the base is another PR
      - known gaps or follow-ups
 

@@ -175,9 +175,12 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   (gitignored local scratch) or the committable `evidence/` root
   (`--tracked`) that proves the TDD cycle — ordered
   `--tdd=red --expected-failure` → `--tdd=green` → `--tdd=refactor`
-  steps. UI-touching waves must attach screenshots
-  per the capture policy in `docs/plans/evidence.md`; the harness
-  never drives browsers itself. Bundles declare `kind`: `proof`
+  steps. `complete --bundle=<run-id>` binds the wave row to one verified
+  bundle (`evidence:<run-id>` in LOOP.md/state); gate `met` accepts the
+  same token as `--evidence`. UI media is walkthrough-only — proof
+  bundles never require screenshots; the capture policy lives in
+  `docs/plans/evidence.md`. The harness never drives browsers itself.
+  Bundles declare `kind`: `proof`
   (default, gate evidence) or `walkthrough` (local-only companion
   material — `--kind=walkthrough`, never `--tracked`). UI walkthroughs
   are produced by `--action=fixture` (generates a Playwright fixture

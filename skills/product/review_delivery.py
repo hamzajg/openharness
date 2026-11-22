@@ -284,11 +284,18 @@ def _parse_loop(text: str) -> dict:
     status_m = re.search(r"^Status:\s*(\S+)\s*$", text, re.M)
     waves = {}
     for m in _LOOP_WAVE_RE.finditer(text):
+        ev = m.group(5).strip()
+        bundle = ""
+        bm = re.search(r"\s*·\s*evidence:(\S+)\s*$", ev)
+        if bm:
+            bundle = bm.group(1)
+            ev = ev[: bm.start()].rstrip()
         waves[int(m.group(1))] = {
             "status": m.group(2),
             "branch": m.group(3).strip(),
             "pr": m.group(4).strip(),
-            "evidence": m.group(5).strip(),
+            "evidence": ev,
+            "bundle": bundle,
         }
     gates = {}
     for m in _LOOP_GATE_RE.finditer(text):
@@ -975,6 +982,63 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
                     "concern", "tdd-missing", "LOOP.md",
                     f"wave {n} TDD proof incomplete: "
                     + "; ".join(proof["problems"][:2]),
+                ))
+
+        # Bundle binding (Track A): a done wave should name the proof
+        # bundle that proved it (`complete --bundle=<run-id>`). Advisory —
+        # waves completed before binding existed carry no token.
+        def bound_bundle(rid: str):
+            bdir = evidence_bundles.resolve_bundle(root, spec_dir.name, rid)
+            if bdir is None:
+                return None, "", "does not resolve under either evidence root"
+            try:
+                man = evidence_bundles.load(bdir)
+            except evidence_bundles.EvidenceError as ex:
+                return None, "", f"manifest invalid ({ex})"
+            rep = evidence_bundles.verify(bdir, repo=root)
+            if not rep.ok:
+                why = "; ".join(f.message for f in rep.errors[:1])
+                return bdir, man, f"verify fails ({why})"
+            return bdir, man, ""
+
+        for n, row in loop["waves"].items():
+            if row["status"] != "done" or n not in waves:
+                continue
+            rid = row.get("bundle", "")
+            if not rid:
+                findings.append(Finding(
+                    "concern", "unbound-wave-evidence", "LOOP.md",
+                    f"wave {n} is done but names no evidence bundle "
+                    "(record one with `complete --bundle=<run-id>`)",
+                ))
+                continue
+            got = bound_bundle(rid)
+            _, man, problem = got
+            if not problem and man.get("wave") != n:
+                problem = f"records wave {man.get('wave')}, not wave {n}"
+            if got[0] is None or problem:
+                findings.append(Finding(
+                    "concern", "stale-evidence", "LOOP.md",
+                    f"wave {n} names bundle {rid} but it {problem}",
+                ))
+                continue
+            if man.get("verdict") == "fail":
+                findings.append(Finding(
+                    "concern", "evidence-contradicts-loop", "LOOP.md",
+                    f"wave {n} is done but bound bundle {rid} recorded "
+                    "verdict=fail",
+                ))
+
+        for gid, state in loop["gates"].items():
+            ev = state.get("evidence", "")
+            if state.get("status") != "met" or not ev.lower().startswith("evidence:"):
+                continue
+            rid = ev.split(":", 1)[1].strip()
+            _, _, problem = bound_bundle(rid)
+            if problem:
+                findings.append(Finding(
+                    "concern", "stale-evidence", "LOOP.md",
+                    f"gate {gid} names evidence bundle {rid} but it {problem}",
                 ))
 
         for gid, g in gates.items():

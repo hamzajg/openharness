@@ -121,6 +121,25 @@ def bundle_root(repo: Path | str, tracked: bool = False) -> Path:
     return Path(repo) / (TRACKED_ROOT if tracked else ROOT)
 
 
+def resolve_bundle(repo: Path | str, feature: str, run_id: str) -> Path | None:
+    """Find one bundle by run id (or repo-relative path) under either root."""
+    repo = Path(repo)
+    rid = (run_id or "").strip().strip("/")
+    if not rid:
+        return None
+    rel = rid[len(feature) + 1:] if rid.startswith(feature + "/") else rid
+    for tracked in (False, True):
+        cand = bundle_root(repo, tracked=tracked) / feature / rel
+        if (cand / "evidence.json").is_file():
+            return cand
+    p = Path(rid)
+    if not p.is_absolute():
+        p = repo / rid
+    if p.is_dir() and (p / "evidence.json").is_file():
+        return p
+    return None
+
+
 def _in_tracked_root(repo: Path, bundle: Path) -> bool:
     try:
         bundle.resolve().relative_to((repo / TRACKED_ROOT).resolve())
@@ -495,6 +514,12 @@ def _git(repo: Path, *args: str) -> sp.CompletedProcess:
 def _git_head(repo: Path) -> str | None:
     run = _git(repo, "rev-parse", "HEAD")
     return run.stdout.strip() if run.returncode == 0 else None
+
+
+def _is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
+    """True when `ancestor` is reachable from `descendant` in `repo`."""
+    run = _git(repo, "merge-base", "--is-ancestor", ancestor, descendant)
+    return run.returncode == 0
 
 
 def _tracked_files(repo: Path, bundle: Path) -> list[str]:
@@ -952,13 +977,17 @@ def verify(
             Finding("warning", "no-head", "git HEAD unavailable; commit binding not checked")
         )
     elif not _same_commit(recorded, expected):
-        report.findings.append(
-            Finding(
-                "error",
-                "commit-mismatch",
-                f"manifest claims {recorded} but the checked commit is {expected}",
+        # A bundle proves the run at its recorded commit; later commits on
+        # top of it do not stale the proof. Only a head that is not an
+        # ancestor of the checked commit is a real mismatch.
+        if not (repo_path and _is_ancestor(repo_path, recorded, expected)):
+            report.findings.append(
+                Finding(
+                    "error",
+                    "commit-mismatch",
+                    f"manifest claims {recorded} but the checked commit is {expected}",
+                )
             )
-        )
 
     # -- verdict vs steps
     a_recorded = manifest["verdict"]
