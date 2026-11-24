@@ -2,7 +2,7 @@
 name: delivery-loop
 type: block
 location: skills/product/ship_loop.py, skills/product/spec_scaffold.py, skills/product/ship_validate.py, skills/product/review_delivery.py, .opencode/commands/ship-loop.md, .opencode/commands/review-delivery.md, .claude/commands/ship-loop.md, .claude/commands/review-delivery.md, .opencode/agents/, .claude/agents/
-interfaces: [ship_loop.invoke, ship_loop --action=next|status|start|complete|gate|block|resume|reset|finish]
+interfaces: [ship_loop.invoke, ship_loop --action=next|status|compliance|start|complete|gate|block|resume|reset|finish|reconcile]
 ---
 # Block: delivery-loop
 
@@ -138,6 +138,7 @@ command makes, not a property of the reviewer.
 | `next` | Increment the iteration counter and print the next directive, `DONE`, `BLOCKED`, or `STOP`. |
 | `status` | Same decision without incrementing (orientation). |
 | `compliance` | Read-only corpus report: per feature, review mode, audit verdicts, proven ACs, evidence coverage, and a `done-compliant` / `done-legacy` / `done-attention` verdict. |
+| `reconcile` (alias `check`) | Compare `LOOP.md` claims with git/GitHub ground truth and report every mismatch; never writes state. `--offline` skips GitHub and reports PR/CI claims as unverified. |
 | `start --wave=N` | Mark wave N in progress, record branch, reset `blocked`. |
 | `complete --wave=N --note=... [--pr=#n]` | Mark wave N done with evidence; prints the next directive. |
 | `gate --gate=G1 --status=met --evidence=...` | Record a precondition as met (evidence required; `file:` checks verified). |

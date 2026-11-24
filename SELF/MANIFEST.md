@@ -63,3 +63,10 @@ See `SELF/blocks/<name>.md` for full block specs:
 | [delivery-audit](SELF/blocks/delivery-audit.md) | `/review-delivery` + `delivery-auditor`; deterministic evidence brief + independent verdict; spec and delivery checkpoints; D013 |
 | [evidence](SELF/blocks/evidence.md) | Evidence bundles: manifest + hashes, `step`/`attach` capture, generated walkthrough page, `verify` checks; loop gate; ADR 0007 |
 | [decision-review](SELF/blocks/decision-review.md) | `/challenge-decision` + `decision-challenger`; deterministic brief + design lenses; verdict advisory (D011), artifact gate-required via scaffold G1 |
+
+## Rules
+
+[SELF/EVOLUTION.md](SELF/EVOLUTION.md) (`type: rules`, printed by
+`oh self evolution`) is the binding contract for changing the harness itself:
+decision precedent, block-spec sync, LOC budgets, tests, and the PR shape.
+`SELF/PRINCIPLES.md` is the normative decision log it enforces.

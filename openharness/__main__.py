@@ -116,9 +116,9 @@ def main():
     if v == "self":
         sr = Path(__file__).resolve().parent.parent / "SELF"
         if rest:
-            p = sr / "blocks" / f"{rest[0]}.md"
-            p = p if p.exists() else sr / f"{rest[0]}.md"
-            if not p.exists():
+            p = next((q for q in (sr / "blocks" / f"{rest[0]}.md", sr / f"{rest[0]}.md",
+                                  sr / f"{rest[0].upper()}.md") if q.exists()), None)
+            if p is None:
                 print(f"No such self doc: {rest[0]}", file=sys.stderr); sys.exit(1)
         else:
             p = sr / "MANIFEST.md"

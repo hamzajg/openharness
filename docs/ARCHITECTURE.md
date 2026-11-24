@@ -1,7 +1,7 @@
 # Architecture — openharness
 
 Current-state map. Descriptive, not aspirational; normative decisions live
-in `SELF/PRINCIPLES.md` (D001–D018). See `docs/adr/` for the baseline record.
+in `SELF/PRINCIPLES.md` (D001–D019). See `docs/adr/` for the baseline record.
 
 ## Dual role
 

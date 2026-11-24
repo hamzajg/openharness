@@ -2,7 +2,7 @@
 name: serve
 type: block
 location: openharness/serve.py, openharness/serve_api.py, openharness/observers/, openharness/web/
-interfaces: [GET /api/sessions, GET /api/sessions/{id}, GET /api/stream/{id}, GET /api/skills, POST /api/skills/{name}/run, GET /api/self, GET /api/env, GET /api/knowledge, /api/docs]
+interfaces: [GET /api/sessions, GET /api/sessions/{id}, GET /api/sessions/{id}/metrics, GET /api/stream/{id}, GET /api/loops, GET /api/loops/{repo}/{feature}, GET /api/loops/stream, GET /api/metrics, GET /api/skills, POST /api/skills/{name}/run, GET /api/self, GET /api/env, GET /api/knowledge, GET /api/repos/status, POST /api/repos/sync, POST /api/repos/prune, GET /api/evolution, /api/docs]
 ---
 # Block: serve
 
@@ -15,8 +15,8 @@ FastAPI observer + controller app (default `127.0.0.1:7337`). Provides: JSON API
   - `GET /api/env` → calls `env.probe` + reads `ENV.md` + `env.drift`.
   - `GET /api/self` → reads SELF/*.md on disk.
   - `GET /api/knowledge` → `rag.search`.
-- **Only observes what agent CLIs already record on disk.** (D006.) Sessions are discovered by globbing `~/.claude/projects/**/*.jsonl` (Claude) and opencode storage dir (OpenCodeObserver). No vendor SDK hooks.
-- SSE not WebSocket. One-way tail is enough; `EventSource` in browser polls the file every 1s and emits new lines.
+- **Only observes what agent CLIs already record on disk.** (D006.) Sessions are discovered from `~/.claude/projects/<project>/<session>.jsonl` (Claude) and the opencode storage dir (`rglob("*.jsonl")`, OpenCodeObserver). No vendor SDK hooks.
+- SSE not WebSocket. One-way tail is enough: the browser opens an `EventSource`, and the server re-tails the transcript file (~1s) and emits new lines.
 - Bind `127.0.0.1` by default. No auth in v1 (localhost only).
 - FastAPI docs at `/api/docs` (free Swagger).
 

@@ -4,8 +4,10 @@ type: rules
 ---
 # Rules for Agents Modifying the Harness
 
+Printed by `python -m openharness self evolution`.
+
 ## Before You Change Anything
-1. **Read `SELF/PRINCIPLES.md` first.** Every decision D001–D018 is binding precedent.
+1. **Read `SELF/PRINCIPLES.md` first.** Every decision D001–D019 is binding precedent.
 2. Never violate a standing decision. If you must, **append D00N+1** with rationale that **explicitly supersedes** it. Reference the old decision by number.
 
 ## Block Spec Contract
@@ -27,12 +29,12 @@ type: rules
 
 ## Tests
 9. `pytest` **must pass** before proposing the change.
-10. New code path → new test. Coverage of runtime core should stay at 100%.
+10. New code path → new test. There is no coverage gate: CI runs `pytest` only, so test the behavior you changed rather than chasing a percentage the suite cannot show.
 
 ## New Files
 11. New spec files are **always** `.md` with YAML frontmatter. (D004.)
 12. New executable logic lives in `.py`, preferably under `skills/` (if user-facing) or `openharness/` (if plumbing).
 
 ## Presenting the Change
-13. Title the PR: `evolve: <one-line summary>`.
+13. Title the PR with a Conventional Commit prefix: `feat:`, `fix:`, `docs:`, `chore:` — or `evolve:` when the change is to the harness itself. `GET /api/evolution` maps these prefixes to commit types; there is no `evolve:`-only convention to follow.
 14. Body must: (a) reference which SELF/PRINCIPLES decision(s) apply, (b) show `pytest` output, (c) show before/after LOC counts for the touched budget bucket.
