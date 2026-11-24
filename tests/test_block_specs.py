@@ -8,6 +8,7 @@ tests make the drift fail instead of survive.
 from __future__ import annotations
 
 import re
+import subprocess
 from functools import lru_cache
 from pathlib import Path
 
@@ -55,6 +56,15 @@ def _symbol_exists(mod: str, attr: str) -> bool:
 
 
 @lru_cache(maxsize=1)
+def _tracked() -> set[str]:
+    """Files git knows about; env-specific registries are gitignored on purpose."""
+    out = subprocess.run(
+        ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=False
+    )
+    return set(out.stdout.splitlines()) if out.returncode == 0 else set()
+
+
+@lru_cache(maxsize=1)
 def _routes() -> frozenset[tuple[str, str]]:
     api = (ROOT / "openharness" / "serve_api.py").read_text()
     m = re.search(r'APIRouter\(prefix="([^"]*)"', api) or re.search(
@@ -99,6 +109,7 @@ def test_every_block_has_frontmatter_and_is_indexed(blocks):
 
 
 def test_block_locations_exist(blocks):
+    tracked = _tracked()
     for stem, meta in blocks.items():
         for loc in str(meta["location"]).split(","):
             loc = loc.strip().rstrip("/")
@@ -106,6 +117,8 @@ def test_block_locations_exist(blocks):
                 continue
             if Path(loc).suffix not in (".py", ".md"):
                 continue  # runtime/data directories may not exist yet
+            if tracked and loc not in tracked:
+                continue  # gitignored local state (e.g. .openharness/REPOS.local.md)
             assert (ROOT / loc).exists(), f"{stem}: location not found: {loc}"
 
 
