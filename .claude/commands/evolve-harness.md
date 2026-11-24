@@ -20,7 +20,7 @@ output and surface any drift; do not silently choose.
 
 ## Workflow — follow SELF/EVOLUTION.md EXACTLY
 
-1. **Read `SELF/PRINCIPLES.md` first.** Confirm the proposed change does not violate D001–D014. If it would, you MUST first propose a new D00N+1 decision that explicitly supersedes the old one, and only then proceed.
+1. **Read `SELF/PRINCIPLES.md` first.** Confirm the proposed change does not violate D001–D019. If it would, you MUST first propose a new D00N+1 decision that explicitly supersedes the old one, and only then proceed.
 
 2. Design the **smallest possible change** that achieves the user's goal. No speculative abstractions. No "for the future."
 
@@ -35,8 +35,9 @@ output and surface any drift; do not silently choose.
    ```
    If any test fails, fix the code. Do NOT weaken tests.
 
-5. Compute and report LOC counts (before & after for the affected budget bucket):
-   - Runtime core (≤ 300 LOC): `find openharness -name "*.py" -not -path "*/web/*" -not -name "serve*.py" -not -path "*/observers/*" | xargs wc -l`
-   - Serve/UI block (≤ 900 LOC): tally `serve.py`, `serve_api.py`, `observers/*.py`, and the web source files.
+5. Compute and report LOC counts (before & after) for the affected bucket — the same counters CI uses:
+   - Core (≤ 330 LOC, D012/D016): `__main__.py`, `skill.py`, `registry.py`, `frontmatter.py`, `env.py`, `knowledge/rag.py`
+   - Platform (≤ 1100 LOC): `repos.py`, `metrics.py`, `serve.py`, `serve_api.py`, `observers/*.py`
+   - `GET /api/evolution` shows both; `pytest tests/test_budgets.py` enforces them. Delete code before growing a bucket.
 
-6. Present the change as a PR summary with title `evolve: <one-line summary>` and body referencing which D00N decisions apply, passing pytest output, and LOC counts.
+6. Present the change as a PR summary titled `<type>: <one-line summary>` (`feat`/`fix`/`docs`/`chore`, or `evolve` for a harness change) with a body referencing which D00N decisions apply, passing pytest output, and LOC counts.

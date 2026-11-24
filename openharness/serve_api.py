@@ -158,6 +158,8 @@ def get_self(block: str | None = Query(default=None)):
         if not p.exists():
             p = self_root / f"{block}.md"
         if not p.exists():
+            p = self_root / f"{block.upper()}.md"
+        if not p.exists():
             raise HTTPException(status_code=404, detail="block not found")
         return {"text": p.read_text(), "block": block}
     return {"text": (self_root / "MANIFEST.md").read_text(), "block": "MANIFEST"}

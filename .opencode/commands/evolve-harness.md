@@ -21,7 +21,7 @@ output and surface any drift; do not silently choose.
 
 ## Workflow — follow SELF/EVOLUTION.md EXACTLY
 
-1. Read `SELF/PRINCIPLES.md` first. Confirm no violation of D001–D008. If a change would violate, first propose D00N+1 that explicitly supersedes.
+1. Read `SELF/PRINCIPLES.md` first. Confirm no violation of D001–D019. If a change would violate, first propose D00N+1 that explicitly supersedes.
 
 2. Design the smallest possible change. No speculative abstractions.
 
@@ -36,8 +36,9 @@ output and surface any drift; do not silently choose.
    ```
    Fix failures; do NOT weaken tests.
 
-5. Report LOC counts (before & after affected bucket):
-   - Runtime core (≤ 300 LOC): `find openharness -name "*.py" -not -path "*/web/*" -not -name "serve*.py" -not -path "*/observers/*" | xargs wc -l`
-   - Serve/UI block (≤ 900 LOC): tally serve.py, serve_api.py, observers/*.py, web source files.
+5. Report LOC counts (before & after) for the affected bucket — the same counters CI uses:
+   - Core (≤ 330 LOC, D012/D016): `__main__.py`, `skill.py`, `registry.py`, `frontmatter.py`, `env.py`, `knowledge/rag.py`
+   - Platform (≤ 1100 LOC): `repos.py`, `metrics.py`, `serve.py`, `serve_api.py`, `observers/*.py`
+   - `GET /api/evolution` shows both; `pytest tests/test_budgets.py` enforces them. Delete code before growing a bucket.
 
-6. Present PR: title `evolve: <summary>`, body with applicable D00N refs, passing pytest output, LOC counts.
+6. Present PR: title `<type>: <summary>` (`feat`/`fix`/`docs`/`chore`, or `evolve` for a harness change), body with applicable D00N refs, passing pytest output, LOC counts.
