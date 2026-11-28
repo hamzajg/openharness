@@ -21,7 +21,7 @@ output and surface any drift; do not silently choose.
 
 ## Workflow — follow SELF/EVOLUTION.md EXACTLY
 
-1. Read `SELF/PRINCIPLES.md` first. Confirm no violation of D001–D019. If a change would violate, first propose D00N+1 that explicitly supersedes.
+1. Read `SELF/PRINCIPLES.md` first. Confirm no violation of D001–D020. If a change would violate, first propose D00N+1 that explicitly supersedes.
 
 2. Design the smallest possible change. No speculative abstractions.
 

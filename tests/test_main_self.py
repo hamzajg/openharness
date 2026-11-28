@@ -20,7 +20,7 @@ def test_self_manifest_by_lowercase_name(monkeypatch, capsys):
 def test_self_rules_doc_resolves_by_lowercase_name(monkeypatch, capsys):
     out = _run(monkeypatch, capsys, "evolution")
     assert "Rules for Agents Modifying the Harness" in out
-    assert "D001–D019" in out
+    assert "D001–D020" in out
 
 
 def test_unknown_self_doc_exits(monkeypatch, capsys):

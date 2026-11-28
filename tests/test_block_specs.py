@@ -1,7 +1,7 @@
 """SELF/blocks specs must name real code and stay linked from the MANIFEST.
 
 Specs drift quietly: an interface gets renamed, an action is added, a block is
-split out and never indexed (D001-D019 live in SELF/PRINCIPLES.md). These
+split out and never indexed (D001-D020 live in SELF/PRINCIPLES.md). These
 tests make the drift fail instead of survive.
 """
 
