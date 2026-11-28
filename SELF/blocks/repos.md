@@ -2,7 +2,7 @@
 name: repos
 type: block
 location: openharness/repos.py, REPOS.md, .openharness/REPOS.local.md, sources/
-interfaces: [repos.registry_path, repos.entries, repos.sync]
+interfaces: [repos.registry_path, repos.entries, repos.sync, repos.status, repos.prune]
 ---
 # Block: repos
 
@@ -24,6 +24,11 @@ cloned/updated into `sources/` using the user's existing git credentials only.
   - If `sources/<name>/` exists: run `git -C sources/<name> pull --ff-only`.
   - Else: `git clone [-b branch] url sources/<name>`.
   - Prints `✓ <name>: ...` on success, `!! <name>: <error>` on failure.
+- `status(*names)` reports each clone's branch, expected default, ahead/behind
+  counts, and dirty flag (`oh status`).
+- `prune(*names, remote=False)` deletes local branches already merged into the
+  default with `git branch -d`; `--remote` fetches and deletes merged
+  remote-tracking branches too (`oh prune [--remote]`).
 - `sources/` is **gitignored**. Never committed. Reconstructable via `python -m openharness pull`.
 - **No token management.** Auth relies entirely on the user's existing git credentials (ssh-agent, `gh auth`, `~/.netrc`, etc.). No secret surface in the harness. (D007.)
 - **D008 (central mode):** Target repos stay pristine. No harness files are copied into them.

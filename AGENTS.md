@@ -24,7 +24,7 @@ Verified 2026-11-15 against CI (`.github/workflows/ci.yml`) and README.
 | Run a skill | `python -m openharness run <skill>` |
 | Delivery loop | `/ship-loop` (agent-driven) · oracle: `python -m openharness run ship_loop --action=next --repo_path=sources/<repo>` |
 | Serve (observer UI) | `oh serve` → http://localhost:7337 |
-| Repo ops | `oh pull` (clone registered repos into `sources/`) |
+| Repo ops | `oh pull` (clone/pull into `sources/`); `oh status` (branch, ahead/behind, dirty); `oh prune [--remote]` (delete merged branches) |
 | Web UI build | `cd openharness/web && npm ci && npm run build` |
 
 Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
@@ -53,7 +53,8 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   - `web/` — observer UI (Vite+TS): Sessions, Loops (live ship-loop
     progress), Skills, SELF, Knowledge; **observer only, never re-implements
     runtime logic (D005)**.
-- `skills/` — executable Python skills grouped by area (`harness/`,
+- `skills/` — executable Python skills grouped by area (`harness/` e.g.
+  `harness_evidence`, `init_profile`,
   `security/` e.g. `scan_secrets`, `legacy_migration/` e.g.
   `map_architecture`, `strangler_plan`, `product/` e.g. `discover_product`,
   `spec_scaffold`, `wave_plan`, `ship_validate`, `product_map`,
@@ -178,6 +179,9 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   don't add instrumentation hooks into agents.
 - Decision log D001–D020 in `SELF/PRINCIPLES.md` is normative — read it
   before structural changes.
+- `SELF/EVOLUTION.md` (`oh self evolution`) is the binding contract for
+  changing the harness itself; `SELF/MANIFEST.md`'s "Rules" section points
+  to it.
 - The web UI must call the same verbs as the CLI (D005) — no business
   logic in TSX.
 - Never hand-edit `specs/<feature>/LOOP.md` or `LOOP.state.json`;
@@ -223,6 +227,8 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   report the real result.
 - Keep changes minimal and consistent with surrounding code. Respect the
   D001–D020 decision log.
+- Harness changes also follow `SELF/EVOLUTION.md`: block-spec sync, LOC
+  budgets, tests, and the PR shape it defines.
 - For product work, prefer `/ship-loop` (autonomous) or `/ship-product`
   (phased); both keep specs and loop state in the target repo under
   `specs/` and ship one wave per PR.

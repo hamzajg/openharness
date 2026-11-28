@@ -1722,3 +1722,60 @@ def test_capture_fails_loudly_without_device_tool(tmp_path, monkeypatch):
             action="capture", repo=str(tmp_path), bundle=str(bundle),
             device="android",
         )
+
+
+# ----------------------------------------------------------------- share
+
+def test_share_writes_zip_and_sha256(tmp_path):
+    bundle, _ = _make(tmp_path)
+
+    out = harness_evidence.invoke(
+        action="share", repo=str(tmp_path), bundle=str(bundle)
+    )
+
+    zip_path = bundle.parent / f"{bundle.name}.zip"
+    assert zip_path.is_file()
+    assert "sha256" in out
+    import zipfile
+    names = zipfile.ZipFile(zip_path).namelist()
+    assert any(n.startswith(bundle.name + "/") for n in names)
+    assert Path(str(zip_path) + ".sha256").is_file()
+
+
+def test_share_public_copies_a_verified_bundle(tmp_path):
+    bundle, _ = _make(tmp_path)
+
+    out = harness_evidence.invoke(
+        action="share", repo=str(tmp_path), bundle=str(bundle), public=True
+    )
+
+    dest = tmp_path / "docs" / "evidence" / "cart" / bundle.name
+    assert (dest / "evidence.json").is_file()
+    assert "not secret-scanned" in out
+    with pytest.raises(SkillError, match="already exists"):
+        harness_evidence.invoke(
+            action="share", repo=str(tmp_path), bundle=str(bundle), public=True
+        )
+
+
+# ----------------------------------------------------------------- prune
+
+def test_prune_keeps_newest_and_loop_referenced(tmp_path):
+    root = tmp_path / ".openharness" / "evidence" / "cart"
+    for i in range(1, 5):
+        evidence.new_bundle(tmp_path, "cart", run=f"run-{i}", head=HEAD)
+    d = tmp_path / "specs" / "cart"
+    d.mkdir(parents=True)
+    (d / "LOOP.state.json").write_text(json.dumps(
+        {"waves": {"1": {"bundle": "run-1"}}}
+    ))
+
+    out = harness_evidence.invoke(action="prune", repo=str(tmp_path), keep=2)
+
+    assert sorted(p.name for p in root.iterdir()) == ["run-1", "run-3", "run-4"]
+    assert "run-1" in out  # referenced bundle reported as skipped
+
+
+def test_prune_requires_keep(tmp_path):
+    with pytest.raises(SkillError, match="--keep"):
+        harness_evidence.invoke(action="prune", repo=str(tmp_path), keep=0)
