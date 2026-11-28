@@ -91,7 +91,7 @@ def test_logo_design_infers_domain_and_plans_assets(tmp_path):
     )
     (tmp_path / "specs" / "orders").mkdir(parents=True)
     brief = tmp_path / "docs" / "brand" / "logo.md"
-    out = get("logo_design").invoke(repo_path=str(tmp_path), out=str(brief))
+    out = get("logo_design").invoke(repo_path=str(tmp_path), out="docs/brand/logo.md")
     assert "Logo brief — Loomline" in out
     assert "manufacturing" in out
     assert "## Concept territories" in out
@@ -108,7 +108,7 @@ def test_theme_designer_writes_aa_tokens_and_guide(tmp_path):
     (tmp_path / "README.md").write_text("A production planning tool for factory planners.\n")
     out_dir = tmp_path / "design"
     out = get("theme_designer").invoke(
-        repo_path=str(tmp_path), web_dir=str(web), prefix="acme", out_dir=str(out_dir)
+        repo_path=str(tmp_path), web_dir=str(web), prefix="acme", out_dir="design"
     )
     css = (out_dir / "tokens.css").read_text()
     guide = (out_dir / "THEME.md").read_text()

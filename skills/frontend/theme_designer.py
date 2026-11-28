@@ -573,6 +573,8 @@ def theme_designer(repo_path: str = ".", web_dir: str = "", style: str = "",
 
     if out_dir:
         out = Path(out_dir)
+        if not out.is_absolute():
+            out = root / out
         out.mkdir(parents=True, exist_ok=True)
         (out / "tokens.css").write_text(css)
         (out / "THEME.md").write_text(report)

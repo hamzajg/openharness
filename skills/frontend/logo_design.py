@@ -309,6 +309,8 @@ def logo_design(repo_path: str = ".", web_dir: str = "", product_name: str = "",
     report = "\n".join(lines)
     if out:
         path = Path(out)
+        if not path.is_absolute():
+            path = root / path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(report)
         report += f"\nWrote {path}"
