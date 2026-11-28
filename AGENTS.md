@@ -67,7 +67,7 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   `delivery-verifier`), the independent audit (`delivery-auditor`), and the
   review (`decision-challenger`).
 - `SELF/` — the harness's own specs/principles (`PRINCIPLES.md`, decision
-  log D001–D019, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
+  log D001–D020, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
 - `REPOS.md` — shipped, agnostic registry template. `/init` writes the concrete
   repo list to `.openharness/REPOS.local.md` (gitignored by default); that file
   is the active registry when present, otherwise the template is used (D007).
@@ -152,6 +152,20 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   plan`) refuse placeholders and bare `N/A`; `N/A — <reason>` is the
   explicit escape. Depth scales with the declared tier; presence does not
   (ADR 0011).
+- **D020:** scenario maturity is a spec artifact. `EXAMPLES.feature` carries
+  `@w<N>` wave tags plus `@m-failure`, `@m-ownership`, `@m-data`, `@m-ux` and
+  `@m-outcome` scenario tags, or `# Maturity N/A: @m-<axis> — <reason>` for
+  genuinely inapplicable axes. Added value comes in baby steps: one new axis
+  per `@w<N>` wave in a dedicated scenario, with the happy path in its own
+  scenario; several scenarios for the SAME axis may share a wave, but one
+  big-bang wave carrying multiple axes is rejected. DOMAIN.md tier sets the
+  exercised-axis floor; `spec_scaffold` emits blocking `G4 — Scenario
+  maturity floor` (`Before: plan`), `ship_loop` rejects/stales an unfilled
+  floor, `review_delivery` emits advisory `maturity-*` findings, `wave_plan`
+  warns on crowded waves without changing wave order, and `ship_validate`
+  reports the first wave per covered axis. Tags prove staged breadth only;
+  reviewers judge whether the scenario is real maturity and product value,
+  not decorative complexity (ADR 0012).
 
 ## Landmines
 
@@ -162,7 +176,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   repos in `.openharness/REPOS.local.md`; leave the tracked `REPOS.md` agnostic.
 - `oh serve` observes session JSONL files the agent CLIs already write —
   don't add instrumentation hooks into agents.
-- Decision log D001–D019 in `SELF/PRINCIPLES.md` is normative — read it
+- Decision log D001–D020 in `SELF/PRINCIPLES.md` is normative — read it
   before structural changes.
 - The web UI must call the same verbs as the CLI (D005) — no business
   logic in TSX.
@@ -208,7 +222,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
 - Verify before claiming: run `pytest` (with `--no-deps` install path) and
   report the real result.
 - Keep changes minimal and consistent with surrounding code. Respect the
-  D001–D019 decision log.
+  D001–D020 decision log.
 - For product work, prefer `/ship-loop` (autonomous) or `/ship-product`
   (phased); both keep specs and loop state in the target repo under
   `specs/` and ship one wave per PR.

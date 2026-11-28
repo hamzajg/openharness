@@ -71,8 +71,8 @@ retroactively.
 ## Consequences
 
 - `spec_scaffold` emits five artifacts (adds DOMAIN.md) and four blocking
-  pre-plan gates (G0–G3). `product-framer` must classify the tier and
-  start agent-added gates at G4.
+  pre-plan gates at the time (G0–G3). D020 adds G4 for scenario maturity, so
+  `product-framer` now classifies the tier and starts agent-added gates at G5.
 - `ship_loop` learns one new check type (`section:`) and two validators;
   all shallow, all naming missing fields in errors.
 - Reviewers gain concrete text to check: glossary consistency, invariant

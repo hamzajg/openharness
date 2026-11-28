@@ -22,6 +22,11 @@ anything (D001, D009).
   states, UX bar, accessibility — or `N/A — <reason>`), plus the expected
   user outcome, evidence or assumption, an observable signal, and a
   follow-up owner/date when known.
+- `specs/<feature>/EXAMPLES.feature` — specifications by example: `@w<N>`
+  wave tags plus `@m-<axis>` scenario-maturity tags (failure, ownership,
+  data, UX, outcome) or reasoned `Maturity N/A` lines (D020). Each new axis
+  gets its own wave and dedicated scenario; the happy path gets its own
+  scenario, so value arrives in small iterations rather than one big wave.
 - `specs/<feature>/DOMAIN.md` — the domain contract (D019): declared tier
   (`simple | standard | domain-heavy`), ubiquitous-language glossary,
   bounded contexts and translation points, aggregates/invariants,
@@ -92,7 +97,10 @@ Status lives in `LOOP.md`: `pending` · `met` · `waived` · `failed`.
   `stale`. A `file:` check for `DOMAIN.md` requires a declared tier and a
   non-placeholder line in every section (D019); a `section:` check
   requires the named `##` heading filled — `## Experience` accepts
-  `N/A — <reason>` but rejects a bare `N/A`.
+  `N/A — <reason>` but rejects a bare `N/A`. A `file:` check for
+  `EXAMPLES.feature` requires the tier's scenario-maturity floor (D020):
+  every axis exercised by a real tagged scenario or justified with
+  `Maturity N/A: @m-<axis> — <reason>`; a later gap makes G4 `stale`.
 - `waived` requires `--waived-by` and `--note`; only a human can waive.
 - Overdue gates keep blocking: a pending `Before: spec` gate still blocks
   wave 1 if artifacts were filled out of order.
@@ -179,7 +187,10 @@ or waived.
   contract at the same checkpoint: tier, ubiquitous language, bounded
   contexts, aggregates/invariants and integration style; `SPEC.md`'s
   `## Experience` records the user journey, edge states and UX bar (or a
-  reasoned `N/A`). G2/G3 block planning until both are filled. After release, `VALIDATION.md` may
+  reasoned `N/A`). G2/G3 block planning until both are filled. D020 adds G4:
+  `EXAMPLES.feature` must exercise the tier's maturity axes with real
+  `@m-<axis>` scenarios or reasoned `N/A` lines, staged one new axis per wave
+  in dedicated scenarios. After release, `VALIDATION.md` may
   record the observed result, adoption, cost/TCO notes, source, owner/date,
   and learning. A pending follow-up is not an acceptance gap or a finish
   blocker (D009).
@@ -228,6 +239,10 @@ or waived.
 - D018's five-dimension frame (business/user value, economic viability,
   UX/adoption, technical/operational quality, adaptability) shapes the spec,
   decision review and audit, but adds no gate, score or dashboard.
+- D020's staged maturity floor is required before planning through blocking
+  gate G4: one new axis per wave, one axis per scenario. The audit's
+  `maturity-*` findings and `wave_plan` warnings are advisory; the oracle
+  proves staged breadth, not that a scenario truly exercises its axis.
 - Overdue gates keep blocking; advisory gates never do.
 - Events are append-only (last 200 kept).
 - Default merge policy is `review`: PRs stay open for a human.

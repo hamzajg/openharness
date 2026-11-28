@@ -5,6 +5,7 @@ writes VALIDATION.md containing:
 - Traceability matrix: acceptance criterion -> scenarios -> wave -> items ->
   test evidence found in the repo (scenario names searched in test files).
 - Coverage stats: scenarios with/without detected test evidence.
+- Maturity coverage: @m-<axis> axes, their first wave, or a reasoned N/A (D020).
 - Demo script: the happy-path scenarios ordered as a manual walkthrough.
 - Gaps: scenarios with no/weak-only evidence, unplanned waves, missing
   artifacts.
@@ -24,6 +25,11 @@ from pathlib import Path
 
 from openharness import evidence as evidence_bundles
 from openharness.skill import skill
+from skills.product.spec_scaffold import (
+    MATURITY_AXES,
+    declared_tier,
+    maturity_status,
+)
 
 _SKIP_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
@@ -36,6 +42,11 @@ _AC_ROW_RE = re.compile(r"^\|\s*\d+\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|\s*$", r
 _NUMBERED_AC_RE = re.compile(r"^\s*(\d+)[.)]\s+(.+?)\s*$", re.M)
 _AC_SECTION_RE = re.compile(r"^##\s+Acceptance criteria\s*$", re.M | re.I)
 _TAG_RE = re.compile(r"@w(\d+)")
+_MATURITY_TAG_RE = re.compile(r"@m-([a-z-]+)", re.I)
+_MATURITY_NA_RE = re.compile(
+    r"^\s*#\s*Maturity\s+N/A\s*:\s*@m-([a-z-]+)\s*[—–-]\s*(\S.{7,})\s*$",
+    re.I | re.M,
+)
 _ITEM_RE = re.compile(r"^##\s+(?:B|US)(\d+)\s*[—-]\s*(.+)$", re.M)
 _WAVE_ITEM_RE = re.compile(r"^##\s+Wave\s+(\d+)", re.M)
 _OUTCOME_SECTION_RE = re.compile(
@@ -66,7 +77,7 @@ def _test_files(root: Path):
 
 
 def _scenario_index(feature_text: str):
-    """Return list of {name, waves:set[int], happy:bool}."""
+    """Return list of {name, waves, axes, happy} for each scenario."""
     out = []
     lines = feature_text.splitlines()
     pending_tags = []
@@ -74,6 +85,7 @@ def _scenario_index(feature_text: str):
         s = line.strip()
         if s.startswith("@"):
             pending_tags += _TAG_RE.findall(s)
+            pending_tags += [f"m-{a.lower()}" for a in _MATURITY_TAG_RE.findall(s)]
             if "happy" in s:
                 pending_tags.append("happy")
         elif s.startswith("Scenario"):
@@ -81,6 +93,7 @@ def _scenario_index(feature_text: str):
             out.append({
                 "name": name,
                 "waves": {int(w) for w in pending_tags if w.isdigit()},
+                "axes": {t[2:] for t in pending_tags if t.startswith("m-")},
                 "happy": "happy" in pending_tags,
             })
             pending_tags = []
@@ -241,7 +254,8 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
     if missing:
         return f"ERROR: missing artifacts in {d}: {', '.join(missing)}"
 
-    scenarios = _scenario_index(feat_f.read_text())
+    feature_text = feat_f.read_text()
+    scenarios = _scenario_index(feature_text)
     acs = _ac_rows(spec_f.read_text(), scenarios) if spec_f.is_file() else []
     waves_text = waves_f.read_text() if waves_f.is_file() else ""
     planned_waves = {int(w) for w in _WAVE_ITEM_RE.findall(waves_text)}
@@ -303,6 +317,33 @@ def ship_validate(spec_dir: str = "", repo_path: str = ".") -> str:
         mark = "✓" if evidence[s["name"]]["strong"] else ("~" if evidence[s["name"]]["weak"] else "✗")
         waves = ", ".join(f"@w{w}" for w in sorted(s["waves"])) or "untagged"
         out.append(f"- {mark} `{s['name']}` ({waves})")
+    out.append("")
+
+    tier = declared_tier((d / "DOMAIN.md").read_text(errors="ignore")
+                         if (d / "DOMAIN.md").is_file() else "")
+    covered = {a for s in scenarios for a in s["axes"]}
+    axis_wave: dict[str, int] = {}
+    for scenario in scenarios:
+        wave = min(scenario["waves"]) if scenario["waves"] else 0
+        for axis in scenario["axes"]:
+            if axis not in MATURITY_AXES:
+                continue
+            if axis not in axis_wave or wave < axis_wave[axis]:
+                axis_wave[axis] = wave
+    naive = {a.lower(): reason for a, reason in _MATURITY_NA_RE.findall(feature_text)}
+    floor_ok, floor_problems = maturity_status(feature_text, tier)
+    out.append("## Maturity coverage")
+    out.append("")
+    out.append(f"- Tier: {tier} — floor {'met' if floor_ok else 'not met: ' + ', '.join(floor_problems[:3])}")
+    for axis in MATURITY_AXES:
+        if axis in covered:
+            wave = axis_wave.get(axis, 0)
+            where = f"@w{wave}" if wave else "untagged"
+            out.append(f"- ✓ @m-{axis} — exercised by a {where} scenario")
+        elif axis in naive:
+            out.append(f"- N/A @m-{axis} — {naive[axis]}")
+        else:
+            out.append(f"- ✗ @m-{axis} — no scenario or justified N/A")
     out.append("")
     tdd = _tdd_status(root, d.name)
     out.append("## TDD evidence")

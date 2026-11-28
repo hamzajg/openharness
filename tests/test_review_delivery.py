@@ -48,6 +48,7 @@ SPEC = textwrap.dedent("""\
     |---|-----------|-------------|
     | 1 | Adding an item shows it in the cart | add an item |
     | 2 | Checkout creates an order | checkout |
+    | 3 | An added item survives reload | an added item survives reload |
     """)
 
 FEATURE = textwrap.dedent("""\
@@ -59,11 +60,21 @@ FEATURE = textwrap.dedent("""\
         When I add an item
         Then it appears
 
-      @w2 @happy-path
+      @w1 @m-data
+      Scenario: an added item survives reload
+        Given a cart with one item
+        When I reload the page
+        Then the item is still there
+
+      @w2 @m-failure
       Scenario: checkout
         Given a full cart
         When I check out
         Then an order exists
+
+    # Maturity N/A: @m-ownership — anonymous cart, no auth boundary
+    # Maturity N/A: @m-ux — no distinct edge state in this narrow spec
+    # Maturity N/A: @m-outcome — signal arrives after release
     """)
 
 BACKLOG = textwrap.dedent("""\
@@ -88,6 +99,7 @@ VALIDATION = textwrap.dedent("""\
     |----|-----------|-----------|---------|---------------|
     | 1 | Adding an item shows it | add an item | 1 | test_cart.py |
     | 2 | Checkout creates an order | checkout | 2 | test_cart.py |
+    | 3 | An added item survives reload | an added item survives reload | 1 | test_cart.py |
 
     ## Gaps
 
@@ -105,7 +117,7 @@ def _write(root: Path, rel: str, content: str) -> Path:
 DOMAIN = textwrap.dedent("""\
     # Domain model: Cart
 
-    **Tier:** standard
+    **Tier:** simple
 
     ## Ubiquitous language
 
@@ -154,6 +166,7 @@ def _delivery(root: Path, name: str = "cart") -> Path:
     _write(root, "tests/test_cart.py", textwrap.dedent("""\
         def test_cart():
             # add an item
+            # an added item survives reload
             # checkout
             assert True
         """))
@@ -241,11 +254,55 @@ def test_domain_and_experience_gaps_are_advisory_concerns(tmp_path):
     assert "0 blockers" in out
 
 
+def test_maturity_gaps_are_advisory_concerns(tmp_path):
+    d = _spec_only(tmp_path)
+    (d / "EXAMPLES.feature").write_text(FEATURE.replace(
+        "  @w1 @m-data\n", "  @w1\n"
+    ).replace("  @w2 @m-failure\n", "  @w2\n"))
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    concerns = out.split("## Concerns", 1)[1].split("## Unverified", 1)[0]
+    assert "[maturity-axis-missing]" in concerns
+    assert "@m-failure" in concerns
+    assert "0 blockers" in out
+
+
+def test_maturity_na_without_reason_is_a_concern(tmp_path):
+    d = _spec_only(tmp_path)
+    feature = FEATURE.replace(
+        "  @w1 @m-data\n", "  # Maturity N/A: @m-data\n  @w1 @m-data\n",
+    )
+    (d / "EXAMPLES.feature").write_text(feature)
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    concerns = out.split("## Concerns", 1)[1].split("## Unverified", 1)[0]
+    assert "[maturity-na-unjustified]" in concerns
+    assert "0 blockers" in out
+
+
+def test_crowded_maturity_wave_is_an_advisory_concern(tmp_path):
+    d = _spec_only(tmp_path)
+    (d / "EXAMPLES.feature").write_text(
+        FEATURE.replace("  @w2 @m-failure", "  @w1 @m-failure")
+    )
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    concerns = out.split("## Concerns", 1)[1].split("## Unverified", 1)[0]
+    assert "[maturity-wave-crowded]" in concerns
+
+
+def test_unknown_maturity_tag_is_a_concern(tmp_path):
+    d = _spec_only(tmp_path)
+    (d / "EXAMPLES.feature").write_text(FEATURE.replace("@m-failure", "@m-security"))
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    concerns = out.split("## Concerns", 1)[1].split("## Unverified", 1)[0]
+    assert "[maturity-tag-unknown]" in concerns
+    assert "@m-security" in concerns
+    assert "0 blockers" in out
+
+
 def test_clean_delivery_audit_has_no_findings(tmp_path):
     _delivery(tmp_path)
     out = _audit(tmp_path, phase="delivery", changed="src/cart/store.py")
     assert "Findings: **0 blockers · 0 concerns · 0 unverified**" in out
-    assert "Validation rows: 2" in out
+    assert "Validation rows: 3" in out
 
 
 def test_done_wave_without_tdd_steps_is_a_concern(tmp_path):
@@ -351,7 +408,7 @@ def test_unknown_wave_reference_is_a_blocker(tmp_path):
 def test_untagged_scenario_is_a_blocker(tmp_path):
     d = _spec_only(tmp_path)
     (d / "EXAMPLES.feature").write_text(
-        (d / "EXAMPLES.feature").read_text().replace("  @w2 @happy-path\n", "")
+        (d / "EXAMPLES.feature").read_text().replace("  @w2 @m-failure\n", "")
     )
     out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
     assert "[scenario-untagged]" in out and "checkout" in out

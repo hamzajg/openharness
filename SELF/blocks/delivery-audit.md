@@ -50,6 +50,11 @@ Two halves:
   criteria (`sh gradlew test`) need no Gherkin scenario.
 - **Evidence** — placeholder wave/gate evidence, missing `file:` gate
   artifacts, unowned waivers, weak/empty validation rows, validation gaps.
+- **Scenario maturity (D020)** — `maturity-axis-missing`,
+  `maturity-na-unjustified`, `maturity-tag-unknown`, `maturity-scenario-mixed`,
+  `maturity-wave-crowded`, `maturity-axis-untagged`; the auditor decides whether
+  a tagged scenario really exercises failure/auth/data/UX/outcome, and whether
+  each axis arrived in its own small wave and dedicated scenario.
 - **Scope** — changed files outside the spec's in-scope paths, and
   `TODO`/`FIXME`/`placeholder` markers in changed product code.
 - **Verdict block** — filled by the auditor, never by the skill.
@@ -81,6 +86,9 @@ A `BLOCK` verdict stops the loop; `PASS` and accepted `CONCERNS` continue.
   repository and the tests are the evidence.
 - A passing test suite is not proof of the spec; the tests must assert the
   scenario's outcome, not merely contain its name.
+- An `@m-<axis>` tag is not proof of maturity (D020); confirm the assertion
+  exercises that axis and that axes are staged one per wave in dedicated
+  scenarios, or record a `CONCERN` with the specific gap.
 - Dismissed brief findings are recorded with a reason, never dropped silently.
 - Never invent evidence. If it was not read or run, it is `UNVERIFIED`.
 

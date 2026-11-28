@@ -295,3 +295,45 @@ invariants leak into callers. Specs that skip the domain model produce
 plausible-looking waves that do not compose. The experience contract does
 the same for UX: "intuitive" is ungradeable until it is written down as a
 journey, edge states and a bar a reviewer can check (ADR 0011).
+
+### D020 — Scenario maturity is a spec artifact
+
+Rule: `EXAMPLES.feature` must describe observable behavior beyond the happy
+path. Five axes are tagged on real scenarios: `@m-failure`
+(retry/timeout/idempotency/partial failure/conflict), `@m-ownership`
+(roles/ownership/isolation/revocation/audit), `@m-data` (persistence,
+migration, import/export, search/pagination, eventual consistency), `@m-ux`
+(empty/loading/error/denied/offline, undo, accessibility), and `@m-outcome`
+(an observable signal tied to D017's numeric target). An axis that genuinely
+does not apply must be justified outside a scenario with `# Maturity N/A:
+@m-<axis> — <reason>`; a bare `N/A` or placeholder is rejected. Added value
+arrives in small waves: each new axis gets its own `@w<N>` wave and a dedicated
+scenario, and the happy path gets its own scenario. More than one scenario for
+the SAME axis in one wave is depth; several different axes in one wave is the
+big-bang iteration this decision forbids.
+
+The DOMAIN.md tier controls depth, never presence: `simple` needs a happy path
+and at least 2 exercised axes, `standard` needs 3 including failure (and UX
+covered or justified), `domain-heavy` needs every axis covered or justified
+plus at least 3 exercised, including failure and data. `spec_scaffold` emits
+blocking gate `G4 — Scenario maturity floor` (`Before: plan`,
+`Check: file:specs/<feature>/EXAMPLES.feature`); `ship_loop` refuses to mark
+it met while the axis floor is unmet and treats a later regression as stale.
+`review_delivery` reports `maturity-axis-missing`, `maturity-na-unjustified`,
+`maturity-tag-unknown`, `maturity-scenario-mixed`, `maturity-wave-crowded` and
+`maturity-axis-untagged` as advisory concerns; `wave_plan` warns on crowded
+waves without changing wave order, and `ship_validate` reports the first wave
+per covered axis in `VALIDATION.md`. Deterministic checks prove breadth, not quality:
+whether a scenario actually exercises the axis remains semantic judgment for
+the spec audit, challenger and wave reviewer. Innovation means closing real
+maturity gaps that create product value, not adding frameworks to look mature
+(D018).
+
+Because: happy-path-only examples pass every traceability check while
+proving nothing about operation in the real world. Agents optimize for the
+demo they can imagine, so the product stops at primitive use cases that
+would not survive multi-user use, failure, reload, or a measured outcome.
+Putting the axes in the spec artifact — with the same shallow gate pattern as
+D017/D019 — forces the expensive questions while they are still cheap to
+change, and leaves a reviewable trace from value contract to executable
+example (ADR 0012).

@@ -214,6 +214,23 @@ Both checks are shallow on purpose: they prove the contract exists and is
 not a template. Whether a `domain-heavy` model is real is the spec
 audit's and wave reviewer's judgment, not the oracle's.
 
+## Scenario maturity before planning (required)
+
+`spec_scaffold` writes a fifth blocking `Before: plan` gate (D020),
+`G4 — Scenario maturity floor` (`Check:
+file:specs/<feature>/EXAMPLES.feature`). `EXAMPLES.feature` must carry
+`@w<N>` wave tags plus real `@m-failure`, `@m-ownership`, `@m-data`,
+`@m-ux` and `@m-outcome` scenarios, or justify an inapplicable axis with
+`# Maturity N/A: @m-<axis> — <reason>` outside a scenario. The DOMAIN.md
+tier sets how many axes must be exercised: `simple` needs 2, `standard`
+needs 3 including failure, `domain-heavy` needs every axis covered or
+justified with at least 3 exercised including failure and data. Each new axis
+goes in its own `@w<N>` wave and a dedicated scenario; the happy path gets its
+own scenario. Several scenarios for the SAME axis in one wave are depth;
+several axes in one wave fail G4 and appear as `wave_plan` warnings. The oracle
+only proves staged breadth; the spec audit and wave reviewer decide whether
+each scenario actually tests its axis.
+
 ## Challenge design decisions (required by default)
 
 `spec_scaffold` writes a blocking gate — `G1 — Design decisions
@@ -350,8 +367,9 @@ must:
    differentiation.
 3. Pick the best candidate in autonomous mode.
 4. Scaffold `specs/<feature>/`.
-5. Fill `SPEC.md`, `EXAMPLES.feature` (tags `@w<N>`), `BACKLOG.md` (user
-   stories with `Depends:`).
+5. Fill `SPEC.md`, `EXAMPLES.feature` (`@w<N>` waves plus `@m-<axis>`
+   maturity staged one new axis per wave in a dedicated scenario, happy path
+   separate, or reasoned N/A), `BACKLOG.md` (user stories with `Depends:`).
 6. Derive preconditions into `GATES.md`.
 7. Run `wave_plan` until it reports no warnings.
 

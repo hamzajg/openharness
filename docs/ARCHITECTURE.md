@@ -1,7 +1,7 @@
 # Architecture — openharness
 
 Current-state map. Descriptive, not aspirational; normative decisions live
-in `SELF/PRINCIPLES.md` (D001–D018). See `docs/adr/` for the baseline record.
+in `SELF/PRINCIPLES.md` (D001–D020). See `docs/adr/` for the baseline record.
 
 ## Dual role
 
@@ -51,8 +51,12 @@ OpenHarness is simultaneously:
   → checks blocking gates for the current phase → returns one directive (or a
   `GATE:`/`NEXT: fix wave-plan warnings` directive) → the agent delegates it
   to a subagent role → outcome recorded back into `LOOP.md`/`LOOP.state.json`.
-  The audit mode (`review`) is persisted in that state. No harness-side
-  scheduling (D001, D009).
+  `EXAMPLES.feature` carries `@w<N>` wave tags and `@m-<axis>` maturity tags;
+  gate G4 uses `maturity_status` (with the DOMAIN.md tier) to block shallow
+  happy-path-only specs before planning, including big-bang waves that cram
+  several axes into one iteration (D020). `wave_plan` emits D020 warnings for
+  crowded waves but never changes wave order. The audit mode (`review`) is
+  persisted in that state. No harness-side scheduling (D001, D009).
 - **Independent audit:** `/review-delivery` → `review_delivery` builds a
   deterministic brief (artifact presence, AC → scenario → wave → backlog →
   LOOP traceability, claimed path/script/endpoint/ADR existence, evidence

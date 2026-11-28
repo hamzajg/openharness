@@ -37,6 +37,37 @@ FEATURE = textwrap.dedent("""\
         Then an order exists
     """)
 
+MATURE_FEATURE = textwrap.dedent("""\
+    Feature: Cart
+
+      @w1 @happy-path
+      Scenario: add an item
+        Given a cart
+        When I add an item
+        Then it appears
+
+      @w1 @m-data
+      Scenario: an added item survives reload
+        Given a cart with one item
+        When I reload the page
+        Then the item is still there
+
+      @w2 @m-failure
+      Scenario: a timed-out checkout is not duplicated
+        Given a checkout request with an idempotency key
+        When the gateway times out and the request is retried
+        Then one order exists
+
+      @w3 @m-ux
+      Scenario: an empty cart explains the next step
+        Given an empty cart
+        When I open checkout
+        Then I see an empty state
+
+    # Maturity N/A: @m-ownership — anonymous cart, no auth boundary
+    # Maturity N/A: @m-outcome — signal arrives after release
+    """)
+
 
 FILLED_VALUE_CONTRACT = """\
 ## Value contract
@@ -220,6 +251,55 @@ def test_experience_gate_requires_fields_or_reasoned_na(tmp_path):
     ))
     out = _run(tmp_path, action="gate", gate="G3", status="met", evidence=evidence_arg)
     assert "Gate G3 met" in out
+
+
+def test_scaffold_creates_maturity_gate(tmp_path):
+    spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
+    gates = (tmp_path / "specs" / "cart-checkout" / "GATES.md").read_text()
+    assert "G4 — Scenario maturity floor" in gates
+    assert "Before: plan" in gates and "Blocking: yes" in gates
+    assert "Check: file:specs/cart-checkout/EXAMPLES.feature" in gates
+
+
+def test_maturity_gate_requires_tier_aware_examples(tmp_path):
+    spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
+    d = tmp_path / "specs" / "cart-checkout"
+    evidence_arg = "file:specs/cart-checkout/EXAMPLES.feature"
+    (d / "DOMAIN.md").write_text(FILLED_DOMAIN_MD)
+
+    out = _run(tmp_path, action="gate", gate="G4", status="met", evidence=evidence_arg)
+    assert out.startswith("ERROR") and "staged scenario maturity" in out
+
+    (d / "EXAMPLES.feature").write_text(MATURE_FEATURE)
+    out = _run(tmp_path, action="gate", gate="G4", status="met", evidence=evidence_arg)
+    assert "Gate G4 met" in out
+
+    # Dropping the maturity tags makes the gate stale, not silently met.
+    (d / "EXAMPLES.feature").write_text(FEATURE)
+    out = _run(tmp_path)
+    assert "GATE:" in out and "G4" in out and "stale" in out
+
+
+def test_maturity_gate_rejects_big_bang_waves(tmp_path):
+    spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
+    d = tmp_path / "specs" / "cart-checkout"
+    evidence_arg = "file:specs/cart-checkout/EXAMPLES.feature"
+    (d / "DOMAIN.md").write_text(FILLED_DOMAIN_MD)
+
+    crowded = MATURE_FEATURE.replace("  @w2 @m-failure", "  @w1 @m-failure")
+    (d / "EXAMPLES.feature").write_text(crowded)
+    out = _run(tmp_path, action="gate", gate="G4", status="met", evidence=evidence_arg)
+    assert out.startswith("ERROR") and "split maturity axes into separate waves" in out
+
+    (d / "EXAMPLES.feature").write_text(MATURE_FEATURE)
+    assert "Gate G4 met" in _run(
+        tmp_path, action="gate", gate="G4", status="met", evidence=evidence_arg
+    )
+
+    # Crowding the axes after the gate was met regresses it to stale.
+    (d / "EXAMPLES.feature").write_text(crowded)
+    out = _run(tmp_path)
+    assert "GATE:" in out and "G4" in out and "stale" in out
 
 
 FILLED_DOMAIN_MD = """\
