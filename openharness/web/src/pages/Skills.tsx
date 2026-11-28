@@ -90,7 +90,7 @@ export default function Skills() {
         </div>
         <p className="text-xs text-ink-mute">
           {skills.length} skill{skills.length === 1 ? '' : 's'} ·{' '}
-          <span className="text-amber-300">{nonDet}</span> non-deterministic
+          <span className="text-warn">{nonDet}</span> non-deterministic
         </p>
       </Toolbar>
 

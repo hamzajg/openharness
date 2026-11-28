@@ -58,6 +58,8 @@ measurable — a number, a unit, and a review window.
 - Edge states: (empty / loading / error / permission-denied states that matter)
 - UX bar: (what "intuitive" concretely means for this feature)
 - Accessibility: (keyboard / screen-reader / contrast notes, or n/a — reason)
+- UI pattern: (F-pattern | Z-pattern | single-column; optional `— rationale`; per tier: simple declares Z‑pattern implicit or F/Z; standard names the pattern; domain-heavy references the standard)
+- Navigation/overlay: (full-page | side-pane | modal | inline; add `— rationale` for why this surface over the alternatives; per tier: standard explains the choice, domain-heavy cites the standard)
 
 ## Scope (in)
 
@@ -274,9 +276,10 @@ _GATES_MD = """# Gates: {title}
 - Blocking: yes
 - Check: section:specs/{slug}/SPEC.md#Experience
 - Why: D019 — user-facing features must name the primary journey, edge
-  states, a concrete UX bar and accessibility notes before planning. A
-  feature with no user-facing surface writes `N/A — <reason>`; a bare N/A
-  is rejected.
+  states, a concrete UX bar, accessibility notes, a UI pattern and a
+  navigation surface (full-page | side-pane | modal | inline) before
+  planning. A feature with no user-facing surface writes `N/A — <reason>`;
+  a bare N/A is rejected.
 
 ## G4 — Scenario maturity floor
 - Before: plan
@@ -377,6 +380,12 @@ _TIER_RE = re.compile(
 )
 
 
+def domain_tier(text: str) -> str | None:
+    """The declared DOMAIN.md tier, lower-cased, or None when absent."""
+    match = _TIER_RE.search(text or "")
+    return match.group(1).lower() if match else None
+
+
 def domain_status(text: str) -> tuple[bool, list[str]]:
     """(filled, problems) for DOMAIN.md (D019).
 
@@ -397,18 +406,73 @@ def domain_status(text: str) -> tuple[bool, list[str]]:
     return not problems, problems
 
 
-_EXPERIENCE_FIELDS = ("Primary journey", "Edge states", "UX bar", "Accessibility")
+_EXPERIENCE_FIELDS = ("Primary journey", "Edge states", "UX bar", "Accessibility", "UI pattern", "Navigation/overlay")
 _NA_LINE_RE = re.compile(r"^N/?A\b", re.I)
 _NA_REASON_RE = re.compile(r"^N/?A\s*[—–-]\s*(\S.{7,})\s*$", re.I)
 _BARE_NA_RE = re.compile(r"^n/?a\.?$", re.I)
+# The named pattern may carry a rationale ("F-pattern — dense stock tables"),
+# and `F/Z` is the hedge the tier guidance prescribes for simple features.
+_UI_PATTERN_RE = re.compile(r"^(?:F-pattern|Z-pattern|single-column|F/Z)\b", re.I)
+_UI_PATTERN_NAMED_RE = re.compile(r"^(?:F-pattern|Z-pattern|single-column)\b", re.I)
+_UI_SIMPLE_RE = re.compile(r"^(?:Z-pattern|F/Z)\b", re.I)
+# Primary surface the journey runs on. `drawer` is accepted as an alias for
+# the canonical `side-pane` so an author's vocabulary cannot fail the gate.
+_NAV_SURFACE_RE = re.compile(r"^(?:full-page|side-pane|drawer|modal|inline)\b", re.I)
+_NAV_WHY_RE = re.compile(
+    r"^(?:full-page|side-pane|drawer|modal|inline)\s*[—–-]\s*(\S.{7,})\s*$",
+    re.I,
+)
+# Design references a domain-heavy feature may cite for its pattern or
+# navigation surface.
+_UI_STANDARD_RE = re.compile(
+    r"\b(?:Material(?:\s+Design)?|Apple\s+HIG|Human\s+Interface\s+Guidelines|NN/?g|Nielsen(?:\s+Norman)?|Polaris|Bootstrap|Fluent|Carbon|Ant\s+Design|Tailwind)\b",
+    re.I,
+)
 
 
-def experience_status(text: str) -> tuple[bool, list[str]]:
+def experience_field(text: str, field: str) -> str:
+    """One `- <field>: value` bullet from `## Experience`, continuations joined.
+
+    Indented continuation lines belong to the value; the next bullet, blank
+    line or heading ends it. Returns "" when the section or field is absent.
+    """
+    body = _section_body(text, "Experience")
+    pattern = re.compile(rf"^\s*-\s*{re.escape(field)}\s*:\s*(.*)$", re.I)
+    parts: list[str] = []
+    capturing = False
+    for line in body.splitlines():
+        if capturing:
+            if line.startswith((" ", "\t")) and line.strip():
+                parts.append(line.strip())
+                continue
+            break
+        match = pattern.match(line)
+        if match:
+            capturing = True
+            parts.append(match.group(1).strip())
+    return " ".join(parts).strip()
+
+
+def experience_surface(text: str) -> str | None:
+    """The declared navigation surface, normalized (`drawer` -> `side-pane`)."""
+    match = _NAV_SURFACE_RE.match(experience_field(text, "Navigation/overlay"))
+    if not match:
+        return None
+    token = match.group(0).lower()
+    return "side-pane" if token == "drawer" else token
+
+
+def experience_status(text: str, tier: str | None = None) -> tuple[bool, list[str]]:
     """(filled, problems) for SPEC.md's `## Experience` section (D019).
 
     Either every field is substantively filled, or the whole section declares
     `N/A — <reason>` (a bare N/A is rejected — explicit defaults, not silent
     skips). Per-field `n/a — <reason>` is allowed inside filled fields.
+    When `tier` (from DOMAIN.md) is supplied, the UI pattern must match the
+    tier's depth rule: simple = Z-pattern/F-Z hedge, standard = a named
+    pattern, domain-heavy = a named pattern citing a design standard. The
+    navigation surface follows the same shape: standard must say why it was
+    chosen, domain-heavy must also cite the design standard behind it.
     """
     body = _section_body(text, "Experience")
     if not body.strip():
@@ -427,6 +491,62 @@ def experience_status(text: str) -> tuple[bool, list[str]]:
         value = fm.group(1).strip() if fm else ""
         if not value or _UNFILLED_VALUE_RE.search(value) or _BARE_NA_RE.match(value):
             problems.append(field)
+    # Validate UI pattern field: a named pattern (optionally with a
+    # rationale) or a per-field `n/a — <reason>`; anything else is rejected.
+    pattern_fm = re.search(
+        rf"^-\s*UI pattern:\s*(.+?)\s*$",
+        body, re.M | re.I,
+    )
+    pattern_value = pattern_fm.group(1).strip() if pattern_fm else ""
+    if (
+        pattern_value
+        and not _BARE_NA_RE.match(pattern_value)
+        and not _NA_REASON_RE.match(pattern_value)
+    ):
+        if not _UI_PATTERN_RE.match(pattern_value):
+            problems.append(
+                "UI pattern (F-pattern | Z-pattern | single-column | F/Z)"
+            )
+        elif tier == "simple" and not _UI_SIMPLE_RE.match(pattern_value):
+            problems.append("UI pattern (simple tier: Z-pattern or F/Z)")
+        elif tier == "standard" and not _UI_PATTERN_NAMED_RE.match(pattern_value):
+            problems.append(
+                "UI pattern (standard tier must name F-pattern, Z-pattern or "
+                "single-column; F/Z is a hedge, not a decision)"
+            )
+        elif tier == "domain-heavy" and not _UI_STANDARD_RE.search(pattern_value):
+            problems.append(
+                "UI pattern (domain-heavy tier must cite a design standard, "
+                "e.g. Material, Apple HIG, Polaris, NN/g)"
+            )
+    # Validate the navigation surface: a closed vocabulary so the page / pane /
+    # modal decision is reviewable, with depth scaling by tier.
+    nav_fm = re.search(
+        rf"^-\s*Navigation/overlay:\s*(.+?)\s*$",
+        body, re.M | re.I,
+    )
+    nav_value = nav_fm.group(1).strip() if nav_fm else ""
+    if (
+        nav_value
+        and not _BARE_NA_RE.match(nav_value)
+        and not _NA_REASON_RE.match(nav_value)
+    ):
+        if not _NAV_SURFACE_RE.match(nav_value):
+            problems.append(
+                "Navigation/overlay (full-page | side-pane | modal | inline)"
+            )
+        elif tier in ("standard", "domain-heavy") and not _NAV_WHY_RE.match(
+            nav_value
+        ):
+            problems.append(
+                "Navigation/overlay (standard tier must explain the choice: "
+                "`<surface> — <rationale>`)"
+            )
+        elif tier == "domain-heavy" and not _UI_STANDARD_RE.search(nav_value):
+            problems.append(
+                "Navigation/overlay (domain-heavy tier must cite a design "
+                "standard, e.g. Material, Apple HIG, Polaris, NN/g)"
+            )
     return not problems, problems
 
 
@@ -607,14 +727,17 @@ def maturity_status(feature_text: str, tier: str = "simple") -> tuple[bool, list
     return not problems, problems
 
 
-def section_status(text: str, section: str) -> tuple[bool, list[str]]:
+def section_status(
+    text: str, section: str, tier: str | None = None
+) -> tuple[bool, list[str]]:
     """(filled, problems) for a generic `## <section>` gate target.
 
-    `Experience` delegates to its field-aware validator; any other section
-    only needs to exist with at least one non-placeholder line.
+    `Experience` delegates to its field-aware validator (passing the DOMAIN.md
+    tier when the caller has it); any other section only needs to exist with
+    at least one non-placeholder line.
     """
     if section.strip().lower() == "experience":
-        return experience_status(text)
+        return experience_status(text, tier=tier)
     body = _section_body(text, section.strip())
     if not body.strip():
         return False, [f"## {section.strip()}"]

@@ -32,7 +32,10 @@ from openharness.skill import skill
 from skills.product.spec_scaffold import (
     declared_tier,
     domain_status,
+    domain_tier,
+    experience_field,
     experience_status,
+    experience_surface,
     maturity_status,
     value_contract_status,
 )
@@ -179,6 +182,64 @@ class Finding:
     code: str
     where: str
     message: str
+
+
+# Explicit journey cues that make a declared surface implausible. Kept narrow
+# on purpose: the spec audit raises a concern for a reviewer to judge, it does
+# not try to decide the surface for them.
+_SURFACE_CONFLICTS = {
+    "modal": (
+        "a browsing or editing journey",
+        re.compile(
+            r"\b(?:browse|browsing|list|table|wizard|multi[- ]step|form|"
+            r"create|edit|configure)\b",
+            re.I,
+        ),
+    ),
+    "full-page": (
+        "a context-preserving pane journey",
+        re.compile(
+            r"\b(?:drawer|side[- ]pane|without leaving|stays? visible|"
+            r"keeps? the (?:list|table|page) visible)\b",
+            re.I,
+        ),
+    ),
+    "side-pane": (
+        "a routed or full-page journey",
+        re.compile(
+            r"\b(?:new page|full[- ]page|separate (?:page|route)|"
+            r"deep[- ]?link|navigates? to|wizard|multi[- ]step)\b",
+            re.I,
+        ),
+    ),
+    "inline": (
+        "an overlay or routed journey",
+        re.compile(
+            r"\b(?:drawer|side[- ]pane|new page|full[- ]page|"
+            r"separate (?:page|route)|navigates? to)\b",
+            re.I,
+        ),
+    ),
+}
+
+
+def _surface_journey_mismatch(surface: str | None, journey: str) -> str | None:
+    """Advisory text when the primary journey plainly contradicts the surface."""
+    if not surface or not journey:
+        return None
+    entry = _SURFACE_CONFLICTS.get(surface)
+    if not entry:
+        return None
+    label, cue = entry
+    matches = sorted({m.group(0).lower() for m in cue.finditer(journey)})
+    if not matches:
+        return None
+    quoted = ", ".join(f"`{m}`" for m in matches[:4])
+    return (
+        f"declared surface `{surface}` conflicts with the primary journey, "
+        f"which reads like {label} ({quoted}); reconcile the field or the "
+        "journey (docs/frontend-page-guide.md)"
+    )
 
 
 # ----------------------------------------------------------------- parsing
@@ -837,7 +898,10 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
                 "domain model is a template or missing sections: "
                 + ", ".join(d_problems[:4]),
             ))
-    e_ok, e_problems = experience_status(spec_text) if spec_text else (True, [])
+    tier = domain_tier(artifacts["DOMAIN.md"]) if artifacts["DOMAIN.md"] else None
+    e_ok, e_problems = (
+        experience_status(spec_text, tier=tier) if spec_text else (True, [])
+    )
     if spec_text and not e_ok:
         findings.append(Finding(
             "concern", "experience-missing",
@@ -846,6 +910,17 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
             + ", ".join(e_problems[:4])
             + " (advisory — the Before: plan gate enforces it)",
         ))
+    elif spec_text:
+        mismatch = _surface_journey_mismatch(
+            experience_surface(spec_text),
+            experience_field(spec_text, "Primary journey"),
+        )
+        if mismatch:
+            findings.append(Finding(
+                "concern", "experience-surface-mismatch",
+                f"specs/{spec_dir.name}/SPEC.md",
+                mismatch,
+            ))
 
     # --- scenario maturity (D020): advisory here, G4 gate enforces -----
     if feature_text.strip():

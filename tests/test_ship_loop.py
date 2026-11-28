@@ -133,6 +133,9 @@ FILLED_EXPERIENCE = """\
 - Edge states: empty cart shows browse CTA; payment failure keeps the cart
 - UX bar: single-page checkout, no mode switching
 - Accessibility: keyboard navigable, labeled fields
+- UI pattern: Z-pattern — checkout summary and totals lead to one pay action
+- Navigation/overlay: side-pane — keeps the cart rows visible while editing a
+  line item
 
 """
 
@@ -923,6 +926,19 @@ def test_decision_review_gate_requires_a_filled_verdict(tmp_path):
     review.write_text("# Review\n\nVERDICT: ACCEPT | REVISE | REVISIT | SPLIT\n")
     out = _run(tmp_path)
     assert "GATE:" in out and "G1" in out and "stale" in out
+
+
+def test_experience_gate_stale_when_pattern_hedges_a_standard_tier(tmp_path):
+    d = _spec(tmp_path)
+    (d / "DOMAIN.md").write_text(
+        FILLED_DOMAIN.replace("**Tier:** simple", "**Tier:** standard")
+    )
+    spec = d / "SPEC.md"
+    spec.write_text(spec.read_text().replace(
+        "Z-pattern — checkout summary and totals lead to one pay action", "F/Z"
+    ))
+    out = _run(tmp_path, spec_dir=str(d), action="status")
+    assert "G3" in out and "stale" in out
 
 
 def test_wave_plan_warnings_block_wave_start(tmp_path):

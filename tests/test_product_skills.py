@@ -10,7 +10,10 @@ from skills.product.discover_product import discover_product
 from skills.product.spec_scaffold import (
     declared_tier,
     domain_status,
+    domain_tier,
+    experience_field,
     experience_status,
+    experience_surface,
     maturity_status,
     section_status,
     spec_scaffold,
@@ -59,6 +62,7 @@ def test_spec_scaffold_creates_artifacts_with_outcome_hypothesis(tmp_path):
     assert (d / "DOMAIN.md").is_file()
     spec = (d / "SPEC.md").read_text()
     assert "## Experience" in spec
+    assert "Navigation/overlay" in spec
     gates = (d / "GATES.md").read_text()
     assert "G2 — Domain model captured" in gates
     assert "G3 — Experience contract filled" in gates
@@ -171,11 +175,155 @@ def test_experience_status_needs_fields_or_reasoned_na():
 - Edge states: empty cart shows browse CTA; payment failure keeps the cart
 - UX bar: single-page checkout, no mode switching
 - Accessibility: keyboard navigable, labeled fields
+- UI pattern: F-pattern — items scan top to bottom into the total
+- Navigation/overlay: side-pane — keeps the item list visible while editing
 
 ## Scope (in)
 """
     ok, problems = experience_status(filled)
     assert ok and problems == []
+
+    for pattern in ("Z-pattern", "single-column", "F/Z", "Z-pattern — landing page"):
+        ok, problems = experience_status(
+            filled.replace(
+                "- UI pattern: F-pattern — items scan top to bottom into the total",
+                f"- UI pattern: {pattern}",
+            )
+        )
+        assert ok and problems == [], pattern
+
+    ok, problems = experience_status(
+        filled.replace(
+            "- UI pattern: F-pattern — items scan top to bottom into the total",
+            "- UI pattern: diagonal",
+        )
+    )
+    assert not ok and any("UI pattern" in p for p in problems)
+
+
+def test_experience_status_enforces_tier_pattern_depth():
+    filled = """## Experience
+
+- Primary journey: 1. open stock 2. filter 3. adjust
+- Edge states: empty list shows a create CTA; save failure keeps the form
+- UX bar: filters and totals stay visible while editing
+- Accessibility: keyboard reachable, labelled fields
+- UI pattern: F-pattern — dense stock tables
+- Navigation/overlay: side-pane — keeps the stock list visible while adjusting a level (NN/g: context preservation)
+"""
+    ok, problems = experience_status(filled, tier="standard")
+    assert ok and problems == []
+
+    # simple: the Z-pattern default or the F/Z hedge, decided by nobody.
+    assert experience_status(filled, tier="simple")[0] is False
+    ok, problems = experience_status(
+        filled.replace("F-pattern — dense stock tables", "F/Z"), tier="simple"
+    )
+    assert ok and problems == []
+    ok, _ = experience_status(
+        filled.replace("F-pattern — dense stock tables", "Z-pattern — default"),
+        tier="simple",
+    )
+    assert ok
+
+    # standard: F/Z is a hedge, not a decision.
+    ok, problems = experience_status(filled.replace("F-pattern", "F/Z"), tier="standard")
+    assert not ok and any("standard tier" in p for p in problems)
+
+    # domain-heavy: the named pattern must cite a design standard.
+    ok, problems = experience_status(filled, tier="domain-heavy")
+    assert not ok and any("design standard" in p for p in problems)
+    ok, _ = experience_status(
+        filled.replace("dense stock tables", "dense stock tables, per Material Design"),
+        tier="domain-heavy",
+    )
+    assert ok
+
+    # A whole-section N/A is exempt from the tier rule.
+    ok, _ = experience_status(
+        "## Experience\n\nN/A — backend job, no user-facing surface\n", tier="simple"
+    )
+    assert ok
+
+    assert domain_tier("# D\n\n**Tier:** domain-heavy\n") == "domain-heavy"
+    assert domain_tier("# D\n\n**Tier:** simple | standard | domain-heavy\n") is None
+
+
+def test_experience_status_validates_navigation_surface_by_tier():
+    filled = """## Experience
+
+- Primary journey: 1. open stock 2. filter 3. adjust
+- Edge states: empty list shows a create CTA; save failure keeps the form
+- UX bar: filters and totals stay visible while editing
+- Accessibility: keyboard reachable, labelled fields
+- UI pattern: F-pattern — dense stock tables
+- Navigation/overlay: side-pane — keeps the filtered list visible while editing
+"""
+    for tier in (None, "standard"):
+        ok, problems = experience_status(filled, tier=tier)
+        assert ok and problems == [], tier
+
+    # The vocabulary is closed: popup and a bare page are not surfaces.
+    ok, problems = experience_status(
+        filled.replace("side-pane — keeps the filtered list visible while editing", "popup"),
+        tier="standard",
+    )
+    assert not ok and any("Navigation/overlay" in p for p in problems)
+
+    # `drawer` is an accepted alias for the canonical `side-pane`.
+    ok, _ = experience_status(
+        filled.replace("side-pane", "drawer"), tier="standard"
+    )
+    assert ok
+
+    # standard: the choice must say why; simple accepts the token alone.
+    token_only = filled.replace(
+        "side-pane — keeps the filtered list visible while editing", "side-pane"
+    )
+    ok, problems = experience_status(token_only, tier="standard")
+    assert not ok and any("explain the choice" in p for p in problems)
+    simple = token_only.replace("F-pattern — dense stock tables", "Z-pattern")
+    assert experience_status(simple, tier="simple")[0]
+
+    # domain-heavy: the rationale must cite the standard behind the choice.
+    ok, problems = experience_status(filled, tier="domain-heavy")
+    assert not ok and any("design standard" in p for p in problems)
+    cited = filled.replace(
+        "F-pattern — dense stock tables",
+        "F-pattern — dense stock tables, per Material Design",
+    ).replace(
+        "side-pane — keeps the filtered list visible while editing",
+        "side-pane — keeps the filtered list visible while editing, per Material Design",
+    )
+    ok, problems = experience_status(cited, tier="domain-heavy")
+    assert ok and problems == []
+
+    # Per-field and whole-section reasoned N/A stay valid.
+    na_nav = cited.replace(
+        "side-pane — keeps the filtered list visible while editing, per Material Design",
+        "n/a — backend-only stock reconciliation",
+    )
+    assert experience_status(na_nav, tier="domain-heavy")[0]
+    assert experience_status(
+        "## Experience\n\nN/A — backend job, no user-facing surface\n",
+        tier="domain-heavy",
+    )[0]
+
+
+def test_experience_field_reads_continuations_and_surface():
+    spec = """## Experience
+
+- Primary journey: opens the list, edits a row
+- Navigation/overlay: drawer — keeps the list visible
+  while editing
+"""
+    assert experience_field(spec, "Primary journey") == "opens the list, edits a row"
+    assert experience_field(spec, "Navigation/overlay") == (
+        "drawer — keeps the list visible while editing"
+    )
+    assert experience_surface(spec) == "side-pane"
+    assert experience_field(spec, "UX bar") == ""
+    assert experience_surface("## Experience\n\n- Primary journey: x\n") is None
 
 
 def test_section_status_dispatches_experience():

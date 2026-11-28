@@ -49,7 +49,7 @@ function LoopRow({
         'group w-full cursor-pointer overflow-hidden rounded-xl border border-l-2 bg-surface/60 text-left transition-colors',
         status.accent,
         selected
-          ? 'border-line ring-1 ring-sky-500/30'
+          ? 'border-line ring-1 ring-accent/30'
           : 'border-line hover:bg-line/30',
       )}
     >
@@ -65,7 +65,7 @@ function LoopRow({
                 {loop.waves_done}/{loop.waves_total} waves
               </span>
               {loop.gates_total > 0 && (
-                <span className={loop.gates_pending > 0 ? 'text-amber-400/90' : ''}>
+                <span className={loop.gates_pending > 0 ? 'text-warn' : ''}>
                   · {loop.gates_total - loop.gates_pending}/{loop.gates_total} gates
                 </span>
               )}
@@ -80,18 +80,21 @@ function LoopRow({
             <IconChevronRight
               className={cn(
                 'h-3.5 w-3.5 transition-colors',
-                selected ? 'text-sky-400' : 'text-ink-faint group-hover:text-ink-dim',
+                selected ? 'text-accent' : 'text-ink-faint group-hover:text-ink-dim',
               )}
             />
-            <div className="hidden h-1 w-28 overflow-hidden rounded-full bg-line sm:block">
+            <div
+              aria-hidden="true"
+              className="hidden h-1 w-28 overflow-hidden rounded-full bg-line sm:block"
+            >
               <div
                 className={cn(
                   'h-full rounded-full transition-all duration-700',
                   loop.status === 'running'
-                    ? 'bg-gradient-to-r from-sky-500 to-cyan-400'
+                    ? 'bg-accent'
                     : loop.status === 'blocked'
-                      ? 'bg-gradient-to-r from-amber-500 to-orange-400'
-                      : 'bg-gradient-to-r from-emerald-500 to-teal-400',
+                      ? 'bg-warn'
+                      : 'bg-ok',
                 )}
                 style={{ width: `${loop.status === 'done' ? 100 : pct}%` }}
               />
@@ -100,8 +103,8 @@ function LoopRow({
         </div>
 
         {reason && (
-          <div className="mt-2.5 rounded-md bg-amber-500/10 px-3 py-2 ring-1 ring-amber-500/20">
-            <p className="text-xs leading-relaxed text-amber-200/90">
+          <div className="mt-2.5 rounded-md bg-warn/10 px-3 py-2 ring-1 ring-warn/20">
+            <p className="text-xs leading-relaxed text-warn">
               <span className="font-medium">Waiting on a human:</span> {reason}
             </p>
           </div>
@@ -143,7 +146,7 @@ function LoopDrawer({
             {loop.waves_done} of {loop.waves_total} waves
           </span>
           {loop.gates_total > 0 && (
-            <span className={loop.gates_pending > 0 ? 'text-amber-400/90' : ''}>
+            <span className={loop.gates_pending > 0 ? 'text-warn' : ''}>
               {loop.gates_total - loop.gates_pending} of {loop.gates_total} gates met
             </span>
           )}
@@ -227,7 +230,7 @@ function LoopDrawer({
                       <span
                         className={cn(
                           'absolute -left-[3.5px] top-[7px] h-1.5 w-1.5 rounded-full',
-                          i === 0 ? 'bg-sky-400' : 'bg-line-strong',
+                          i === 0 ? 'bg-accent' : 'bg-line-strong',
                         )}
                       />
                       <div className="text-[11px] leading-relaxed">
@@ -340,14 +343,15 @@ export default function Loops() {
     <div className="space-y-6">
       <Toolbar className="justify-between">
         <div className="grid max-w-md flex-1 grid-cols-3 gap-3">
-          <StatCard label="In progress" value={counts.running} tone="text-sky-300" />
-          <StatCard label="Needs you" value={counts.blocked} tone="text-amber-300" />
-          <StatCard label="Done" value={counts.done} tone="text-emerald-300" />
+          <StatCard label="In progress" value={counts.running} tone="text-info" />
+          <StatCard label="Needs you" value={counts.blocked} tone="text-warn" />
+          <StatCard label="Done" value={counts.done} tone="text-ok" />
         </div>
         <LiveBadge live={live} label={live ? 'Live' : 'Reconnecting'} />
       </Toolbar>
 
       <SegmentedControl<Filter>
+        label="Filter loops"
         value={filter}
         onChange={setFilter}
         options={[

@@ -19,7 +19,8 @@ anything (D001, D009).
 - `specs/<feature>/SPEC.md` — includes a parseable `## Value contract`
   (problem, users, baseline/current cost, numeric target indicator, economic
   hypothesis, owner/date), a `## Experience` contract (primary journey, edge
-  states, UX bar, accessibility — or `N/A — <reason>`), plus the expected
+  states, UX bar, accessibility, UI pattern, navigation surface — or
+  `N/A — <reason>`), plus the expected
   user outcome, evidence or assumption, an observable signal, and a
   follow-up owner/date when known.
 - `specs/<feature>/EXAMPLES.feature` — specifications by example: `@w<N>`
@@ -187,8 +188,9 @@ or waived.
   signal without inventing baselines. `DOMAIN.md` (D019) records the domain
   contract at the same checkpoint: tier, ubiquitous language, bounded
   contexts, aggregates/invariants and integration style; `SPEC.md`'s
-  `## Experience` records the user journey, edge states and UX bar (or a
-  reasoned `N/A`). G2/G3 block planning until both are filled. D020 adds G4:
+  `## Experience` records the user journey, edge states, UX bar, UI pattern
+  and navigation surface with the rationale its tier requires (or a reasoned
+  `N/A`). G2/G3 block planning until both are filled. D020 adds G4:
   `EXAMPLES.feature` must exercise the tier's maturity axes with real
   `@m-<axis>` scenarios or reasoned `N/A` lines, staged one new axis per wave
   in dedicated scenarios. After release, `VALIDATION.md` may
