@@ -7,7 +7,7 @@ type: rules
 Printed by `python -m openharness self evolution`.
 
 ## Before You Change Anything
-1. **Read `SELF/PRINCIPLES.md` first.** Every decision D001–D019 is binding precedent.
+1. **Read `SELF/PRINCIPLES.md` first.** Every decision D001–D020 is binding precedent.
 2. Never violate a standing decision. If you must, **append D00N+1** with rationale that **explicitly supersedes** it. Reference the old decision by number.
 
 ## Block Spec Contract

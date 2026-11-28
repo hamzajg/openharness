@@ -52,6 +52,10 @@ Run these first and read the output:
    - claim existence: backticked paths, scripts, endpoints, ADRs;
    - evidence integrity: placeholder wave/gate evidence, gate files, weak or
      empty validation rows, validation gaps;
+   - scenario maturity: `maturity-axis-missing`, `maturity-na-unjustified`,
+     `maturity-tag-unknown`, `maturity-scenario-mixed`,
+     `maturity-wave-crowded`, `maturity-axis-untagged` (advisory; G4 enforces
+     the staged floor);
    - scope drift and unfinished markers in changed code.
 
    The brief is **not** a verdict. A clean brief means nothing mechanical was
@@ -64,6 +68,9 @@ Run these first and read the output:
    - re-verify every blocker and concern against the cited file:line;
    - open the tests and confirm they assert the scenario's outcome, not just
      its name;
+   - judge whether each `@m-<axis>` tag really exercises that axis (D020); a
+     token match or decorative tag is not maturity, and a scenario mixing two
+     axes or a wave introducing two axes is a big-bang increment;
    - run the real test command when the toolchain is available;
    - check the demo script's happy path end to end;
    - compare changed public contracts with the spec and README;

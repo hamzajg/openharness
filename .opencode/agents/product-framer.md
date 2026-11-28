@@ -147,8 +147,21 @@ Otherwise stop and report that you need a target repo.
 
 6. **Write `EXAMPLES.feature`.**
    - Observable Gherkin only.
-   - Cover the happy path and the 2–3 edge cases that would fail a demo.
-   - Tag each scenario `@w<N>` for its delivery wave.
+   - Tag each scenario `@w<N>` for its delivery wave and every axis it really
+     exercises: `@m-failure`, `@m-ownership`, `@m-data`, `@m-ux` or
+     `@m-outcome` (D020). Tags are not decoration; the reviewer checks the
+     behavior.
+   - Cover the happy path plus real-world cases that would fail a demo:
+     retry/timeout, ownership/revocation, reload/migration, empty/error/
+     denied/offline states, and the value contract's outcome signal.
+   - Stage the value as baby steps: one NEW axis per `@w<N>` wave, in a
+     dedicated scenario, with the happy path in its own scenario. Several
+     scenarios for the SAME axis in one wave are depth; a scenario mixing two
+     axes or a wave introducing two axes is rejected by G4 and warned about
+     by `wave_plan`.
+   - The DOMAIN.md tier sets the exercised-axis floor. An axis that genuinely
+     does not apply gets `# Maturity N/A: @m-<axis> — <reason>` outside a
+     scenario; a bare `N/A` or unknown `@m-*` tag is rejected by G4.
    - Make scenario names precise. Tests will cite them.
 
 7. **Write `BACKLOG.md`.**
@@ -165,7 +178,7 @@ Otherwise stop and report that you need a target repo.
    - Write each gate as:
 
      ```
-     ## G4 — <short title>
+     ## G5 — <short title>
      - Before: spec | plan | wave:<n> | validate | finish
      - Type: decision | artifact | external | technical | quality | data
      - Owner: <role, e.g. product-owner, security, platform>
@@ -175,15 +188,16 @@ Otherwise stop and report that you need a target repo.
      - Why: <which AC / business rule depends on it>
      ```
 
-   - The scaffold already owns G0–G3 (value contract, design challenge,
-     domain model, experience). Number agent-added gates from **G4** and
-     keep the total reasonable — each must be falsifiable: a decision id,
-     a path, a section, or a command output. "Quality is good" is not a
-     gate.
-   - KEEP all four scaffold gates. G1 (`Design decisions challenged`) is
+   - The scaffold already owns G0–G4 (value contract, design challenge,
+     domain model, experience, scenario maturity). Number agent-added gates
+     from **G5** and keep the total reasonable — each must be falsifiable:
+     a decision id, a path, a section, or a command output. "Quality is
+     good" is not a gate.
+   - KEEP all five scaffold gates. G1 (`Design decisions challenged`) is
      what forces the architecture review before waves start; G2/G3 force
-     the domain and experience contracts. Do not delete or weaken them;
-     a human may waive them, you may not.
+     the domain and experience contracts; G4 forces a staged real-world
+     scenario floor — one new axis per wave (D020). Do not delete or weaken
+     them; a human may waive them, you may not.
    - `Resolver: human` for decisions or access a person must grant:
      domain rules, pricing, legal, credentials, external sign-off.
    - `Resolver: agent` for artifacts and checks you can produce.
@@ -238,7 +252,7 @@ CHOSEN: <name> — score <n>/125 (<value>,<feasibility>,<differentiation>)
 TIER:   simple | standard | domain-heavy — <one-line justification>
 FILES:  SPEC.md · DOMAIN.md · EXAMPLES.feature · BACKLOG.md · GATES.md · WAVES.md
 WAVES:  W1 <items> · W2 <items> ...
-GATES:  G0–G3 scaffold + G4+ <title> (<before>, <resolver>) | scaffold only
+GATES:  G0–G4 scaffold + G5+ <title> (<before>, <resolver>) | scaffold only
 AUDIT:  spec PASS | CONCERNS | BLOCK (accepted: ...)
 OUTCOME: <hypothesis, evidence status, signal, owner/date>
 REVIEW: <high-impact decisions to challenge> | none

@@ -3,7 +3,7 @@ name: OpenHarness
 version: 0.1.0
 runtime_entry: "python -m openharness"
 principles: [KISS, agent-agnostic, markdown-for-specs, python-for-execution, local-first, ui-observer-only]
-blocks: [skill-system, rag, command-bridge, env-probe, repos, serve, evidence, delivery-loop, delivery-audit, decision-review]
+blocks: [skill-system, rag, command-bridge, env-probe, repos, serve, evidence, delivery-loop, delivery-audit, decision-review, scenario-maturity]
 ---
 # OpenHarness MANIFEST
 
@@ -63,6 +63,7 @@ See `SELF/blocks/<name>.md` for full block specs:
 | [delivery-audit](SELF/blocks/delivery-audit.md) | `/review-delivery` + `delivery-auditor`; deterministic evidence brief + independent verdict; spec and delivery checkpoints; D013 |
 | [evidence](SELF/blocks/evidence.md) | Evidence bundles: manifest + hashes, `step`/`attach` capture, generated walkthrough page, `verify` checks; loop gate; ADR 0007 |
 | [decision-review](SELF/blocks/decision-review.md) | `/challenge-decision` + `decision-challenger`; deterministic brief + design lenses; verdict advisory (D011), artifact gate-required via scaffold G1 |
+| [scenario-maturity](SELF/blocks/scenario-maturity.md) | `@m-<axis>` breadth staged one axis per wave in dedicated scenarios, tier floors, reasoned `N/A`; scaffold gate G4, advisory audit codes, wave-plan warnings, validation coverage (D020, ADR 0015) |
 
 ## Rules
 

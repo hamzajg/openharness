@@ -8,8 +8,10 @@ import pytest
 from openharness.skill import SkillError
 from skills.product.discover_product import discover_product
 from skills.product.spec_scaffold import (
+    declared_tier,
     domain_status,
     experience_status,
+    maturity_status,
     section_status,
     spec_scaffold,
     value_contract_status,
@@ -181,6 +183,179 @@ def test_section_status_dispatches_experience():
     assert ok
     ok, problems = section_status("# x\n\n## Missing\n\n- (placeholder only)\n", "Nope")
     assert not ok and "## Nope" in problems[0]
+
+
+MATURE_FEATURE = """\
+# Checkout — specifications by example
+# Scenario tags @w<N> map items to delivery waves.
+
+Feature: Checkout
+
+  @w1 @happy-path
+  Scenario: place an order from a full cart
+    Given a checkout with two items
+    When I confirm the order
+    Then an order is created
+
+  @w1 @m-data
+  Scenario: reload restores the pending checkout
+    Given a checkout with two items
+    When I reload the page
+    Then both items are still present
+
+  @w2 @m-failure
+  Scenario: a timed-out payment is not charged twice
+    Given a payment request with an idempotency key
+    When the gateway times out and the request is retried
+    Then the order is charged once
+
+  @w3 @m-ownership
+  Scenario: another shopper cannot open this checkout
+    Given a checkout owned by one shopper
+    When another shopper opens its link
+    Then access is denied
+
+  @w4 @m-ux
+  Scenario: the empty cart explains the next step
+    Given an empty cart
+    When I open checkout
+    Then I see an empty state with a next step
+
+  @w5 @m-outcome
+  Scenario: the retry signal records exactly one charge
+    Given a retried payment request
+    When the outcome signal is read
+    Then exactly one charge is recorded
+"""
+
+
+SHALLOW_FEATURE = """\
+# Checkout — specifications by example
+
+Feature: Checkout
+
+  @w1 @happy-path
+  Scenario: place an order from a full cart
+    Given a checkout with two items
+    When I confirm the order
+    Then an order is created
+
+  @w1 @m-data
+  Scenario: reload restores the pending checkout
+    Given a checkout with two items
+    When I reload the page
+    Then both items are still present
+
+  @w2 @m-ux
+  Scenario: the empty cart explains the next step
+    Given an empty cart
+    When I open checkout
+    Then I see an empty state with a next step
+
+# Maturity N/A: @m-failure — gateway retries are out of scope
+# Maturity N/A: @m-ownership — checkout is anonymous
+# Maturity N/A: @m-outcome — signal arrives after release
+"""
+
+
+def test_maturity_status_is_tier_aware():
+    for tier in ("simple", "standard", "domain-heavy"):
+        ok, problems = maturity_status(MATURE_FEATURE, tier)
+        assert ok and problems == []
+
+    ok, problems = maturity_status(SHALLOW_FEATURE, "simple")
+    assert ok and problems == []
+    ok, problems = maturity_status(SHALLOW_FEATURE, "standard")
+    assert not ok and any("@m-failure" in p for p in problems)
+
+
+def test_maturity_status_rejects_unknown_tags_and_bare_na():
+    bad_tag = MATURE_FEATURE.replace("@m-failure", "@m-security")
+    ok, problems = maturity_status(bad_tag, "standard")
+    assert not ok and any("@m-security" in p for p in problems)
+
+    bare_na = MATURE_FEATURE.replace(
+        "  @w1 @m-data\n", "  # Maturity N/A: @m-data\n  @w1 @m-data\n",
+    )
+    ok, problems = maturity_status(bare_na, "standard")
+    assert not ok and any("N/A needs a reason" in p for p in problems)
+
+
+def test_maturity_status_spreads_axes_across_waves():
+    crowded = MATURE_FEATURE.replace("  @w2 @m-failure", "  @w1 @m-failure")
+    ok, problems = maturity_status(crowded, "domain-heavy")
+    assert not ok
+    assert any("wave @w1 introduces" in p and "@m-data" in p for p in problems)
+
+
+def test_maturity_status_requires_dedicated_scenarios():
+    mixed = MATURE_FEATURE.replace(
+        "  @w3 @m-ownership\n  Scenario: another shopper cannot open this checkout",
+        "  @w3 @m-ownership @m-outcome\n"
+        "  Scenario: another shopper cannot open this checkout",
+    )
+    ok, problems = maturity_status(mixed, "domain-heavy")
+    assert not ok and any("dedicated scenario" in p for p in problems)
+
+    happy_mixed = MATURE_FEATURE.replace(
+        "  @w1 @happy-path\n  Scenario: place an order from a full cart",
+        "  @w1 @happy-path @m-data\n  Scenario: place an order from a full cart",
+    )
+    ok, problems = maturity_status(happy_mixed, "domain-heavy")
+    assert not ok and any("mixes @happy-path" in p for p in problems)
+
+
+def test_declared_tier_defaults_to_simple():
+    assert declared_tier(FILLED_DOMAIN) == "domain-heavy"
+    assert declared_tier("# Domain model\n\nNo tier here.\n") == "simple"
+
+
+def test_scaffold_emits_maturity_gate_and_header(tmp_path):
+    spec_scaffold.invoke(repo_path=str(tmp_path), feature="Checkout", output_dir="specs")
+    d = tmp_path / "specs" / "checkout"
+    gates = (d / "GATES.md").read_text()
+    assert "G4 — Scenario maturity floor" in gates
+    assert "Before: plan" in gates and "Blocking: yes" in gates
+    assert "Check: file:specs/checkout/EXAMPLES.feature" in gates
+    assert "## G5 — Pricing rules approved" in gates  # agent gates start at G5
+    feature = (d / "EXAMPLES.feature").read_text()
+    assert "@m-failure" in feature and "@m-outcome" in feature
+    assert "Maturity N/A: @m-ownership" in feature
+    assert "one new maturity axis per wave" in feature
+
+
+def test_wave_plan_keeps_maturity_waves_distinct(tmp_path):
+    d = tmp_path / "specs" / "checkout"
+    d.mkdir(parents=True)
+    (d / "BACKLOG.md").write_text(
+        "## US1 — As a shopper, I want checkout, so that I get my order\n"
+        "- Scenarios: @w1\n- Size: M\n\n"
+        "## US2 — As a shopper, I want a safe payment retry\n"
+        "- Scenarios: @w2\n- Depends: US1\n- Size: S\n"
+    )
+    (d / "EXAMPLES.feature").write_text(MATURE_FEATURE)
+    out = wave_plan.invoke(spec_dir=str(d))
+    waves = (d / "WAVES.md").read_text()
+    assert "reload restores the pending checkout" in waves
+    assert "a timed-out payment is not charged twice" in waves
+    assert "D020 baby steps" not in out
+    assert "@m-" not in out
+
+
+def test_wave_plan_warns_on_a_crowded_maturity_wave(tmp_path):
+    d = tmp_path / "specs" / "checkout"
+    d.mkdir(parents=True)
+    (d / "BACKLOG.md").write_text(
+        "## US1 — As a shopper, I want checkout, so that I get my order\n"
+        "- Scenarios: @w1\n- Size: M\n"
+    )
+    (d / "EXAMPLES.feature").write_text(
+        MATURE_FEATURE.replace("  @w2 @m-failure", "  @w1 @m-failure")
+    )
+    out = wave_plan.invoke(spec_dir=str(d))
+    assert "## Warnings" in out
+    assert "D020 baby steps" in out
+    assert "wave @w1 introduces" in out
 
 
 def test_spec_scaffold_never_overwrites(tmp_path):
@@ -388,6 +563,41 @@ def test_ship_validate_writes_traceability(tmp_path):
     assert "Traceability" in out and "Demo script" in out
     assert "test_demo.py" in out  # evidence found
     assert "## TDD evidence" in out and "Wave 1: no bundle recorded" in out
+
+
+def test_ship_validate_reports_maturity_coverage(tmp_path):
+    from skills.product.ship_validate import ship_validate
+    repo = tmp_path / "repo"
+    d = repo / "specs" / "demo"
+    d.mkdir(parents=True)
+    (d / "SPEC.md").write_text("# Spec: Demo\n")
+    (d / "EXAMPLES.feature").write_text(
+        "Feature: Demo\n"
+        "# Maturity N/A: @m-ownership — anonymous local tool\n"
+        "# Maturity N/A: @m-outcome — outcome is post-release\n"
+        "  @w1 @happy-path\n"
+        "  Scenario: open the draft editor\n"
+        "    Given a draft\n"
+        "    When I open it\n"
+        "    Then the editor is ready\n"
+        "  @w1 @m-data\n"
+        "  Scenario: reload restores the draft\n"
+        "    Given a draft\n"
+        "    When I reload\n"
+        "    Then it returns\n"
+        "  @w2 @m-failure\n"
+        "  Scenario: retry after timeout does not duplicate\n"
+        "    Given a timed-out save\n"
+        "    When I retry\n"
+        "    Then one draft exists\n"
+        "# Maturity N/A: @m-ux — no user-facing surface\n"
+    )
+    (d / "WAVES.md").write_text("# Waves\n\n## Wave 1 — iteration 1\n\n| Item |\n")
+    out = ship_validate.invoke(spec_dir=str(d), repo_path=str(repo))
+    assert "## Maturity coverage" in out
+    assert "@m-failure — exercised by a @w2 scenario" in out
+    assert "@m-data — exercised by a @w1 scenario" in out
+    assert "@m-ownership — anonymous local tool" in out
 
 
 def test_ship_validate_finds_tsx_test_evidence(tmp_path):

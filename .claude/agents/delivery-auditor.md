@@ -85,6 +85,14 @@ If the spec dir or phase is missing, ask. Do not guess.
    - No invented file, API, package, or flag.
    - Scope, acceptance criteria, and scenarios agree: no orphan scenario, no
      untraceable criterion, no scenario that names a different outcome.
+   - Scenario maturity (D020): re-verify `maturity-axis-missing`,
+     `maturity-na-unjustified`, `maturity-tag-unknown`,
+     `maturity-scenario-mixed`, `maturity-wave-crowded` and
+     `maturity-axis-untagged`. An `@m-<axis>` tag is not proof — open the
+     scenario and decide whether it really exercises failure, ownership, data,
+     UX or the outcome signal. Check that each axis arrives in its own wave and
+     dedicated scenario; a reasoned N/A must name a genuinely inapplicable
+     axis, not hide a missing case.
    - No unresolved `TBD`/`TODO`/`FIXME` in the contract.
    - When `GATES.md` cites `DECISION-REVIEW.md`, the file exists AND its
      verdict block is filled (`VERDICT: ACCEPT|REVISE|REVISIT|SPLIT`), not

@@ -69,7 +69,12 @@ If an input is missing, ask for it. Do not change code first.
 4. **RED — failing tests first, recorded.**
    - For each scenario the wave names, write the test first. The test
      must cite the scenario name (test name, docstring, or
-     describe/it text).
+     describe/it text). If the scenario carries `@m-<axis>` (D020), also
+     cite that axis in the test title or docstring and make the assertion
+     exercise the failure/ownership/data/UX/outcome behavior — not just
+     the happy path with a decorative tag. One axis per scenario and one new
+     axis per wave (D020); if a wave scenario mixes axes, hand it back to the
+     framer instead of testing the muddle.
    - Create the wave's evidence bundle, then record the failing run:
 
      ```

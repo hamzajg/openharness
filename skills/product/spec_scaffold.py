@@ -1,8 +1,9 @@
 """Scaffold a spec-driven feature directory: SPEC.md + EXAMPLES.feature + BACKLOG.md + GATES.md.
 
-Creates specs/<feature>/ inside the target repo with four artifacts:
-- SPEC.md — the spec driver (problem, users, scope, out-of-scope, acceptance criteria)
-- EXAMPLES.feature — specifications by example (Gherkin scenarios, tagged @w<N>)
+Creates specs/<feature>/ inside the target repo with five artifacts:
+- SPEC.md — the spec driver (problem, users, scope, value/experience contracts)
+- EXAMPLES.feature — specifications by example (@w<N> waves + @m-<axis> maturity)
+- DOMAIN.md — tier, ubiquitous language, contexts, aggregates, invariants (D019)
 - BACKLOG.md — ordered work items referencing scenario tags and dependency hints
 - GATES.md — preconditions for phase transitions (status lives in LOOP.md)
 
@@ -147,6 +148,20 @@ _DOMAIN_MD = """# Domain model: {title}
 
 _FEATURE = """# {title} — specifications by example
 # Scenario tags @w<N> map items to delivery waves (see WAVES.md / BACKLOG.md).
+# Scenario maturity (D020): examples must cover real-world behavior, not only
+# a happy-path demo. Tag a REAL Scenario with one or more axes below:
+#   @m-failure   idempotency, retry/timeout, partial failure, stale/conflict
+#   @m-ownership roles, ownership, tenant isolation, revocation, audit trail
+#   @m-data      persistence, migration, import/export, search/pagination
+#   @m-ux        empty/loading/error/permission-denied/offline, undo, a11y
+#   @m-outcome   observable signal tied to the value-contract target
+# For an axis that genuinely does not apply, write OUTSIDE a Scenario:
+#   # Maturity N/A: @m-ownership — anonymous tool, no auth boundary
+# The DOMAIN.md tier sets the floor: simple needs 2 covered axes, standard
+# needs 3 including failure, domain-heavy needs all axes covered or justified.
+# Baby steps: one new maturity axis per wave; the happy path gets its own
+# scenario. A wave may hold several scenarios for the SAME axis, never
+# several different axes in one big iteration.
 
 Feature: {title}
 
@@ -216,7 +231,7 @@ _GATES_MD = """# Gates: {title}
   before wave planning commits the features.
 
 <!-- Example (indented so it is not parsed):
-  ## G4 — Pricing rules approved
+  ## G5 — Pricing rules approved
   - Before: spec
   - Type: decision
   - Owner: product-owner
@@ -262,6 +277,22 @@ _GATES_MD = """# Gates: {title}
   states, a concrete UX bar and accessibility notes before planning. A
   feature with no user-facing surface writes `N/A — <reason>`; a bare N/A
   is rejected.
+
+## G4 — Scenario maturity floor
+- Before: plan
+- Type: artifact
+- Owner: agent
+- Resolver: agent
+- Blocking: yes
+- Check: file:specs/{slug}/EXAMPLES.feature
+- Why: D020 — happy-path-only examples pass traceability while proving
+  nothing about real-world operation. Cover failure/recovery, auth/ownership,
+  data/integration and user-visible edge states with @m-<axis> scenarios
+  tied to @w<N>, or justify each inapplicable axis with `Maturity N/A:
+  @m-<axis> — <reason>`. The DOMAIN.md tier sets the depth floor. Baby
+  steps are mandatory: one new maturity axis per wave, one axis per
+  scenario; the happy path gets its own scenario. Do not cram the value
+  contract into one big-bang wave.
 """
 
 
@@ -399,6 +430,183 @@ def experience_status(text: str) -> tuple[bool, list[str]]:
     return not problems, problems
 
 
+MATURITY_AXES = ("failure", "ownership", "data", "ux", "outcome")
+_ANY_MATURITY_TAG_RE = re.compile(r"@m-([A-Za-z][A-Za-z0-9_-]*)", re.I)
+_MATURITY_NA_LINE_RE = re.compile(
+    r"^\s*#\s*Maturity\s+N/A\s*:\s*@m-([A-Za-z][A-Za-z0-9_-]*)"
+    r"(?:\s*[—–-]\s*(.*?))?\s*$",
+    re.I,
+)
+_MATURITY_FLOORS = {
+    "simple": (2, ()),
+    "standard": (3, ("failure",)),
+    "domain-heavy": (3, ("failure", "data")),
+}
+_MATURITY_WAVE_RE = re.compile(r"@w(\d+)", re.I)
+
+
+def maturity_wave_problems(feature_text: str) -> list[str]:
+    """D020 baby-step problems: one new axis per wave, dedicated scenarios.
+
+    This is deliberately orthogonal to axis coverage: a spec can cover all
+    five axes and still be rejected for cramming them into wave 1. Multiple
+    scenarios for the SAME axis in one wave are fine — that is depth, not a
+    big-bang increment.
+    """
+    axes = set(MATURITY_AXES)
+    problems: list[str] = []
+    pending_axes: set[str] = set()
+    pending_waves: set[int] = set()
+    pending_happy = False
+    pending_name = ""
+    first_wave: dict[str, int] = {}
+
+    def close_scenario() -> None:
+        nonlocal pending_axes, pending_waves, pending_happy, pending_name
+        name = pending_name.strip()
+        if not name:
+            return
+        known = pending_axes & axes
+        tags = ", ".join(f"@m-{a}" for a in MATURITY_AXES if a in known)
+        if len(known) > 1:
+            problems.append(
+                f"scenario '{name}' carries {tags} — give each axis a "
+                "dedicated scenario"
+            )
+        if pending_happy and known:
+            problems.append(
+                f"scenario '{name}' mixes @happy-path with {tags} — keep "
+                "the baby steps separate"
+            )
+        if known and not pending_waves:
+            problems.append(
+                f"scenario '{name}' has {tags} but no @w<N> wave"
+            )
+        for axis in known:
+            if pending_waves:
+                w = min(pending_waves)
+                if axis not in first_wave or w < first_wave[axis]:
+                    first_wave[axis] = w
+        pending_axes, pending_waves = set(), set()
+        pending_happy, pending_name = False, ""
+
+    for line in feature_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("@"):
+            for axis in _ANY_MATURITY_TAG_RE.findall(stripped):
+                axis = axis.lower()
+                if axis in axes:
+                    pending_axes.add(axis)
+            pending_waves.update(int(w) for w in _MATURITY_WAVE_RE.findall(stripped))
+            if "happy" in stripped.lower():
+                pending_happy = True
+            continue
+        if stripped.startswith("Scenario"):
+            pending_name = (
+                stripped.split(":", 1)[1].strip()
+                if ":" in stripped else stripped
+            )
+            close_scenario()
+
+    by_wave: dict[int, list[str]] = {}
+    for axis, wave in first_wave.items():
+        by_wave.setdefault(wave, []).append(axis)
+    for wave, wave_axes in by_wave.items():
+        if len(wave_axes) > 1:
+            tags = ", ".join(
+                f"@m-{a}" for a in MATURITY_AXES if a in wave_axes
+            )
+            problems.append(
+                f"wave @w{wave} introduces {tags} — split maturity axes into "
+                "separate waves"
+            )
+    return problems
+
+
+def declared_tier(domain_text: str) -> str:
+    """Tier declared in DOMAIN.md; default to `simple` when absent (D019/D020)."""
+    match = _TIER_RE.search(domain_text)
+    return match.group(1).lower() if match else "simple"
+
+
+def maturity_status(feature_text: str, tier: str = "simple") -> tuple[bool, list[str]]:
+    """(covered, problems) for EXAMPLES.feature scenario maturity (D020).
+
+    Deliberately shallow: every axis must be exercised by a real, tagged
+    Scenario or justified with `# Maturity N/A: @m-<axis> — <reason>`, and the
+    declared tier sets a floor on how many axes are actually exercised. This
+    proves the examples are wide enough to plan from — not that the scenarios
+    are good. Breadth is staged across waves (one new axis per wave, one axis
+    per dedicated scenario) so a spec cannot smuggle the whole value contract
+    into one big-bang iteration. Semantic quality stays with the spec audit
+    and wave reviewer.
+    """
+    tier = (tier or "simple").lower()
+    if tier not in _MATURITY_FLOORS:
+        tier = "simple"
+    floor, required = _MATURITY_FLOORS[tier]
+    axes = set(MATURITY_AXES)
+    covered: set[str] = set()
+    justified: set[str] = set()
+    pending: set[str] = set()
+    problems: list[str] = maturity_wave_problems(feature_text)
+    real_scenarios = 0
+    has_happy = False
+
+    for line in feature_text.splitlines():
+        na_match = _MATURITY_NA_LINE_RE.match(line)
+        if na_match:
+            axis = na_match.group(1).lower()
+            reason = (na_match.group(2) or "").strip()
+            if axis not in axes:
+                problems.append(f"unknown maturity tag @m-{axis}")
+            elif not reason or _UNFILLED_VALUE_RE.search(reason):
+                problems.append(f"@m-{axis} (N/A needs a reason after the dash)")
+            elif axis in covered:
+                problems.append(f"@m-{axis} (covered and marked N/A)")
+            else:
+                justified.add(axis)
+            continue
+
+        stripped = line.strip()
+        if stripped.startswith("@"):
+            for tag in _ANY_MATURITY_TAG_RE.findall(stripped):
+                tag = tag.lower()
+                if tag not in axes:
+                    problems.append(f"unknown maturity tag @m-{tag}")
+                else:
+                    pending.add(tag)
+            if "happy" in stripped.lower():
+                pending.add("happy")
+            continue
+
+        if stripped.startswith("Scenario"):
+            name = stripped.split(":", 1)[1].strip() if ":" in stripped else ""
+            if not name or _UNFILLED_VALUE_RE.search(name):
+                problems.append("scenario name still a placeholder")
+            else:
+                real_scenarios += 1
+                has_happy = has_happy or "happy" in pending
+                covered.update(pending & axes)
+            pending = set()
+
+    if not real_scenarios:
+        problems.append("at least one real Scenario")
+    elif not has_happy:
+        problems.append("at least one @happy-path scenario")
+    for axis in MATURITY_AXES:
+        if axis not in covered and axis not in justified:
+            problems.append(f"@m-{axis}")
+    if len(covered) < floor:
+        problems.append(f"{tier} tier needs {floor} covered axes (found {len(covered)})")
+    for axis in required:
+        if axis not in covered:
+            problems.append(f"@m-{axis} ({tier} tier needs a real scenario)")
+    if tier in ("standard", "domain-heavy") and "ux" not in covered and "ux" not in justified:
+        problems.append("@m-ux (user-facing tier needs a scenario or N/A — <reason>)")
+    return not problems, problems
+
+
 def section_status(text: str, section: str) -> tuple[bool, list[str]]:
     """(filled, problems) for a generic `## <section>` gate target.
 
@@ -417,9 +625,9 @@ def section_status(text: str, section: str) -> tuple[bool, list[str]]:
 
 @skill
 def spec_scaffold(repo_path: str = ".", feature: str = "", output_dir: str = "specs") -> str:
-    """Create specs/<feature>/ with SPEC.md, EXAMPLES.feature, BACKLOG.md, GATES.md skeletons.
+    """Create the spec skeletons for one feature (SPEC/DOMAIN/EXAMPLES/BACKLOG/GATES).
 
-    Writes four artifacts into <repo_path>/<output_dir>/<feature-slug>/.
+    Writes five artifacts into <repo_path>/<output_dir>/<feature-slug>/.
     Never overwrites an existing file. The agent fills the placeholders; keep
     the section headers and tag conventions intact so `wave_plan` can parse
     BACKLOG.md later.

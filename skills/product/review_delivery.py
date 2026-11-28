@@ -30,8 +30,10 @@ from pathlib import Path
 from openharness import evidence as evidence_bundles
 from openharness.skill import skill
 from skills.product.spec_scaffold import (
+    declared_tier,
     domain_status,
     experience_status,
+    maturity_status,
     value_contract_status,
 )
 
@@ -844,6 +846,34 @@ def _audit(root: Path, spec_dir: Path, phase: str, changed: str, base: str) -> t
             + ", ".join(e_problems[:4])
             + " (advisory — the Before: plan gate enforces it)",
         ))
+
+    # --- scenario maturity (D020): advisory here, G4 gate enforces -----
+    if feature_text.strip():
+        tier = declared_tier(artifacts["DOMAIN.md"])
+        m_ok, m_problems = maturity_status(feature_text, tier)
+        seen_maturity: set[tuple[str, str]] = set()
+        for problem in m_problems:
+            if "unknown maturity tag" in problem:
+                code = "maturity-tag-unknown"
+            elif "N/A needs a reason" in problem:
+                code = "maturity-na-unjustified"
+            elif "dedicated scenario" in problem or "mixes @happy-path" in problem:
+                code = "maturity-scenario-mixed"
+            elif "wave @w" in problem:
+                code = "maturity-wave-crowded"
+            elif "no @w<N> wave" in problem:
+                code = "maturity-axis-untagged"
+            else:
+                code = "maturity-axis-missing"
+            if (code, problem) in seen_maturity:
+                continue
+            seen_maturity.add((code, problem))
+            findings.append(Finding(
+                "concern", code,
+                f"specs/{spec_dir.name}/EXAMPLES.feature",
+                f"{problem} — {tier} tier staged maturity floor is not met "
+                "(advisory — the Before: plan gate enforces it)",
+            ))
 
     # --- claim verification -------------------------------------------
     checked_paths = 0

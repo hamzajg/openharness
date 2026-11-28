@@ -26,7 +26,9 @@ from pathlib import Path
 from openharness import evidence as evidence_bundles
 from openharness.skill import SkillError, skill
 from skills.product.spec_scaffold import (
+    declared_tier,
     domain_status,
+    maturity_status,
     section_status,
     value_contract_status,
 )
@@ -377,6 +379,13 @@ def _check_target(check: str) -> tuple[str, str]:
     return payload, ""
 
 
+def _maturity_problems(path: Path) -> list[str]:
+    """Shallow maturity gaps for an EXAMPLES.feature gate check (D020)."""
+    tier = declared_tier(_read(path.parent / "DOMAIN.md"))
+    ok, problems = maturity_status(_read(path), tier)
+    return [] if ok else problems
+
+
 def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
     """(effective status, evidence) — `stale` means met but evidence vanished."""
     row = state["gates"].get(gate["id"], {})
@@ -393,6 +402,8 @@ def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
         if path.name == "DECISION-REVIEW.md" and not _filled_decision_review(path):
             return "stale", evidence
         if path.name == "DOMAIN.md" and not domain_status(_read(path))[0]:
+            return "stale", evidence
+        if path.name == "EXAMPLES.feature" and _maturity_problems(path):
             return "stale", evidence
         if check.startswith("file:") and path.name == "SPEC.md":
             if not value_contract_status(_read(path))[0]:
@@ -486,6 +497,12 @@ def _gate_directive(root: Path, spec_dir: Path, phase: str, blocking: list[tuple
             gcheck = gate["check"].lower()
             if gcheck.endswith("domain.md"):
                 hint = "fill DOMAIN.md — tier, glossary, bounded contexts, aggregates (D019)"
+            elif gcheck.endswith("examples.feature"):
+                hint = (
+                    "stage EXAMPLES.feature — @w<N> plus one new @m-failure/"
+                    "@m-ownership/@m-data/@m-ux/@m-outcome axis per wave, each "
+                    "in a dedicated scenario, or reasoned N/A (D020)"
+                )
             elif gcheck.startswith("section:"):
                 hint = (
                     f"fill `## {gate['check'].rsplit('#', 1)[-1]}` in the checked "
@@ -533,9 +550,10 @@ def _phase_guidance(root: Path) -> str:
         "   `## Experience` — journey/edge states/UX bar or N/A — reason, and",
         "   `## Decisions` — every one-way-door choice, options + simplest/",
         "   reversible alternative, consequences), DOMAIN.md (tier, glossary,",
-        "   bounded contexts, aggregates), EXAMPLES.feature (@w<N>",
-        "   tags) and BACKLOG.md (user stories, one `## US<n> — ...` block",
-        "   each). Keep the scaffold's G0–G3 gates.",
+        "   bounded contexts, aggregates), EXAMPLES.feature (@w<N> waves plus",
+        "   Scenario maturity: one new @m-<axis> case per wave, in a dedicated",
+        "   scenario, or reasoned N/A — G4) and BACKLOG.md (user stories, one",
+        "   block each). Keep G0–G4; baby steps, not a big-bang wave.",
         "5. Challenge the decisions: `challenge_decision --spec_dir=<dir> --write`,",
         "   decision-challenger fills DECISION-REVIEW.md, record gate G1 met.",
         "6. `python -m openharness run wave_plan --spec_dir="
@@ -1259,6 +1277,17 @@ def ship_loop(
                                 + ", ".join(problems[:4])
                                 + ". Fill the tier and every section before "
                                 "marking this gate met (D019)"
+                            )
+                    if path.name == "EXAMPLES.feature":
+                        problems = _maturity_problems(path)
+                        if problems:
+                            return (
+                                "ERROR: EXAMPLES.feature has no staged scenario "
+                                "maturity — "
+                                + ", ".join(problems[:4])
+                                + ". Cover one new @m-<axis> per wave in a "
+                                "dedicated scenario or justify with "
+                                "`Maturity N/A: @m-<axis> — <reason>` (D020)"
                             )
                     if gcheck.startswith("file:") and path.name == "SPEC.md":
                         ok, problems = value_contract_status(_read(path))

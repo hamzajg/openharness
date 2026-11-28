@@ -134,7 +134,13 @@ points, aggregates and their invariants, the transaction boundary,
 integration style, and external translations. `simple` still names its
 owning context and states "no new domain concepts" explicitly. Gates
 `G2 — Domain model captured` and `G3 — Experience contract filled` block
-wave planning until both are filled; a bare `N/A` is rejected.
+wave planning until both are filled; a bare `N/A` is rejected. `G4 — Scenario
+maturity floor` (D020) also blocks planning: `EXAMPLES.feature` must cover the
+five maturity axes with real `@m-<axis>` scenarios or reasoned
+`Maturity N/A: @m-<axis> — <reason>` lines at the DOMAIN.md tier's depth.
+Stage them as small waves: one new axis per `@w<N>` wave in a dedicated
+scenario, with the happy path in its own scenario; do not bundle all axes in
+one big-bang wave.
 
 **Optional — challenge high-impact decisions.** When a decision is a
 one-way door (data ownership, schema, public contract, service split,
@@ -150,8 +156,18 @@ Decisions section. If it changes a precondition, update `GATES.md`.
 Write Gherkin scenarios in `EXAMPLES.feature`. Rules:
 
 - Each scenario describes observable behavior. Not implementation.
-- Tag each scenario with `@w<N>` for its delivery wave.
-- Cover the happy path and the 2–3 edge cases that would fail a demo.
+- Tag each scenario with `@w<N>` for its delivery wave **and** its single
+  `@m-<axis>` scenario-maturity axis (D020): `@m-failure`, `@m-ownership`,
+  `@m-data`, `@m-ux`, `@m-outcome`. One axis per scenario.
+- Stage the value: one NEW axis per `@w<N>` wave, in a dedicated scenario,
+  with the happy path in its own scenario. Several scenarios for the SAME axis
+  in one wave are depth; several different axes in one wave are a big-bang
+  iteration and fail G4 / `wave_plan` warnings.
+- Cover the happy path and real-world cases that would fail a demo: retries,
+  ownership, reload/persistence, error/empty states and an observable outcome.
+  The DOMAIN.md tier sets the exercised-axis floor; an inapplicable axis
+  needs `# Maturity N/A: @m-<axis> — <reason>` outside a scenario, never a
+  bare `N/A`. Add a tag only when the scenario truly exercises that axis.
 - Use scenario names as the spec's vocabulary. Tests must cite them.
 
 ### Phase 5 — Backlog + Waves

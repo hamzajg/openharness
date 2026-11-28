@@ -75,6 +75,12 @@ If the PR or branch is missing, inspect `specs/<feature>/LOOP.md` and
      - the test exercises the behavior. It is not a tautology or a
        mock-only check.
      - the implementation satisfies the observable outcome.
+     - if the scenario carries `@m-<axis>` (D020), the red log and the
+       assertion show that axis — retry/idempotency, ownership/isolation,
+       reload/persistence, an edge UI state, or the outcome signal. A tag
+       on a happy-path-only test is a blocker, not maturity. Also reject a
+       mixed-axis scenario or a wave that introduces two axes — D020 wants
+       small iterations, not a big-bang wave.
    - Check the TDD evidence in the wave's bundle (`.openharness/evidence/
      <feature>/<run>/evidence.json` or the tracked `evidence/` root):
      - an ordered `tdd: red` (status `fail` + `expected_failure`),

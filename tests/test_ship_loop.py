@@ -40,6 +40,33 @@ FEATURE = textwrap.dedent("""\
         Then an order exists
     """)
 
+MATURE_FEATURE = textwrap.dedent("""\
+    Feature: Cart
+
+      @w1 @happy-path
+      Scenario: add an item
+        Given a cart
+        When I add an item
+        Then it appears
+
+      @w1 @m-data
+      Scenario: an added item survives reload
+        Given a cart with one item
+        When I reload the page
+        Then the item is still there
+
+      @w2 @m-failure
+      Scenario: a timed-out checkout is not duplicated
+        Given a checkout request with an idempotency key
+        When the gateway times out and the request is retried
+        Then one order exists
+
+    # Maturity N/A: @m-ownership — anonymous cart, no auth boundary
+    # Maturity N/A: @m-ux — experience is covered by the happy-path cart
+    # Maturity N/A: @m-outcome — signal arrives after release
+    """)
+
+
 DECISION_REVIEW = textwrap.dedent("""\
     # Decision review
 
@@ -75,7 +102,7 @@ def _fill_value_contract(d: Path) -> None:
 FILLED_DOMAIN = """\
 # Domain model: Cart
 
-**Tier:** standard
+**Tier:** simple
 
 ## Ubiquitous language
 
@@ -136,7 +163,7 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
     spec_scaffold.invoke(repo_path=str(root), feature=name, output_dir="specs")
     d = root / "specs" / name
     (d / "BACKLOG.md").write_text(BACKLOG)
-    (d / "EXAMPLES.feature").write_text(FEATURE)
+    (d / "EXAMPLES.feature").write_text(MATURE_FEATURE)
     wave_plan.invoke(spec_dir=str(d))
     # Loop defaults are enforced now: satisfy the scaffold's G0 value and G1
     # design-challenge gates plus the required spec audit so wave-mechanics
@@ -163,6 +190,11 @@ def _spec(root: Path, name: str = "cart-checkout") -> Path:
         repo_path=str(root), spec_dir=str(d), action="gate", gate="G3",
         status="met",
         evidence=f"section:{d.relative_to(root)}/SPEC.md#Experience",
+    )
+    ship_loop.invoke(
+        repo_path=str(root), spec_dir=str(d), action="gate", gate="G4",
+        status="met",
+        evidence=f"file:{d.relative_to(root)}/EXAMPLES.feature",
     )
     (d / "SPEC-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")
     _bundle(root, name)
@@ -208,6 +240,26 @@ def test_no_specs_returns_frame_guidance(tmp_path):
     assert "spec_scaffold" in out
     assert "G0" in out and "Value contract" in out
     assert "G1" in out
+    assert "G4" in out and "Scenario maturity" in out
+
+
+def test_maturity_gate_directive_points_to_examples(tmp_path):
+    spec_scaffold.invoke(repo_path=str(tmp_path), feature="cart-checkout", output_dir="specs")
+    d = tmp_path / "specs" / "cart-checkout"
+    (d / "GATES.md").write_text(
+        "# Gates: Cart\n\n"
+        "## G4 — Scenario maturity floor\n"
+        "- Before: plan\n"
+        "- Type: artifact\n"
+        "- Owner: agent\n"
+        "- Resolver: agent\n"
+        "- Blocking: yes\n"
+        "- Check: file:specs/cart-checkout/EXAMPLES.feature\n"
+    )
+    out = _run(tmp_path, review="advisory")
+    assert "GATE:" in out and "G4 — Scenario maturity floor" in out
+    assert "before planning waves" in out
+    assert "EXAMPLES.feature" in out and "@m-failure" in out
 
 
 def test_missing_artifacts_ask_for_spec(tmp_path):
@@ -221,8 +273,8 @@ def test_missing_artifacts_ask_for_spec(tmp_path):
 def test_scaffolded_without_waves_asks_for_plan(tmp_path):
     spec_scaffold.invoke(repo_path=str(tmp_path), feature="Cart Checkout", output_dir="specs")
     d = tmp_path / "specs" / "cart-checkout"
-    # G0 (value contract) blocks planning first, then G1 (design decisions
-    # challenged), then the required spec audit.
+    # G0 (value contract) blocks planning first, then G1 (design decisions),
+    # G4 (scenario maturity), and finally the required spec audit.
     out = _run(tmp_path)
     assert "GATE:" in out and "G0" in out and "Value contract" in out
     _fill_value_contract(d)
@@ -240,6 +292,9 @@ def test_scaffolded_without_waves_asks_for_plan(tmp_path):
     _fill_experience(d)
     _run(tmp_path, action="gate", gate="G3", status="met",
          evidence="section:specs/cart-checkout/SPEC.md#Experience")
+    (d / "EXAMPLES.feature").write_text(MATURE_FEATURE)
+    _run(tmp_path, action="gate", gate="G4", status="met",
+         evidence="file:specs/cart-checkout/EXAMPLES.feature")
     out = _run(tmp_path)
     assert "audit the spec" in out and "SPEC-AUDIT.md" in out
     (d / "SPEC-AUDIT.md").write_text("# Audit\n\nAUDIT: PASS\n")

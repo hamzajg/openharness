@@ -3,7 +3,8 @@
 Parses the deterministic artifact contract written by `spec_scaffold`:
 - BACKLOG.md items: `## B<n> — title` blocks with `- Scenarios: @wX` and
   optional `- Depends: B1, B3` lines.
-- EXAMPLES.feature scenario tags (@w<N>) link examples to waves.
+- EXAMPLES.feature scenario tags (@w<N>) link examples to waves; @m-<axis>
+  maturity tags must be staged one new axis per wave (D020).
 
 Emits WAVES.md: waves ordered so dependencies land in earlier-or-equal
 waves, each wave independently shippable (its own branch/PR). Deterministic.
@@ -13,6 +14,7 @@ import re
 from pathlib import Path
 
 from openharness.skill import SkillError, skill
+from skills.product.spec_scaffold import maturity_wave_problems
 
 _ITEM_RE = re.compile(r"^##\s+(B|US)(\d+)\s*[—-]\s*(.+)$", re.M)
 _SCEN_RE = re.compile(r"^-\s*Scenarios:\s*(.+)$", re.M)
@@ -134,7 +136,9 @@ def wave_plan(spec_dir: str = "") -> str:
             "WAVES.md was not written."
         )
 
-    scenarios = _feature_scenarios(feature.read_text()) if feature.is_file() else {}
+    feature_text = feature.read_text() if feature.is_file() else ""
+    scenarios = _feature_scenarios(feature_text) if feature_text else {}
+    maturity_warnings = maturity_wave_problems(feature_text)
     waves, violations = _assign_waves(items)
     missing_deps = sorted({(bid, dep) for bid, it in items.items() for dep in it["deps"] if dep not in items})
     retag = [
@@ -154,9 +158,11 @@ def wave_plan(spec_dir: str = "") -> str:
     out.append("increment — one branch, one PR, green tests, demoable outcome.")
     out.append("Do not start wave N+1 until wave N merges.")
     out.append("")
-    if violations or missing_deps or retag:
+    if violations or missing_deps or retag or maturity_warnings:
         out.append("## Warnings")
         out.append("")
+        for problem in maturity_warnings:
+            out.append(f"- D020 baby steps: {problem}")
         for bid, dep in missing_deps:
             out.append(f"- {items[bid]['ref']} depends on item #{dep} which does not exist in BACKLOG.md")
         for bid, w, tags in retag:
