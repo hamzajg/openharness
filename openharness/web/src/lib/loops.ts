@@ -8,9 +8,9 @@ export interface StatusStyle {
 }
 
 const STATUS: Record<string, StatusStyle> = {
-  running: { label: 'In progress', tone: 'info', accent: 'border-l-sky-500' },
-  blocked: { label: 'Blocked', tone: 'warn', accent: 'border-l-amber-500' },
-  done: { label: 'Done', tone: 'ok', accent: 'border-l-emerald-500' },
+  running: { label: 'In progress', tone: 'info', accent: 'border-l-accent' },
+  blocked: { label: 'Blocked', tone: 'warn', accent: 'border-l-warn' },
+  done: { label: 'Done', tone: 'ok', accent: 'border-l-ok' },
 }
 
 export function loopStatus(status: string): StatusStyle {
@@ -37,15 +37,15 @@ export const GATE_LABEL: Record<string, string> = {
 }
 
 export function waveDotClass(status: string) {
-  if (status === 'done') return 'bg-emerald-400'
-  if (status === 'in-progress') return 'animate-pulse bg-sky-400'
+  if (status === 'done') return 'bg-ok'
+  if (status === 'in-progress') return 'animate-pulse bg-accent'
   return 'bg-line-strong'
 }
 
 export function gateTone(status: string) {
-  if (status === 'met') return 'text-emerald-300'
-  if (status === 'waived') return 'text-violet-300'
-  if (status === 'failed') return 'text-red-300'
+  if (status === 'met') return 'text-ok'
+  if (status === 'waived') return 'text-alt'
+  if (status === 'failed') return 'text-danger'
   return 'text-ink-dim'
 }
 

@@ -15,12 +15,12 @@ import {
 /* ---------- visuals ---------- */
 
 const TYPE_STYLE: Record<string, { dot: string; label: string }> = {
-  feature:  { dot: 'bg-sky-400',      label: 'feat' },
-  fix:      { dot: 'bg-amber-400',    label: 'fix' },
-  evolve:   { dot: 'bg-violet-400',   label: 'evolve' },
+  feature:  { dot: 'bg-accent',       label: 'feat' },
+  fix:      { dot: 'bg-warn',         label: 'fix' },
+  evolve:   { dot: 'bg-alt',          label: 'evolve' },
   docs:     { dot: 'bg-ink-mute',     label: 'docs' },
   chore:    { dot: 'bg-ink-faint',    label: 'chore' },
-  refactor: { dot: 'bg-cyan-400',     label: 'refactor' },
+  refactor: { dot: 'bg-info',         label: 'refactor' },
   other:    { dot: 'bg-line-strong',  label: 'commit' },
 }
 
@@ -36,7 +36,7 @@ function CommitRow({ c }: { c: EvolutionCommit }) {
   const t = typeStyle(c.type)
   return (
     <div className="flex items-start gap-3 py-2">
-      <span className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', t.dot)} />
+      <span aria-hidden="true" className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', t.dot)} />
       <div className="min-w-0 flex-1">
         <p className="text-sm leading-snug text-ink-body">{c.subject}</p>
         <p className="mt-0.5 font-mono text-[11px] text-ink-faint">
@@ -101,14 +101,14 @@ export default function Maturity() {
           <StatCard
             label="Core LOC"
             value={`${s.core_loc}/${s.core_budget}`}
-            tone={s.core_loc > s.core_budget ? 'text-amber-300' : 'text-emerald-300'}
+            tone={s.core_loc > s.core_budget ? 'text-warn' : 'text-ok'}
             sub={s.core_loc > s.core_budget ? 'over D012 budget' : 'within D012 budget'}
             bar={{ pct: corePct, over: s.core_loc > s.core_budget }}
           />
           <StatCard
             label="Platform LOC"
             value={`${s.platform_loc}/${s.platform_budget}`}
-            tone={s.platform_loc > s.platform_budget ? 'text-amber-300' : 'text-ink'}
+            tone={s.platform_loc > s.platform_budget ? 'text-warn' : 'text-ink'}
             sub="repos + metrics + observers + serve (D012)"
             bar={{ pct: platformPct, over: s.platform_loc > s.platform_budget }}
           />
@@ -124,7 +124,7 @@ export default function Maturity() {
           {data.decisions.map((d) => (
             <Card key={d.id} className="p-4">
               <div className="mb-1.5 flex items-baseline gap-2">
-                <span className="font-mono text-[11px] font-semibold text-sky-400">{d.id}</span>
+                <span className="font-mono text-[11px] font-semibold text-accent">{d.id}</span>
                 <span className="text-sm font-medium text-ink">{d.title}</span>
               </div>
               {d.rule && (
@@ -149,6 +149,7 @@ export default function Maturity() {
             Change history <span className="font-normal text-ink-faint">— harness self-evolution</span>
           </SectionTitle>
           <SegmentedControl
+            label="Filter change history"
             value={typeFilter}
             onChange={setTypeFilter}
             options={TYPE_FILTERS.map((t) => ({

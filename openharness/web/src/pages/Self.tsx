@@ -34,7 +34,7 @@ function NavButton({
       className={cn(
         'whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition-colors',
         active
-          ? 'bg-sky-500/10 text-sky-200 ring-1 ring-inset ring-sky-500/20'
+          ? 'bg-accent/10 text-accent ring-1 ring-inset ring-accent/20'
           : 'text-ink-dim hover:bg-surface/60 hover:text-ink',
       )}
     >
@@ -73,7 +73,7 @@ export default function Self() {
         <div className="flex gap-0.5 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
           <NavButton active={block === MATURITY} onClick={() => setBlock(MATURITY)}>
             Maturity
-            <span className="ml-1.5 text-[10px] text-sky-400/70">live</span>
+            <span className="ml-1.5 text-[10px] text-accent/80">live</span>
           </NavButton>
           <div className="my-2 hidden border-t border-line lg:block" />
           <div className="hidden px-1 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-faint lg:block">

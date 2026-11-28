@@ -183,12 +183,13 @@ function SessionRow({ s, onOpen }: { s: SessionMeta; onOpen: () => void }) {
       className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface/60"
     >
       <span
+        aria-hidden="true"
         className={cn(
           'h-2 w-2 shrink-0 rounded-full',
-          s.active ? 'animate-pulse bg-emerald-500' : 'bg-ink-faint',
+          s.active ? 'animate-pulse bg-ok' : 'bg-ink-faint',
         )}
-        title={s.active ? 'Active' : 'Idle'}
       />
+      <span className="sr-only">{s.active ? 'Active session' : 'Idle session'}</span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm text-ink">{s.agent}</span>
@@ -284,7 +285,7 @@ export default function Sessions() {
         onClose={() => setActive(null)}
         title={active ? `${active.agent} session` : ''}
         subtitle={active?.id}
-        accent={active?.active ? 'border-l-emerald-500' : 'border-l-line'}
+        accent={active?.active ? 'border-l-ok' : 'border-l-line'}
         wide
         headerExtra={
           active && (

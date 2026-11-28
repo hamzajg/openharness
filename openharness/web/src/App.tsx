@@ -67,8 +67,8 @@ function useActiveItem() {
 function Brand({ className }: { className?: string }) {
   return (
     <Link to="/" className={cn('flex items-center gap-2.5', className)}>
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-sky-500/15 ring-1 ring-sky-500/30">
-        <IconLoops className="h-4 w-4 text-sky-400" />
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent/15 ring-1 ring-accent/30">
+        <IconLoops className="h-4 w-4 text-accent" />
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-semibold tracking-tight text-ink">OpenHarness</span>
@@ -88,14 +88,14 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
       className={cn(
         'group flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
         active
-          ? 'bg-sky-500/10 text-sky-200 ring-1 ring-inset ring-sky-500/20'
+          ? 'bg-accent/10 text-accent ring-1 ring-inset ring-accent/20'
           : 'text-ink-dim hover:bg-surface/60 hover:text-ink',
       )}
     >
       <item.Icon
         className={cn(
           'h-4 w-4 shrink-0',
-          active ? 'text-sky-400' : 'text-ink-faint group-hover:text-ink-dim',
+          active ? 'text-accent' : 'text-ink-faint group-hover:text-ink-dim',
         )}
       />
       {item.label}
@@ -110,10 +110,10 @@ function MobileNavLink({ item, active }: { item: NavItem; active: boolean }) {
       aria-current={active ? 'page' : undefined}
       className={cn(
         'flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-        active ? 'bg-sky-500/10 text-sky-200' : 'text-ink-mute hover:bg-surface/60 hover:text-ink',
+        active ? 'bg-accent/10 text-accent' : 'text-ink-mute hover:bg-surface/60 hover:text-ink',
       )}
     >
-      <item.Icon className={cn('h-3.5 w-3.5', active ? 'text-sky-400' : 'text-ink-faint')} />
+      <item.Icon className={cn('h-3.5 w-3.5', active ? 'text-accent' : 'text-ink-faint')} />
       {item.label}
     </Link>
   )
@@ -124,11 +124,18 @@ export default function App() {
 
   return (
     <div className="min-h-full lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <a
+        href="#main"
+        className="sr-only rounded-lg bg-surface px-3 py-2 text-sm font-medium text-ink ring-2 ring-accent focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
+      >
+        Skip to content
+      </a>
+
       <aside className="hidden border-r border-line lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
         <div className="px-4 py-5">
           <Brand />
         </div>
-        <nav className="flex-1 space-y-1 px-3">
+        <nav aria-label="Primary" className="flex-1 space-y-1 px-3">
           {NAV.map((item) => (
             <SidebarLink key={item.to} item={item} active={item.to === active.to} />
           ))}
@@ -148,7 +155,7 @@ export default function App() {
               </h1>
               <p className="mt-0.5 text-xs text-ink-mute">{active.description}</p>
             </div>
-            <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-3 lg:hidden">
+            <nav aria-label="Primary" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-3 lg:hidden">
               {NAV.map((item) => (
                 <MobileNavLink key={item.to} item={item} active={item.to === active.to} />
               ))}
@@ -156,7 +163,7 @@ export default function App() {
           </div>
         </header>
 
-        <main className="flex-1">
+        <main id="main" tabIndex={-1} className="flex-1 outline-none">
           <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">
             <Routes>
               <Route path="/" element={<Sessions />} />

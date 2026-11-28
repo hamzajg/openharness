@@ -15,11 +15,11 @@ function textOf(node: any): string {
 const ALERT_MARKER = /^\[alert-(\w+)\]\s*/
 
 const ALERTS: Record<string, { label: string; text: string; box: string }> = {
-  note:      { label: 'Note',      text: 'text-sky-300',     box: 'border-sky-500/30 bg-sky-500/5' },
-  tip:       { label: 'Tip',       text: 'text-emerald-300', box: 'border-emerald-500/30 bg-emerald-500/5' },
-  important: { label: 'Important', text: 'text-violet-300',  box: 'border-violet-500/30 bg-violet-500/5' },
-  warning:   { label: 'Warning',   text: 'text-amber-300',   box: 'border-amber-500/30 bg-amber-500/5' },
-  caution:   { label: 'Caution',   text: 'text-red-300',     box: 'border-red-500/30 bg-red-500/5' },
+  note:      { label: 'Note',      text: 'text-info',   box: 'border-info/30 bg-info/5' },
+  tip:       { label: 'Tip',       text: 'text-ok',     box: 'border-ok/30 bg-ok/5' },
+  important: { label: 'Important', text: 'text-alt',    box: 'border-alt/30 bg-alt/5' },
+  warning:   { label: 'Warning',   text: 'text-warn',   box: 'border-warn/30 bg-warn/5' },
+  caution:   { label: 'Caution',   text: 'text-danger', box: 'border-danger/30 bg-danger/5' },
 }
 
 /** Strip the first [alert-x] marker from rendered children (it sits at the start of the first text node). */
@@ -124,14 +124,14 @@ const components = {
     <em className="text-ink" {...p}>{children}</em>
   ),
   a: ({ children, ...p }: any) => (
-    <a className="text-sky-400 hover:text-sky-300 underline underline-offset-2" target="_blank" rel="noreferrer" {...p}>
+    <a className="text-accent hover:text-accent-hover underline underline-offset-2" target="_blank" rel="noreferrer" {...p}>
       {children}
     </a>
   ),
   hr: (p: any) => <hr className="border-line my-6" {...p} />,
   // inline code only — fenced blocks are handled by `pre` below
   code: ({ children, ...p }: any) => (
-    <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[13px] text-sky-300" {...p}>
+    <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-[13px] text-accent" {...p}>
       {children}
     </code>
   ),
