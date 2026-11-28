@@ -1,4 +1,4 @@
-# ADR 0012 — Scenario maturity as a spec contract
+# ADR 0015 — Scenario maturity as a spec contract
 
 Status: accepted · 2026-11-28 · relates to D002 (markdown specs),
 D010 (gates), D013 (delivery audit), D017 (value contract), D018

@@ -30,9 +30,10 @@ OpenHarness is simultaneously:
 | Metrics | `metrics.py` + `/api/metrics*` | per-session cost/latency rollups over the same JSONL |
 | RAG | `knowledge/rag.py` | ChromaDB + sentence-transformers, local |
 | Web UI | `web/` (Vite+TS) | observer dashboard — calls same verbs, no logic (D005) |
-| Skills | `skills/{harness,security,legacy_migration,product}/` | executable Python skills (`ship_loop`, `review_delivery`, `challenge_decision`, ...) |
+| Skills | `skills/{harness,security,legacy_migration,product,frontend}/` | executable Python skills (`ship_loop`, `review_delivery`, `challenge_decision`, `ux_specs`, `react_stack_standards`, `css_stack_standards`, `ux_architecture`, `logo_design`, `theme_designer`, ...) |
 | Delivery loop | `skills/product/ship_loop.py` + `.opencode/commands/ship-loop.md` + `.opencode/agents/*` | deterministic oracle, per-feature `specs/<feature>/LOOP.md` + `LOOP.state.json` state, `GATES.md` preconditions, subagent roles |
 | Independent audit | `skills/product/review_delivery.py` + `.opencode/commands/review-delivery.md` + `delivery-auditor` | deterministic evidence brief + independent verdict; `SPEC-AUDIT.md` before planning, `DELIVERY-AUDIT.md` before `finish` (D013) |
+| Frontend review | `skills/frontend/*` + `ux-spec-reviewer`, `frontend-platform-reviewer`, `design-system-reviewer`, `ux-architect`, `logo-designer`, `theme-designer` | experience-contract, React/Vite/TS/Jest, Tailwind/Bootstrap/Material and UX-architecture audits; `logo_design` brief/assets and `theme_designer` palette+guide; advisory, read-only except docs/specs and the designers' public/theme outputs |
 | Evidence bundles | `evidence.py` + `skills/harness/evidence.py` | per-run manifest, hashes and generated walkthrough page in `.openharness/evidence/` (local scratch) or `evidence/` with `--tracked` (committable); `verify` binds the bundle to a commit, rejects tracked scratch bundles and secrets (ADR 0007) |
 | Self specs | `SELF/` | PRINCIPLES.md, decision log, domain blocks |
 

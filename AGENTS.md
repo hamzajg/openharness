@@ -60,13 +60,19 @@ Requires: Python ≥3.13. `sources/` is gitignored and reconstructable via
   `spec_scaffold`, `wave_plan`, `ship_validate`, `product_map`,
   `ship_loop`, `review_delivery`, `challenge_decision` — the /ship-product
   pipeline, its delivery loop, the independent spec/delivery audit, and the
-  optional decision review).
+  optional decision review; `frontend/` — `ux_specs`,
+  `react_stack_standards`, `css_stack_standards`, `ux_architecture` — the
+  frontend experience and design-system audits — plus `logo_design` (brand
+  brief + platform asset matrix) and `theme_designer` (AA palette, `tokens.css`
+  and `THEME.md`)).
 - `.opencode/commands/`, `.claude/commands/` — slash commands (`ship-loop`,
   `ship-product`, `review-delivery`, `challenge-decision`, `sync`, ...).
   `.opencode/agents/`, `.claude/agents/` — subagent roles for the loop
   (`product-framer`, `wave-implementer`, `wave-reviewer`,
-  `delivery-verifier`), the independent audit (`delivery-auditor`), and the
-  review (`decision-challenger`).
+  `delivery-verifier`), the independent audit (`delivery-auditor`), the
+  review (`decision-challenger`), and frontend work (`ux-spec-reviewer`,
+  `frontend-platform-reviewer`, `design-system-reviewer`, `ux-architect`),
+  and identity/system generation (`logo-designer`, `theme-designer`).
 - `SELF/` — the harness's own specs/principles (`PRINCIPLES.md`, decision
   log D001–D020, `blocks/`, `harness/`, `legacy_migration/`, `security/`).
 - `REPOS.md` — shipped, agnostic registry template. `/init` writes the concrete
@@ -149,10 +155,11 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   `spec_scaffold` emits `DOMAIN.md` (tier, ubiquitous language, bounded
   contexts, aggregates/invariants, integration style, external
   translations) and a `## Experience` section in SPEC.md (journey, edge
-  states, UX bar, accessibility). Blocking gates `G2`/`G3` (`Before:
-  plan`) refuse placeholders and bare `N/A`; `N/A — <reason>` is the
-  explicit escape. Depth scales with the declared tier; presence does not
-  (ADR 0011).
+  states, UX bar, accessibility, a UI pattern and a navigation surface —
+  `full-page`, `side-pane`, `modal` or `inline`). Blocking gates `G2`/`G3`
+  (`Before: plan`) refuse placeholders and bare `N/A`; `N/A — <reason>` is
+  the explicit escape. Depth scales with the declared tier; presence does
+  not (ADR 0011; pattern and surface depth in ADR 0012/0013).
 - **D020:** scenario maturity is a spec artifact. `EXAMPLES.feature` carries
   `@w<N>` wave tags plus `@m-failure`, `@m-ownership`, `@m-data`, `@m-ux` and
   `@m-outcome` scenario tags, or `# Maturity N/A: @m-<axis> — <reason>` for
@@ -166,7 +173,7 @@ oh serve (observer) ◄── tails agent session JSONL logs (read-only)
   warns on crowded waves without changing wave order, and `ship_validate`
   reports the first wave per covered axis. Tags prove staged breadth only;
   reviewers judge whether the scenario is real maturity and product value,
-  not decorative complexity (ADR 0012).
+  not decorative complexity (ADR 0015).
 
 ## Landmines
 

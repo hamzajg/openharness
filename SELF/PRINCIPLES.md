@@ -336,4 +336,4 @@ would not survive multi-user use, failure, reload, or a measured outcome.
 Putting the axes in the spec artifact — with the same shallow gate pattern as
 D017/D019 — forces the expensive questions while they are still cheap to
 change, and leaves a reviewable trace from value contract to executable
-example (ADR 0012).
+example (ADR 0015).

@@ -12,7 +12,7 @@ The harness already proves AC → scenario → wave → test; this block adds th
 question "does the example set describe a product that can survive real use?"
 It exists because happy-path-only specs pass every existing gate while
 producing primitive products that do not compete with real world solutions
-(D020, ADR 0012).
+(D020, ADR 0015).
 
 ## Axis tags
 Tags sit on real `Scenario` lines alongside `@w<N>` tags. Each axis needs its
