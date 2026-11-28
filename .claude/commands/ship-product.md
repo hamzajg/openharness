@@ -117,8 +117,11 @@ Fill `specs/<feature>/SPEC.md`:
   observable signal (and baseline if known), and a follow-up owner/date.
   Mark unknowns explicitly; do not make up evidence or targets.
 - `## Experience` (D019): primary user journey as ordered steps, edge
-  states that matter, a concrete UX bar, accessibility notes — or
-  `N/A — <reason>` for a feature with no user-facing surface.
+  states that matter, a concrete UX bar, accessibility notes, a UI pattern
+  (`F-pattern`, `Z-pattern` or `single-column`) and a navigation surface
+  (`full-page`, `side-pane`, `modal` or `inline`) — or `N/A — <reason>` for
+  a feature with no user-facing surface. See `docs/frontend-page-guide.md`
+  for choosing the surface.
 - Five-dimension fit (D018): name which of business/user value, economic
   viability, UX/adoption, technical/operational quality, and adaptability
   the feature improves or puts at risk; prefer the simplest intervention.

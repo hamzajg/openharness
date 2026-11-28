@@ -28,6 +28,7 @@ from openharness.skill import SkillError, skill
 from skills.product.spec_scaffold import (
     declared_tier,
     domain_status,
+    domain_tier,
     maturity_status,
     section_status,
     value_contract_status,
@@ -386,6 +387,12 @@ def _maturity_problems(path: Path) -> list[str]:
     return [] if ok else problems
 
 
+def _experience_tier(spec_path: Path) -> str | None:
+    """DOMAIN.md tier beside a SPEC.md, or None when the file is absent."""
+    domain = spec_path.parent / "DOMAIN.md"
+    return domain_tier(_read(domain)) if domain.is_file() else None
+
+
 def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
     """(effective status, evidence) — `stale` means met but evidence vanished."""
     row = state["gates"].get(gate["id"], {})
@@ -408,8 +415,13 @@ def _gate_effective(gate: dict, state: dict, root: Path) -> tuple[str, str]:
         if check.startswith("file:") and path.name == "SPEC.md":
             if not value_contract_status(_read(path))[0]:
                 return "stale", evidence
-        if check.startswith("section:") and not section_status(_read(path), section)[0]:
-            return "stale", evidence
+        if check.startswith("section:"):
+            tier = (
+                _experience_tier(path)
+                if section.strip().lower() == "experience" else None
+            )
+            if not section_status(_read(path), section, tier=tier)[0]:
+                return "stale", evidence
     if status in ("met", "failed"):
         return status, evidence
     return "pending", evidence
@@ -547,7 +559,8 @@ def _phase_guidance(root: Path) -> str:
         "3. Scaffold: `python -m openharness run spec_scaffold --repo_path="
         f"{root} --feature=\"<name>\"`",
         "4. Fill SPEC.md (incl. `## Value contract` with a numeric target,",
-        "   `## Experience` — journey/edge states/UX bar or N/A — reason, and",
+        "   `## Experience` — journey/edge states/UX bar/UI pattern/"
+        "navigation surface or N/A — reason, and",
         "   `## Decisions` — every one-way-door choice, options + simplest/",
         "   reversible alternative, consequences), DOMAIN.md (tier, glossary,",
         "   bounded contexts, aggregates), EXAMPLES.feature (@w<N> waves plus",
@@ -1299,7 +1312,13 @@ def ship_loop(
                                 "before marking this gate met (D017)"
                             )
                     if gcheck.startswith("section:"):
-                        ok, problems = section_status(_read(path), section)
+                        tier = (
+                            _experience_tier(path)
+                            if section.strip().lower() == "experience" else None
+                        )
+                        ok, problems = section_status(
+                            _read(path), section, tier=tier
+                        )
                         if not ok:
                             return (
                                 f"ERROR: {path.name} has no filled `## {section}` — "

@@ -209,8 +209,11 @@ domain-heavy`), a ubiquitous-language glossary, bounded contexts with
   thinness — it still names the owning context and states "no new domain
   concepts" explicitly.
 - `## Experience` in SPEC.md needs the primary journey, edge states, a
-  concrete UX bar and accessibility notes — or `N/A — <reason>` for a
-  feature with no user-facing surface. A bare `N/A` is rejected.
+  concrete UX bar, accessibility notes, a UI pattern (`F-pattern`,
+  `Z-pattern` or `single-column`) and a navigation surface (`full-page`,
+  `side-pane`, `modal` or `inline`) — or `N/A — <reason>` for a feature with
+  no user-facing surface. A bare `N/A` is rejected. `standard` specs add the
+  rationale for the surface; `domain-heavy` specs cite the design standard.
 
 Both checks are shallow on purpose: they prove the contract exists and is
 not a template. Whether a `domain-heavy` model is real is the spec

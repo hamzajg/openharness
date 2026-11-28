@@ -276,7 +276,8 @@ Rule: Every feature carries two contracts beyond the value contract.
 the bounded contexts that own each concept, the aggregates and invariants,
 the transaction boundary, and how external models are translated. `SPEC.md`
 carries `## Experience`: the primary user journey, the edge states that
-matter, a concrete UX bar, and accessibility notes.
+matter, a concrete UX bar, accessibility notes, a UI pattern and a
+navigation surface (`full-page`, `side-pane`, `modal` or `inline`).
 
 Both scale with a declared tier — `simple | standard | domain-heavy` — but
 `tier` controls required *depth*, never existence. A `simple` feature still

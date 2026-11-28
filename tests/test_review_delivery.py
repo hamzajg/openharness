@@ -5,7 +5,7 @@ import textwrap
 from pathlib import Path
 
 from openharness import evidence
-from skills.product.review_delivery import review_delivery
+from skills.product.review_delivery import _surface_journey_mismatch, review_delivery
 from skills.product.ship_loop import ship_loop
 from skills.product.ship_validate import ship_validate
 from skills.product.wave_plan import wave_plan
@@ -35,6 +35,9 @@ SPEC = textwrap.dedent("""\
     - Edge states: empty cart shows browse CTA; payment failure keeps the cart
     - UX bar: single-page checkout, no mode switching
     - Accessibility: keyboard navigable, labeled fields
+    - UI pattern: Z-pattern — line items scan down the left rail into totals
+    - Navigation/overlay: side-pane — keeps the cart rows visible while editing
+      a line item
 
     ## Scope (in)
     - `src/cart` — cart domain, storage, and HTTP surface.
@@ -295,6 +298,51 @@ def test_unknown_maturity_tag_is_a_concern(tmp_path):
     concerns = out.split("## Concerns", 1)[1].split("## Unverified", 1)[0]
     assert "[maturity-tag-unknown]" in concerns
     assert "@m-security" in concerns
+
+
+def test_surface_journey_mismatch_cues():
+    assert _surface_journey_mismatch("modal", "browse the cart list and edit a row")
+    assert _surface_journey_mismatch(
+        "full-page", "opens a drawer without leaving the filtered list"
+    )
+    assert _surface_journey_mismatch(
+        "side-pane", "navigates to the order detail page"
+    )
+    assert _surface_journey_mismatch("inline", "opens a side-pane to edit")
+
+    # Matching journeys stay quiet, including a modal as a secondary confirm.
+    assert _surface_journey_mismatch(
+        "side-pane", "keeps the cart rows visible while editing a line"
+    ) is None
+    assert _surface_journey_mismatch(
+        "modal", "confirm deleting the order"
+    ) is None
+    assert _surface_journey_mismatch(
+        "full-page", "opens the order detail page"
+    ) is None
+    assert _surface_journey_mismatch(
+        "inline", "edits the quantity in the row"
+    ) is None
+
+
+def test_contradictory_navigation_surface_is_an_advisory_concern(tmp_path):
+    d = _spec_only(tmp_path)
+    spec = d / "SPEC.md"
+    text = spec.read_text().replace(
+        "- Primary journey: 1. add item 2. review cart 3. checkout",
+        "- Primary journey: browse the cart list and edit each line item",
+    )
+    text = re.sub(
+        r"(?ms)^- Navigation/overlay:.*?(?=\n\n)",
+        "- Navigation/overlay: modal — short edit dialog",
+        text, count=1,
+    )
+    spec.write_text(text)
+
+    out = _audit(tmp_path, phase="spec", changed="src/cart/store.py")
+    concerns = out.split("## Concerns", 1)[1].split("## Unverified", 1)[0]
+    assert "experience-surface-mismatch" in concerns
+    assert "declared surface `modal`" in concerns
     assert "0 blockers" in out
 
 

@@ -77,9 +77,11 @@ Otherwise stop and report that you need a target repo.
      value-contract claim. Mark unknowns.
    - `## Experience` (D019): the primary user journey as ordered steps,
      the edge states that matter (empty/loading/error/permission-denied),
-     a concrete UX bar (what "intuitive" means here), and accessibility
-     notes. A feature with no user-facing surface writes
-     `N/A — <reason>`; a bare N/A is rejected by gate G3.
+     a concrete UX bar (what "intuitive" means here), accessibility notes,
+     a UI pattern (`F-pattern`, `Z-pattern` or `single-column`) and a
+     navigation surface (`full-page`, `side-pane`, `modal` or `inline`).
+     A feature with no user-facing surface writes `N/A — <reason>`; a bare
+     N/A is rejected by gate G3. See `docs/frontend-page-guide.md`.
    - Five-dimension fit (D018): in the outcome hypothesis, name which of
      business/user value, economic viability, UX/adoption, technical/
      operational quality, and adaptability the feature improves, and which
